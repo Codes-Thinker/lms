@@ -92,16 +92,28 @@ export class ReportsService {
       .filter((f) => f.status !== FeeStatus.PAID)
       .reduce((s, f) => s + f.amount, 0);
 
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        OR: [{ assigneeId: userId }, { createdById: userId }],
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+    });
+
     return {
       user: {
         id: user.id,
         fullName: user.fullName,
         email: user.email,
         accountType: user.accountType,
+        status: user.status,
         track: user.track,
+        designation: user.designation,
         department: user.department?.name ?? null,
         batch: user.batch?.code ?? null,
         phone: user.phone,
+        lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+        createdAt: user.createdAt.toISOString(),
       },
       attendancePercent,
       feesPending,
@@ -131,6 +143,13 @@ export class ReportsService {
         amount: f.amount,
         status: f.status,
         dueDate: f.dueDate.toISOString().slice(0, 10),
+      })),
+      tasks: tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        audience: t.audience,
+        dueAt: t.dueAt?.toISOString() ?? null,
       })),
     };
   }

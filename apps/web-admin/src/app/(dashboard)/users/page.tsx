@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { roleLabel } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
 
 type UserRow = {
@@ -91,7 +94,7 @@ export default function UsersPage() {
       <div className="glass-card p-5">
         <h2 className="text-lg font-semibold">Users</h2>
         <p className="text-sm text-slate-500">
-          Add users here — they appear in this list and can sign in to the app
+          Add Student · Intern · Teacher — tap a name for full profile
         </p>
         {error ? (
           <p className="mt-2 text-sm text-red-600">
@@ -136,7 +139,7 @@ export default function UsersPage() {
             >
               {ACCOUNT_TYPES.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {roleLabel(t)}
                 </option>
               ))}
             </select>
@@ -196,19 +199,39 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((u) => (
-                <tr key={u.id} className="border-t border-slate-100">
-                  <td className="px-5 py-3.5">
-                    <p className="font-semibold">{u.name || u.fullName}</p>
-                    <p className="text-xs text-slate-500">{u.email}</p>
-                  </td>
-                  <td className="px-5 py-3.5">{u.accountType}</td>
-                  <td className="px-5 py-3.5">{u.track || "—"}</td>
-                  <td className="px-5 py-3.5">
-                    <Badge variant="secondary">{u.status}</Badge>
-                  </td>
-                </tr>
-              ))}
+              {items.map((u) => {
+                const display = u.name || u.fullName || u.email;
+                return (
+                  <tr key={u.id} className="border-t border-slate-100">
+                    <td className="px-5 py-3.5">
+                      <Link
+                        href={`/users/${u.id}`}
+                        className="flex items-center gap-2.5 hover:text-blue-700"
+                      >
+                        <UserAvatar
+                          name={display}
+                          email={u.email}
+                          accountType={u.accountType}
+                          size="sm"
+                        />
+                        <span>
+                          <span className="block font-semibold">{display}</span>
+                          <span className="block text-xs text-slate-500">
+                            {u.email}
+                          </span>
+                        </span>
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant="secondary">{roleLabel(u.accountType)}</Badge>
+                    </td>
+                    <td className="px-5 py-3.5">{u.track || "—"}</td>
+                    <td className="px-5 py-3.5">
+                      <Badge variant="outline">{u.status}</Badge>
+                    </td>
+                  </tr>
+                );
+              })}
               {!loading && items.length === 0 && !error ? (
                 <tr>
                   <td colSpan={4} className="px-5 py-8 text-center text-slate-500">

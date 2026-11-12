@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type Project = {
   id: string;
@@ -51,7 +53,20 @@ export default function InternsPage() {
           <tbody>
             {interns.map((i) => (
               <tr key={i.id} className="border-t border-slate-100">
-                <td className="px-5 py-3.5 font-semibold">{i.name}</td>
+                <td className="px-5 py-3.5">
+                  <Link
+                    href={`/users/${i.id}`}
+                    className="flex items-center gap-2.5 font-semibold hover:text-blue-700"
+                  >
+                    <UserAvatar
+                      name={i.name}
+                      email={i.email}
+                      accountType="INTERN"
+                      size="sm"
+                    />
+                    {i.name}
+                  </Link>
+                </td>
                 <td className="px-5 py-3.5">{i.email}</td>
               </tr>
             ))}

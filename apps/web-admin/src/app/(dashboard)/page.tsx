@@ -11,7 +11,9 @@ import {
   ListTodo,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { api, getAdminUser } from "@/lib/api";
+import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/components/ui/notifications-provider";
 
@@ -35,10 +37,21 @@ type AttendanceRow = {
 
 type FeeRow = {
   id: string;
+  studentId?: string;
   studentName: string;
   courseTitle: string;
   amount: number;
   status: string;
+};
+
+type UserRow = {
+  id: string;
+  name?: string;
+  fullName?: string;
+  email: string;
+  accountType: string;
+  track?: string | null;
+  status?: string;
 };
 
 export default function DashboardPage() {
@@ -46,6 +59,7 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [fees, setFees] = useState<FeeRow[]>([]);
+  const [people, setPeople] = useState<UserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const name = getAdminUser()?.name || getAdminUser()?.fullName || "Admin";
 
@@ -53,15 +67,17 @@ export default function DashboardPage() {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, att, feeList] = await Promise.all([
+        const [ov, att, feeList, users] = await Promise.all([
           api<Overview>("/reports/overview"),
           api<AttendanceRow[]>("/attendance"),
           api<FeeRow[]>("/fees"),
+          api<{ items: UserRow[] }>("/users?pageSize=24"),
         ]);
         if (cancelled) return;
         setOverview(ov);
         setAttendance(att.slice(0, 6));
         setFees(feeList.filter((f) => f.status !== "PAID").slice(0, 5));
+        setPeople(users.items);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       }
@@ -87,7 +103,7 @@ export default function DashboardPage() {
       tone: "bg-sky-50 text-sky-600",
     },
     {
-      label: "Staff",
+      label: "Teachers",
       value: String(overview?.staff ?? "—"),
       href: "/staff",
       icon: BriefcaseBusiness,
@@ -109,7 +125,7 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-xl font-semibold">Welcome, {name}</h2>
             <p className="text-sm text-slate-500">
-              Live overview
+              Track students, teachers &amp; staff — tap a person for full details
             </p>
           </div>
           <Badge variant="default">{unread} unread</Badge>
@@ -138,11 +154,58 @@ export default function DashboardPage() {
         })}
       </div>
 
+      <div className="glass-card p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">People</h3>
+            <p className="text-sm text-slate-500">
+              Students · Interns · Teachers — with profile
+            </p>
+          </div>
+          <Link href="/users" className="text-sm font-medium text-blue-600 hover:underline">
+            Manage users
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {people.map((p) => {
+            const display = p.name || p.fullName || p.email;
+            return (
+              <Link
+                key={p.id}
+                href={`/users/${p.id}`}
+                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+              >
+                <UserAvatar
+                  name={display}
+                  email={p.email}
+                  accountType={p.accountType}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900">{display}</p>
+                  <p className="truncate text-xs text-slate-500">
+                    {roleLabel(p.accountType)}
+                    {p.track ? ` · ${p.track}` : ""}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+          {people.length === 0 ? (
+            <p className="text-sm text-slate-500">No users yet — add from Users</p>
+          ) : null}
+        </div>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="glass-card p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-blue-600" />
-            <h3 className="font-semibold">Fees pending</h3>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-blue-600" />
+              <h3 className="font-semibold">Student fees pending</h3>
+            </div>
+            <Link href="/fees" className="text-sm text-blue-600 hover:underline">
+              Fees module
+            </Link>
           </div>
           <p className="mb-3 text-2xl font-semibold">
             Rs {(overview?.feesPending ?? 0).toLocaleString()}
@@ -150,14 +213,23 @@ export default function DashboardPage() {
           <ul className="space-y-2 text-sm">
             {fees.map((f) => (
               <li key={f.id} className="flex justify-between border-t border-slate-100 pt-2">
-                <span>
-                  {f.studentName} · {f.courseTitle}
+                {f.studentId ? (
+                  <Link
+                    href={`/users/${f.studentId}`}
+                    className="font-medium text-blue-700 hover:underline"
+                  >
+                    {f.studentName}
+                  </Link>
+                ) : (
+                  <span>{f.studentName}</span>
+                )}
+                <span className="text-slate-600">
+                  {f.courseTitle} · Rs {f.amount.toLocaleString()}
                 </span>
-                <span className="font-medium">Rs {f.amount.toLocaleString()}</span>
               </li>
             ))}
             {fees.length === 0 ? (
-              <li className="text-slate-500">No pending fees</li>
+              <li className="text-slate-500">No pending student fees</li>
             ) : null}
           </ul>
         </div>
@@ -168,7 +240,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold">Today attendance</h3>
           </div>
           <p className="mb-3 text-sm text-slate-500">
-            Open tasks {overview?.openStaffTasks ?? 0} · Intern projects{" "}
+            Teacher tasks {overview?.openStaffTasks ?? 0} · Intern projects{" "}
             {overview?.openInternProjects ?? 0}
           </p>
           <ul className="space-y-2 text-sm">

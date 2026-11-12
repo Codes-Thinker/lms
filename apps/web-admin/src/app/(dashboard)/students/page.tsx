@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { useNotifications } from "@/components/ui/notifications-provider";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 type StudentRow = {
   id: string;
@@ -165,8 +166,23 @@ export default function StudentsPage() {
               {list.map((s) => (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className="px-5 py-3.5">
-                    <p className="font-semibold">{s.name}</p>
-                    <p className="text-xs text-slate-500">{s.email}</p>
+                    <Link
+                      href={`/users/${s.id}`}
+                      className="flex items-center gap-2.5 hover:text-blue-700"
+                    >
+                      <UserAvatar
+                        name={s.name}
+                        email={s.email}
+                        accountType="STUDENT"
+                        size="sm"
+                      />
+                      <span>
+                        <span className="block font-semibold">{s.name}</span>
+                        <span className="block text-xs text-slate-500">
+                          {s.email}
+                        </span>
+                      </span>
+                    </Link>
                   </td>
                   <td className="px-5 py-3.5">
                     <p>{s.track ?? "—"}</p>
@@ -177,7 +193,7 @@ export default function StudentsPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <Button size="sm" variant="secondary" asChild>
-                      <Link href={`/students/${s.id}/report`}>View report</Link>
+                      <Link href={`/users/${s.id}`}>Open profile</Link>
                     </Button>
                   </td>
                 </tr>
