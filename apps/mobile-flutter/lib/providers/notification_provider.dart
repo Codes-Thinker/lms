@@ -100,6 +100,61 @@ class NotificationProvider extends ChangeNotifier {
           )
           .toList();
       notifyListeners();
+      await LocalCache.setJson(
+        LocalCache.notifications,
+        _items
+            .map(
+              (n) => {
+                'id': n.id,
+                'title': n.title,
+                'body': n.body,
+                'type': n.type,
+                'read': n.read,
+                'createdAt': n.createdAt.toIso8601String(),
+                'userId': n.targetUserId,
+                'data': n.data,
+              },
+            )
+            .toList(),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> markAllRead() async {
+    try {
+      await ApiClient.instance.post('/notifications/read-all');
+      _items = _items
+          .map(
+            (n) => AppNotificationItem(
+              id: n.id,
+              title: n.title,
+              body: n.body,
+              type: n.type,
+              read: true,
+              createdAt: n.createdAt,
+              targetUserId: n.targetUserId,
+              data: n.data,
+            ),
+          )
+          .toList();
+      notifyListeners();
+      await LocalCache.setJson(
+        LocalCache.notifications,
+        _items
+            .map(
+              (n) => {
+                'id': n.id,
+                'title': n.title,
+                'body': n.body,
+                'type': n.type,
+                'read': n.read,
+                'createdAt': n.createdAt.toIso8601String(),
+                'userId': n.targetUserId,
+                'data': n.data,
+              },
+            )
+            .toList(),
+      );
     } catch (_) {}
   }
 }

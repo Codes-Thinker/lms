@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
-import '../../core/constants/time_utils.dart';
 import '../../core/responsive.dart';
 import '../../models/course.dart';
 import '../../providers/attendance_provider.dart';
@@ -18,6 +17,7 @@ import '../../widgets/brand_logo.dart';
 import '../attendance/attendance_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../help/help_hub_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../report/report_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -40,8 +40,7 @@ class TeacherHomeScreen extends StatelessWidget {
     final tasks = context.watch<TaskProvider>();
     final fees = context.watch<FeeProvider>();
     final attendance = context.watch<AttendanceProvider>();
-    final ui = context.watch<UiProvider>();
-    final now = ui.now;
+    final ui = context.read<UiProvider>();
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
 
@@ -98,11 +97,10 @@ class TeacherHomeScreen extends StatelessWidget {
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Messages',
                           onPressed: () {
-                            ui.showSnack(
-                              openTasks.isEmpty
-                                  ? 'No open staff tasks'
-                                  : '${openTasks.length} open task${openTasks.length == 1 ? '' : 's'}',
+                            Navigator.of(context).push(
+                              AppMotion.fadeSlide(const NotificationsScreen()),
                             );
                           },
                           icon: Badge(
@@ -110,41 +108,24 @@ class TeacherHomeScreen extends StatelessWidget {
                             smallSize: 8,
                             backgroundColor: AppColors.danger,
                             child: const Icon(
-                              CupertinoIcons.bell,
+                              Icons.notifications_none_rounded,
                               color: AppColors.ink,
-                              size: 22,
+                              size: 24,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      TimeUtils.greeting(now),
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 18),
                     Text(
                       auth.user?.name ?? 'Teacher',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 26,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
+                        letterSpacing: -0.5,
                         color: AppColors.ink,
-                      ),
-                    ),
-                    const Text(
-                      'Teacher / Staff',
-                      style: TextStyle(
-                        color: AppColors.blue,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
                       ),
                     ),
                     const SizedBox(height: 4),

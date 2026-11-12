@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/time_utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
-import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
+import '../../widgets/live_countdown.dart';
 
 class TaskDetailScreen extends StatelessWidget {
   final String taskId;
@@ -22,7 +21,6 @@ class TaskDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final tasks = context.watch<TaskProvider>();
-    final now = context.watch<UiProvider>().now;
     final task = tasks.byId(taskId);
     final running = tasks.isTimerRunning(taskId);
 
@@ -59,9 +57,12 @@ class TaskDetailScreen extends StatelessWidget {
                     children: [
                       const Text('Due in', style: TextStyle(fontWeight: FontWeight.w600)),
                       const Spacer(),
-                      Text(
-                        TimeUtils.countdown(task.dueAt, now),
-                        style: const TextStyle(color: AppColors.pink, fontWeight: FontWeight.w800),
+                      LiveCountdown(
+                        target: task.dueAt,
+                        style: const TextStyle(
+                          color: AppColors.pink,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ],
                   ),

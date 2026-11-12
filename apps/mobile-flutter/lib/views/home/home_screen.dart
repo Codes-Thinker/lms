@@ -1,6 +1,3 @@
-import 'dart:ui';
-
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_brand.dart';
@@ -13,12 +10,13 @@ import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
-import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
+import '../../widgets/live_countdown.dart';
 import '../course/course_detail_screen.dart';
 import '../fees/fees_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
 
@@ -39,8 +37,7 @@ class HomeScreen extends StatelessWidget {
     final courses = context.watch<CourseProvider>();
     final tasks = context.watch<TaskProvider>();
     final notes = context.watch<NotificationProvider>();
-    final ui = context.watch<UiProvider>();
-    final now = ui.now;
+    final now = DateTime.now();
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
     final myTasks = tasks.tasksForUser(auth.user?.id ?? '');
@@ -89,13 +86,10 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Notifications',
+                      tooltip: 'Messages',
                       onPressed: () {
-                        ui.showSnack(
-                          unread == 0
-                              ? 'No new notifications'
-                              : '$unread unread notification${unread == 1 ? '' : 's'}',
-                          tone: AppSnackTone.info,
+                        Navigator.of(context).push(
+                          AppMotion.fadeSlide(const NotificationsScreen()),
                         );
                       },
                       icon: Badge(
@@ -267,10 +261,7 @@ class HomeScreen extends StatelessWidget {
                           title: 'Next class',
                           subtitle:
                               '${continueCourse!.title} · ${nextTopic?.title ?? 'Continue'}',
-                          timer: TimeUtils.countdown(
-                            continueCourse.nextClassAt!,
-                            now,
-                          ),
+                          target: continueCourse.nextClassAt!,
                           onTap: () {
                             courses.selectCourse(continueCourse);
                             Navigator.of(context).push(
@@ -296,10 +287,7 @@ class HomeScreen extends StatelessWidget {
                             continueCourse.feeDueAt!,
                             now,
                           ),
-                          timer: TimeUtils.countdown(
-                            continueCourse.feeDueAt!,
-                            now,
-                          ),
+                          target: continueCourse.feeDueAt!,
                           onTap: () {
                             Navigator.of(context).push(
                               AppMotion.fadeSlide(const FeesScreen()),
@@ -609,7 +597,7 @@ class HomeScreen extends StatelessWidget {
     required IconData icon,
     required String title,
     required String subtitle,
-    required String timer,
+    required DateTime target,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -643,14 +631,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              timer,
-              style: const TextStyle(
-                color: AppColors.blue,
-                fontWeight: FontWeight.w700,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
+            LiveCountdown(target: target),
           ],
         ),
       ),

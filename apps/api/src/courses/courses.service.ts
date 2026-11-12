@@ -323,7 +323,19 @@ export class CoursesService {
   }
 
   async remove(id: string) {
-    await this.prisma.course.delete({ where: { id } });
+    await this.prisma.course.findUniqueOrThrow({ where: { id } });
+    // Clear optional FKs that are not cascading, then delete.
+    await this.prisma.$transaction([
+      this.prisma.attendanceRecord.updateMany({
+        where: { courseId: id },
+        data: { courseId: null },
+      }),
+      this.prisma.feeCase.updateMany({
+        where: { courseId: id },
+        data: { courseId: null },
+      }),
+      this.prisma.course.delete({ where: { id } }),
+    ]);
     return { ok: true };
   }
 }

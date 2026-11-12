@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/time_utils.dart';
 import '../../providers/course_provider.dart';
-import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/course_cover.dart';
+import '../../widgets/live_countdown.dart';
 
 class CourseDetailScreen extends StatelessWidget {
   final String courseId;
@@ -15,7 +14,6 @@ class CourseDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final courses = context.watch<CourseProvider>();
-    final now = context.watch<UiProvider>().now;
     final matches = courses.courses.where((c) => c.id == courseId);
     final course = matches.isEmpty ? null : matches.first;
 
@@ -62,9 +60,12 @@ class CourseDetailScreen extends StatelessWidget {
                   const Expanded(
                     child: Text('Class starts in', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                  Text(
-                    TimeUtils.countdown(course.nextClassAt!, now),
-                    style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800),
+                  LiveCountdown(
+                    target: course.nextClassAt!,
+                    style: const TextStyle(
+                      color: AppColors.blue,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ),

@@ -23,24 +23,16 @@ class UiProvider extends ChangeNotifier {
   bool _globalLoading = false;
   String? _loadingMessage;
   AppSnack? _activeSnack;
-  DateTime _now = DateTime.now();
-  Timer? _clock;
   Timer? _snackTimer;
 
   int get navIndex => _navIndex;
   bool get globalLoading => _globalLoading;
   String? get loadingMessage => _loadingMessage;
   AppSnack? get activeSnack => _activeSnack;
-  /// Back-compat for older call sites
   String? get pendingSnack => _activeSnack?.message;
-  DateTime get now => _now;
 
-  UiProvider() {
-    _clock = Timer.periodic(const Duration(seconds: 1), (_) {
-      _now = DateTime.now();
-      notifyListeners();
-    });
-  }
+  /// Prefer [LiveCountdown] for ticking UI — do not notify every second.
+  DateTime get now => DateTime.now();
 
   void setNavIndex(int index) {
     if (_navIndex == index) return;
@@ -60,7 +52,6 @@ class UiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// One custom animated snack for the whole app (message only — not a system alert).
   void showSnack(
     String message, {
     String? title,
@@ -82,7 +73,6 @@ class UiProvider extends ChangeNotifier {
     });
   }
 
-  /// Alias used by older shell code
   void queueSnack(String message) => showSnack(message);
 
   String? takeSnack() {
@@ -95,7 +85,6 @@ class UiProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _clock?.cancel();
     _snackTimer?.cancel();
     super.dispose();
   }

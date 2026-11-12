@@ -22,7 +22,7 @@ class AttendanceScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final attendance = context.watch<AttendanceProvider>();
-    final now = context.watch<UiProvider>().now;
+    final now = DateTime.now();
     final user = auth.user;
     final mine = user == null ? null : attendance.todayFor(user.id);
     final predicted = attendance.autoStatus(now);
