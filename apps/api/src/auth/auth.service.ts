@@ -70,15 +70,13 @@ export class AuthService {
       include: { roles: { include: { role: true } } },
     });
     if (!user?.passwordHash) {
-      throw new UnauthorizedException("No account found with this email");
+      throw new UnauthorizedException("Invalid email or password");
     }
     if (user.status !== AccountStatus.ACTIVE) {
-      throw new UnauthorizedException(
-        "This account is not active. Please contact your admin."
-      );
+      throw new UnauthorizedException("Invalid email or password");
     }
     const ok = await argon2.verify(user.passwordHash, dto.password);
-    if (!ok) throw new UnauthorizedException("Incorrect password");
+    if (!ok) throw new UnauthorizedException("Invalid email or password");
 
     await this.prisma.user.update({
       where: { id: user.id },

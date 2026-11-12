@@ -1,14 +1,21 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { AccountStatus, AccountType, Prisma } from "@prisma/client";
+import {
+  AccountStatus,
+  AccountType,
+  NotificationType,
+  Prisma,
+} from "@prisma/client";
 import * as argon2 from "argon2";
 import { createHash, randomBytes } from "crypto";
 import { MailService } from "../mail/mail.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto, ListUsersQueryDto, UpdateUserDto } from "./users.dto";
 
@@ -17,7 +24,8 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly notifications: NotificationsService
   ) {}
 
   private hashToken(token: string): string {
@@ -268,5 +276,101 @@ export class UsersService {
     });
 
     return { ok: true, expiresAt };
+  }
+
+  /**
+   * Hard-delete a user and all account-owned data.
+   * Login with that email/password will fail afterwards (user row gone).
+   */
+  async purgeUser(
+    id: string,
+    opts: { actorId: string; selfRequested: boolean }
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("User not found");
+
+    if (user.accountType === AccountType.SUPER_ADMIN) {
+      const adminCount = await this.prisma.user.count({
+        where: { accountType: AccountType.SUPER_ADMIN },
+      });
+      if (adminCount <= 1) {
+        throw new BadRequestException(
+          "Cannot delete the last super admin account"
+        );
+      }
+      if (opts.selfRequested) {
+        throw new ForbiddenException(
+          "Super admin cannot self-delete from the app"
+        );
+      }
+    }
+
+    const label = `${user.fullName} (${user.email})`;
+    const accountType = user.accountType;
+
+    if (opts.selfRequested) {
+      await this.notifications.notifyAdmins({
+        title: "Account deleted",
+        body: `${label} deleted their account from the app. All of their data was removed.`,
+        type: NotificationType.SYSTEM,
+        data: {
+          kind: "ACCOUNT_DELETED",
+          email: user.email,
+          accountType,
+        },
+      });
+    } else if (opts.actorId !== id) {
+      await this.notifications.notifyAdmins({
+        title: "User removed by admin",
+        body: `${label} was permanently deleted from the dashboard.`,
+        type: NotificationType.SYSTEM,
+        data: {
+          kind: "ACCOUNT_DELETED",
+          email: user.email,
+          accountType,
+          byAdminId: opts.actorId,
+        },
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Break non-cascade FKs first
+      await tx.user.updateMany({
+        where: { createdById: id },
+        data: { createdById: null },
+      });
+      await tx.feeMessage.updateMany({
+        where: { senderId: id },
+        data: { senderId: null },
+      });
+      await tx.taskMessage.updateMany({
+        where: { senderId: id },
+        data: { senderId: null },
+      });
+      await tx.chatMessage.updateMany({
+        where: { senderId: id },
+        data: { senderId: null },
+      });
+      await tx.task.updateMany({
+        where: { createdById: id },
+        data: { createdById: null },
+      });
+      await tx.project.updateMany({
+        where: { createdById: id },
+        data: { createdById: null },
+      });
+
+      // Remove tasks assigned to this user (their work items)
+      await tx.taskMessage.deleteMany({
+        where: { task: { assigneeId: id } },
+      });
+      await tx.task.deleteMany({ where: { assigneeId: id } });
+
+      // Cascades: roles, invitations, enrollments, progress, attendance,
+      // fee cases (+ messages), projects, tickets, surveys, chats, FCM, notifications
+      await tx.user.delete({ where: { id } });
+    });
+
+    return { ok: true, deletedId: id, email: user.email };
   }
 }

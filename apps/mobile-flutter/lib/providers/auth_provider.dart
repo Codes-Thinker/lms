@@ -207,17 +207,24 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Hard-delete on server, then wipe local session — email/password stop working.
   Future<bool> deleteAccount() async {
     if (_user == null) return false;
     _loading = true;
+    _error = null;
     notifyListeners();
     final id = _user!.id;
     try {
-      await ApiClient.instance.patch('/users/$id', body: {'status': 'INACTIVE'});
-    } catch (_) {}
-    await AvatarService.clear(id);
-    await logout();
-    return true;
+      await ApiClient.instance.delete('/users/me');
+      await AvatarService.clear(id);
+      await logout();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _loading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   void setLoginFailed([String? message]) {

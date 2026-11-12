@@ -84,27 +84,107 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Future<void> _deleteAccount(BuildContext context) async {
-    final ok = await showDialog<bool>(
+    final ok = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete account?'),
-        content: const Text(
-          "Your account will be removed from Code's Thinker LMS. This cannot be undone.",
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Delete account?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Iske baad aapka account nahi rahega. Courses, fees, attendance, "
+                  "chat aur saara data permanently delete ho jayega. Admin ko bhi "
+                  "pata chal jayega. Dobara login invalid email/password dikhayega.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: Colors.black.withValues(alpha: 0.65),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'This cannot be undone.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.danger,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                    ),
+                    child: const Text(
+                      'Yes, delete my account',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
     if (ok != true || !context.mounted) return;
 
     final ui = context.read<UiProvider>();
     ui.showLoading();
-    final done = await context.read<AuthProvider>().deleteAccount();
+    await PushNotificationService.instance.unregisterFromBackend();
+    context.read<CourseProvider>().clearMemory();
+    context.read<TaskProvider>().clearMemory();
+    context.read<FeeProvider>().clearMemory();
+    context.read<AttendanceProvider>().clearMemory();
+    context.read<NotificationProvider>().clearMemory();
+    final auth = context.read<AuthProvider>();
+    final done = await auth.deleteAccount();
     ui.hideLoading();
     if (!context.mounted) return;
     if (done) {
@@ -114,7 +194,10 @@ class ProfileScreen extends StatelessWidget {
         (_) => false,
       );
     } else {
-      ui.showSnack('Could not delete account', tone: AppSnackTone.error);
+      ui.showSnack(
+        auth.error ?? 'Could not delete account',
+        tone: AppSnackTone.error,
+      );
     }
   }
 

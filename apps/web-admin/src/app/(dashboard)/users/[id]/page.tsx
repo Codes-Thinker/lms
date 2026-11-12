@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 type Report = {
   user: {
@@ -108,8 +109,11 @@ function emptyReportFromUser(u: RawUser): Report {
 
 export default function UserProfilePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { show } = useSnackbar();
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -166,6 +170,24 @@ export default function UserProfilePage() {
         ? "/interns"
         : "/users";
 
+  async function deleteUserForever() {
+    if (!params?.id || !report) return;
+    const name = report.user.fullName;
+    const confirmed = window.confirm(
+      `Permanently delete ${name}?\n\nTheir courses, fees, attendance, chats, tasks and all account data will be wiped. They will not be able to log in again with this email/password.\n\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await api(`/users/${params.id}`, { method: "DELETE" });
+      show(`${name} deleted — all data removed`);
+      router.replace(backHref);
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Delete failed", "error");
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="glass-card flex flex-wrap items-start justify-between gap-4 p-5">
@@ -198,6 +220,17 @@ export default function UserProfilePage() {
           <Button asChild variant="secondary" size="sm">
             <Link href={backHref}>Back</Link>
           </Button>
+          {u.accountType !== "SUPER_ADMIN" ? (
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={deleting}
+              onClick={() => void deleteUserForever()}
+            >
+              {deleting ? "Deleting…" : "Delete account"}
+            </Button>
+          ) : null}
         </div>
       </div>
 
