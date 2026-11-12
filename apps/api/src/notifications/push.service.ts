@@ -14,15 +14,15 @@ export class PushService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    const json = this.config.get<string>("FIREBASE_SERVICE_ACCOUNT_JSON");
-    if (!json?.trim()) {
+    const raw = this.config.get<string>("FIREBASE_SERVICE_ACCOUNT_JSON");
+    if (!raw?.trim()) {
       this.log.warn(
         "FIREBASE_SERVICE_ACCOUNT_JSON not set — push disabled until configured"
       );
       return;
     }
     try {
-      const cred = JSON.parse(json) as admin.ServiceAccount;
+      const cred = this.parseServiceAccount(raw);
       if (!admin.apps.length) {
         admin.initializeApp({ credential: admin.credential.cert(cred) });
       }
@@ -33,6 +33,28 @@ export class PushService implements OnModuleInit {
         `Firebase Admin init failed: ${e instanceof Error ? e.message : e}`
       );
     }
+  }
+
+  /** Tolerate Render paste quirks: quotes, double-encoding, KEY=value paste. */
+  private parseServiceAccount(raw: string): admin.ServiceAccount {
+    let s = raw.trim().replace(/^\uFEFF/, "");
+    if (s.startsWith("FIREBASE_SERVICE_ACCOUNT_JSON=")) {
+      s = s.slice("FIREBASE_SERVICE_ACCOUNT_JSON=".length).trim();
+    }
+    if (
+      (s.startsWith("'") && s.endsWith("'")) ||
+      (s.startsWith('"') && s.endsWith('"') && s[1] === "{")
+    ) {
+      s = s.slice(1, -1).trim();
+    }
+    let parsed: unknown = JSON.parse(s);
+    if (typeof parsed === "string") {
+      parsed = JSON.parse(parsed);
+    }
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("service account JSON must be an object");
+    }
+    return parsed as admin.ServiceAccount;
   }
 
   async registerDevice(userId: string, token: string, platform = "android") {

@@ -1,9 +1,8 @@
 class ApiConfig {
-  /// Next.js web-admin (run `npm run dev` in apps/web-admin).
-  /// iOS Simulator / desktop: 127.0.0.1
-  /// Android emulator: use 10.0.2.2 instead if needed.
+  /// Nest LMS API (Render). Local override:
+  /// --dart-define=API_BASE=http://192.168.1.24:4000
   static const String baseUrl = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'http://127.0.0.1:3000',
+    defaultValue: 'https://lms-lkza.onrender.com',
   );
 }
