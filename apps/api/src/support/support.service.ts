@@ -42,6 +42,17 @@ export class SupportService {
       },
       include: { user: true },
     });
+    const kindLabel = t.kind === TicketKind.COMPLAIN ? "Complain" : "Report";
+    await this.notifications.notifyAdmins({
+      title: `${kindLabel} · ${t.user.fullName}`,
+      body: t.title,
+      type: NotificationType.GENERAL,
+      data: {
+        ticketId: t.id,
+        kind: t.kind,
+        fromUserId: t.userId,
+      },
+    });
     return {
       id: t.id,
       kind: t.kind,
@@ -60,6 +71,13 @@ export class SupportService {
       where: { id },
       data: { status },
       include: { user: true },
+    });
+    await this.notifications.notifyUser({
+      userId: t.userId,
+      title: `${t.kind === TicketKind.COMPLAIN ? "Complain" : "Report"} updated`,
+      body: `${t.title} → ${status}`,
+      type: NotificationType.GENERAL,
+      data: { ticketId: t.id, status },
     });
     return {
       id: t.id,
@@ -92,12 +110,89 @@ export class SupportService {
     surveyId: string,
     answers: Record<string, string>
   ) {
+    const survey = await this.prisma.survey.findUnique({
+      where: { id: surveyId },
+    });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fullName: true },
+    });
     await this.prisma.surveyResponse.upsert({
       where: { surveyId_userId: { surveyId, userId } },
       update: { answers },
       create: { surveyId, userId, answers },
     });
+    await this.notifications.notifyAdmins({
+      title: `Survey · ${user?.fullName ?? "Student"}`,
+      body: survey?.title ?? "Survey submitted",
+      type: NotificationType.GENERAL,
+      data: {
+        surveyId,
+        kind: "SURVEY",
+        fromUserId: userId,
+      },
+    });
     return { ok: true };
+  }
+
+  async activitySummary() {
+    const [openTickets, reports, complains, surveys, feesSent, chat] =
+      await Promise.all([
+        this.prisma.supportTicket.count({
+          where: { status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] } },
+        }),
+        this.prisma.supportTicket.count({
+          where: {
+            kind: TicketKind.REPORT,
+            status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] },
+          },
+        }),
+        this.prisma.supportTicket.count({
+          where: {
+            kind: TicketKind.COMPLAIN,
+            status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] },
+          },
+        }),
+        this.prisma.surveyResponse.count(),
+        this.prisma.feeCase.count({ where: { status: "SENT" } }),
+        this.unreadSummary(),
+      ]);
+    const recentTickets = await this.prisma.supportTicket.findMany({
+      where: { status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] } },
+      include: { user: true },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    });
+    const recentSurveys = await this.prisma.surveyResponse.findMany({
+      include: { user: true, survey: true },
+      orderBy: { submittedAt: "desc" },
+      take: 4,
+    });
+    return {
+      openTickets,
+      reports,
+      complains,
+      surveys,
+      feesAwaitingReview: feesSent,
+      chatUnread: chat.unreadMessages,
+      chatUnreadThreads: chat.unreadThreads,
+      recentTickets: recentTickets.map((t) => ({
+        id: t.id,
+        kind: t.kind,
+        title: t.title,
+        userName: t.user.fullName,
+        userId: t.userId,
+        status: t.status,
+        createdAt: t.createdAt.toISOString(),
+      })),
+      recentSurveys: recentSurveys.map((r) => ({
+        id: r.id,
+        userName: r.user.fullName,
+        userId: r.userId,
+        surveyTitle: r.survey.title,
+        submittedAt: r.submittedAt.toISOString(),
+      })),
+    };
   }
 
   async listSurveyResponses() {

@@ -36,6 +36,10 @@ export default function FeesPage() {
 
   useEffect(() => {
     load().catch((e) => show(String(e)));
+    const id = window.setInterval(() => {
+      load().catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -44,7 +48,8 @@ export default function FeesPage() {
       <div className="glass-card p-5">
         <h2 className="text-lg font-semibold">Student fees</h2>
         <p className="text-sm text-slate-500">
-          Fees are for students only — open a student profile for full history
+          Live from student app — screenshots & payments refresh every 5s · open
+          profile for full history
         </p>
       </div>
       <div className="glass-card overflow-hidden">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   GraduationCap,
@@ -9,6 +9,11 @@ import {
   CalendarCheck,
   Wallet,
   ListTodo,
+  MessageSquare,
+  Flag,
+  AlertCircle,
+  ClipboardCheck,
+  Radio,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -16,6 +21,7 @@ import { api, getAdminUser } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/components/ui/notifications-provider";
+import { useChatInbox } from "@/components/ui/chat-inbox-provider";
 
 type Overview = {
   students: number;
@@ -54,38 +60,79 @@ type UserRow = {
   status?: string;
 };
 
+type Activity = {
+  openTickets: number;
+  reports: number;
+  complains: number;
+  surveys: number;
+  feesAwaitingReview: number;
+  chatUnread: number;
+  chatUnreadThreads: number;
+  recentTickets: {
+    id: string;
+    kind: string;
+    title: string;
+    userName: string;
+    userId: string;
+    status: string;
+    createdAt: string;
+  }[];
+  recentSurveys: {
+    id: string;
+    userName: string;
+    userId: string;
+    surveyTitle: string;
+    submittedAt: string;
+  }[];
+};
+
 export default function DashboardPage() {
   const { unread } = useNotifications();
+  const { unreadMessages } = useChatInbox();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [fees, setFees] = useState<FeeRow[]>([]);
   const [people, setPeople] = useState<UserRow[]>([]);
+  const [activity, setActivity] = useState<Activity | null>(null);
   const [error, setError] = useState<string | null>(null);
   const name = getAdminUser()?.name || getAdminUser()?.fullName || "Admin";
+
+  const loadCore = useCallback(async () => {
+    const [ov, att, feeList, users, act] = await Promise.all([
+      api<Overview>("/reports/overview"),
+      api<AttendanceRow[]>("/attendance"),
+      api<FeeRow[]>("/fees"),
+      api<{ items: UserRow[] }>("/users?pageSize=24"),
+      api<Activity>("/support/activity-summary"),
+    ]);
+    setOverview(ov);
+    setAttendance(att.slice(0, 6));
+    setFees(
+      feeList
+        .filter((f) => f.status === "SENT" || f.status === "DUE" || f.status === "PARTIAL")
+        .slice(0, 6)
+    );
+    setPeople(users.items);
+    setActivity(act);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [ov, att, feeList, users] = await Promise.all([
-          api<Overview>("/reports/overview"),
-          api<AttendanceRow[]>("/attendance"),
-          api<FeeRow[]>("/fees"),
-          api<{ items: UserRow[] }>("/users?pageSize=24"),
-        ]);
-        if (cancelled) return;
-        setOverview(ov);
-        setAttendance(att.slice(0, 6));
-        setFees(feeList.filter((f) => f.status !== "PAID").slice(0, 5));
-        setPeople(users.items);
+        await loadCore();
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       }
     })();
+    const id = window.setInterval(() => {
+      loadCore().catch(() => {});
+    }, 5000);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
     };
-  }, []);
+  }, [loadCore]);
 
   const kpis = [
     {
@@ -118,6 +165,39 @@ export default function DashboardPage() {
     },
   ];
 
+  const supportCards = [
+    {
+      label: "Fee screenshots",
+      value: activity?.feesAwaitingReview ?? 0,
+      href: "/fees",
+      icon: Wallet,
+    },
+    {
+      label: "Reports open",
+      value: activity?.reports ?? 0,
+      href: "/feedback",
+      icon: Flag,
+    },
+    {
+      label: "Complains open",
+      value: activity?.complains ?? 0,
+      href: "/feedback",
+      icon: AlertCircle,
+    },
+    {
+      label: "Survey answers",
+      value: activity?.surveys ?? 0,
+      href: "/feedback",
+      icon: ClipboardCheck,
+    },
+    {
+      label: "Chat unread",
+      value: activity?.chatUnread ?? unreadMessages,
+      href: "/inbox",
+      icon: MessageSquare,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="glass-card p-5">
@@ -125,10 +205,19 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-xl font-semibold">Welcome, {name}</h2>
             <p className="text-sm text-slate-500">
-              Track students, teachers &amp; staff — tap a person for full details
+              Live Help &amp; support from the app — fees, reports, chat, surveys
             </p>
           </div>
-          <Badge variant="default">{unread} unread</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="success" className="gap-1">
+              <Radio className="h-3 w-3" />
+              Live
+            </Badge>
+            <Badge variant="default">{unread} alerts</Badge>
+            {unreadMessages > 0 ? (
+              <Badge variant="warning">{unreadMessages} chat</Badge>
+            ) : null}
+          </div>
         </div>
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       </div>
@@ -152,6 +241,100 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+      </div>
+
+      <div className="glass-card p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-semibold">Help &amp; support — live</h3>
+            <p className="text-sm text-slate-500">
+              Same portions as student app · updates every 5s · bell + sound
+            </p>
+          </div>
+          <Link href="/feedback" className="text-sm font-medium text-blue-600 hover:underline">
+            Open feedback
+          </Link>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {supportCards.map((c) => {
+            const Icon = c.icon;
+            return (
+              <Link
+                key={c.label}
+                href={c.href}
+                className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 transition hover:border-blue-200 hover:bg-blue-50/50"
+              >
+                <div className="flex items-center gap-2 text-slate-500">
+                  <Icon className="h-3.5 w-3.5 text-blue-600" />
+                  <span className="text-xs">{c.label}</span>
+                </div>
+                <p className="mt-2 text-xl font-semibold">{c.value}</p>
+              </Link>
+            );
+          })}
+        </div>
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Latest reports / complains
+            </p>
+            <ul className="space-y-2 text-sm">
+              {(activity?.recentTickets ?? []).map((t) => (
+                <li
+                  key={t.id}
+                  className="flex justify-between gap-2 border-t border-slate-100 pt-2"
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium text-slate-800">{t.kind}</span>
+                    {" · "}
+                    <Link
+                      href={`/users/${t.userId}`}
+                      className="text-blue-700 hover:underline"
+                    >
+                      {t.userName}
+                    </Link>
+                    {" — "}
+                    {t.title}
+                  </span>
+                  <Badge variant="secondary">{t.status}</Badge>
+                </li>
+              ))}
+              {(activity?.recentTickets.length ?? 0) === 0 ? (
+                <li className="text-slate-500">No open tickets</li>
+              ) : null}
+            </ul>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Latest surveys
+            </p>
+            <ul className="space-y-2 text-sm">
+              {(activity?.recentSurveys ?? []).map((s) => (
+                <li
+                  key={s.id}
+                  className="flex justify-between gap-2 border-t border-slate-100 pt-2"
+                >
+                  <span className="min-w-0 truncate">
+                    <Link
+                      href={`/users/${s.userId}`}
+                      className="font-medium text-blue-700 hover:underline"
+                    >
+                      {s.userName}
+                    </Link>
+                    {" · "}
+                    {s.surveyTitle}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {new Date(s.submittedAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+              {(activity?.recentSurveys.length ?? 0) === 0 ? (
+                <li className="text-slate-500">No survey answers yet</li>
+              ) : null}
+            </ul>
+          </div>
+        </div>
       </div>
 
       <div className="glass-card p-5">
@@ -224,7 +407,7 @@ export default function DashboardPage() {
                   <span>{f.studentName}</span>
                 )}
                 <span className="text-slate-600">
-                  {f.courseTitle} · Rs {f.amount.toLocaleString()}
+                  {f.status} · {f.courseTitle} · Rs {f.amount.toLocaleString()}
                 </span>
               </li>
             ))}

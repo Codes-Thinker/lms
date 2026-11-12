@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { FeeStatus } from "@prisma/client";
+import { FeeStatus, NotificationType } from "@prisma/client";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -96,6 +96,18 @@ export class FeesService {
       await this.prisma.feeCase.update({
         where: { id },
         data: { status: FeeStatus.SENT },
+      });
+      const fee = await this.get(id);
+      const shot = input.hasScreenshot ? "screenshot" : "message";
+      await this.notifications.notifyAdmins({
+        title: `Fee ${shot} · ${fee.studentName}`,
+        body: `${fee.courseTitle} · ${fee.month} · Rs ${fee.amount}`,
+        type: NotificationType.FEE,
+        data: {
+          feeId: fee.id,
+          studentId: fee.studentId,
+          kind: "FEE",
+        },
       });
     }
     return this.get(id);

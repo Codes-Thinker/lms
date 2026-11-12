@@ -196,7 +196,17 @@ export interface AppNotification {
   id: string;
   title: string;
   body: string;
-  type: "attendance" | "fee" | "task" | "project" | "system";
+  type:
+    | "attendance"
+    | "fee"
+    | "task"
+    | "project"
+    | "system"
+    | "chat"
+    | "report"
+    | "complain"
+    | "survey"
+    | "general";
   createdAt: string;
   read: boolean;
 }

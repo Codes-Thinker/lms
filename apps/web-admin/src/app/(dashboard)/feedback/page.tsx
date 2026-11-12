@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 type Ticket = {
   id: string;
   kind: string;
+  userId: string;
   userName: string;
   title: string;
   body: string;
@@ -16,61 +20,149 @@ type Ticket = {
 
 type SurveyResponse = {
   id: string;
+  userId?: string;
   userName: string;
   surveyTitle: string;
+  answers?: Record<string, string>;
   submittedAt: string;
 };
 
 export default function FeedbackPage() {
+  const { show } = useSnackbar();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [surveys, setSurveys] = useState<SurveyResponse[]>([]);
+  const [live, setLive] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
+  const load = useCallback(async () => {
+    const [t, s] = await Promise.all([
       api<Ticket[]>("/support/tickets"),
       api<SurveyResponse[]>("/support/survey/responses"),
-    ]).then(([t, s]) => {
-      setTickets(t);
-      setSurveys(s);
-    });
+    ]);
+    setTickets(t);
+    setSurveys(s);
+    setLive(true);
   }, []);
+
+  useEffect(() => {
+    load().catch((e) => show(e instanceof Error ? e.message : "Failed"));
+    const id = window.setInterval(() => {
+      load().catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(id);
+  }, [load, show]);
+
+  async function setStatus(id: string, status: string) {
+    try {
+      await api(`/support/tickets/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      show(`Ticket marked ${status}`);
+      await load();
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Update failed", "error");
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5">
-        <h2 className="text-lg font-semibold">Feedback</h2>
-        <p className="text-sm text-slate-500">Reports, complains, survey answers</p>
+      <div className="glass-card flex flex-wrap items-start justify-between gap-3 p-5">
+        <div>
+          <h2 className="text-lg font-semibold">Feedback & support</h2>
+          <p className="text-sm text-slate-500">
+            Reports, complains & surveys from the app — live every 5s
+          </p>
+        </div>
+        <Badge variant={live ? "success" : "secondary"}>
+          {live ? "Live" : "Connecting"}
+        </Badge>
       </div>
+
       <div className="space-y-3">
-        {tickets.map((t) => (
-          <div key={t.id} className="glass-card p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold">
-                {t.kind}: {t.title}
-              </p>
-              <Badge variant="secondary">{t.status}</Badge>
-            </div>
-            <p className="mt-1 text-sm text-slate-500">
-              {t.userName} · {new Date(t.createdAt).toLocaleString()}
-            </p>
-            <p className="mt-2 text-sm">{t.body}</p>
+        {tickets.length === 0 ? (
+          <div className="glass-card p-5 text-sm text-slate-500">
+            No reports or complains yet
           </div>
-        ))}
+        ) : (
+          tickets.map((t) => (
+            <div key={t.id} className="glass-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-semibold">
+                  {t.kind}: {t.title}
+                </p>
+                <Badge variant="secondary">{t.status}</Badge>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                <Link
+                  href={`/users/${t.userId}`}
+                  className="font-medium text-blue-700 hover:underline"
+                >
+                  {t.userName}
+                </Link>{" "}
+                · {new Date(t.createdAt).toLocaleString()}
+              </p>
+              <p className="mt-2 text-sm whitespace-pre-wrap">{t.body}</p>
+              {t.status !== "RESOLVED" && t.status !== "CLOSED" ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setStatus(t.id, "IN_PROGRESS")}
+                  >
+                    In progress
+                  </Button>
+                  <Button size="sm" onClick={() => setStatus(t.id, "RESOLVED")}>
+                    Resolve
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))
+        )}
       </div>
+
       <div className="glass-card p-5">
         <h3 className="mb-3 font-semibold">Survey responses</h3>
-        <ul className="space-y-2 text-sm">
-          {surveys.map((s) => (
-            <li key={s.id} className="flex justify-between border-t border-slate-100 pt-2">
-              <span>
-                {s.userName} · {s.surveyTitle}
-              </span>
-              <span className="text-slate-500">
-                {new Date(s.submittedAt).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {surveys.length === 0 ? (
+          <p className="text-sm text-slate-500">No survey answers yet</p>
+        ) : (
+          <ul className="space-y-3 text-sm">
+            {surveys.map((s) => (
+              <li
+                key={s.id}
+                className="rounded-xl border border-slate-100 p-3"
+              >
+                <div className="flex flex-wrap justify-between gap-2">
+                  <span className="font-medium">
+                    {s.userId ? (
+                      <Link
+                        href={`/users/${s.userId}`}
+                        className="text-blue-700 hover:underline"
+                      >
+                        {s.userName}
+                      </Link>
+                    ) : (
+                      s.userName
+                    )}{" "}
+                    · {s.surveyTitle}
+                  </span>
+                  <span className="text-slate-500">
+                    {new Date(s.submittedAt).toLocaleString()}
+                  </span>
+                </div>
+                {s.answers ? (
+                  <ul className="mt-2 space-y-1 text-slate-600">
+                    {Object.entries(s.answers).map(([q, a]) => (
+                      <li key={q}>
+                        <span className="text-slate-400">{q}:</span> {a}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

@@ -72,6 +72,12 @@ export class SupportController {
     return this.support.listSurveyResponses();
   }
 
+  @Get("activity-summary")
+  @Roles("SUPER_ADMIN", "STAFF")
+  activitySummary() {
+    return this.support.activitySummary();
+  }
+
   @Get("chats/unread-summary")
   @Roles("SUPER_ADMIN")
   unreadSummary() {

@@ -12,6 +12,11 @@ const TYPE_LABEL: Record<string, string> = {
   task: "Task",
   project: "Project",
   system: "System",
+  chat: "Chat",
+  report: "Report",
+  complain: "Complain",
+  survey: "Survey",
+  general: "Support",
 };
 
 export function NotificationsBell() {
