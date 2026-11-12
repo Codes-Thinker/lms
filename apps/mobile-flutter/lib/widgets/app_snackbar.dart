@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../core/app_space.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_motion.dart';
 import '../core/responsive.dart';
 import '../providers/ui_provider.dart';
 
-/// Single custom animated message strip (bottom). Not a system alert dialog.
+/// Compact bottom toast — soft surface, light type, short height.
 class AppSnackHost extends StatelessWidget {
   final Widget child;
 
@@ -23,13 +22,13 @@ class AppSnackHost extends StatelessWidget {
         Positioned(
           left: pad,
           right: pad,
-          bottom: AppResponsive.shellBottom(context) - 8,
+          bottom: AppResponsive.shellBottom(context) + 4,
           child: IgnorePointer(
             ignoring: snack == null,
             child: AnimatedSlide(
-              duration: AppMotion.normal,
+              duration: AppMotion.fast,
               curve: Curves.easeOutCubic,
-              offset: snack == null ? const Offset(0, 1.2) : Offset.zero,
+              offset: snack == null ? const Offset(0, 0.35) : Offset.zero,
               child: AnimatedOpacity(
                 duration: AppMotion.fast,
                 opacity: snack == null ? 0 : 1,
@@ -50,86 +49,120 @@ class _SnackBanner extends StatelessWidget {
 
   const _SnackBanner({required this.snack});
 
-  Color get _bg {
+  Color get _accent {
     switch (snack.tone) {
       case AppSnackTone.success:
-        return AppColors.green;
+        return const Color(0xFF059669);
       case AppSnackTone.error:
-        return AppColors.danger;
+        return const Color(0xFFDC2626);
       case AppSnackTone.warning:
-        return AppColors.orange;
+        return const Color(0xFFD97706);
       case AppSnackTone.info:
-        return AppColors.blue;
+        return AppColors.blueDark;
+    }
+  }
+
+  IconData get _icon {
+    switch (snack.tone) {
+      case AppSnackTone.success:
+        return Icons.check_circle_outline_rounded;
+      case AppSnackTone.error:
+        return Icons.error_outline_rounded;
+      case AppSnackTone.warning:
+        return Icons.info_outline_rounded;
+      case AppSnackTone.info:
+        return Icons.notifications_none_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final title = snack.title?.trim();
+    final hasTitle = title != null && title.isNotEmpty;
+    final canTap = snack.onTap != null;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: snack.onTap == null
-            ? null
-            : () {
+        onTap: canTap
+            ? () {
                 final tap = snack.onTap!;
                 context.read<UiProvider>().takeSnack();
                 tap();
-              },
-        borderRadius: BorderRadius.circular(AppSpace.rMd),
+              }
+            : null,
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.lg,
-            vertical: AppSpace.md,
-          ),
+          constraints: const BoxConstraints(minHeight: 44, maxHeight: 64),
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
           decoration: BoxDecoration(
-            color: _bg,
-            borderRadius: BorderRadius.circular(AppSpace.rMd),
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.line),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
-              AppSpace.wMd,
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(_icon, size: 16, color: _accent),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (title != null && title.isNotEmpty) ...[
+                    if (hasTitle)
                       Text(
                         title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.ink.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.5,
+                          height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 2),
-                    ],
                     Text(
                       snack.message,
+                      maxLines: hasTitle ? 1 : 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5,
-                        height: 1.3,
+                        color: hasTitle
+                            ? AppColors.muted
+                            : AppColors.ink.withValues(alpha: 0.88),
+                        fontWeight: FontWeight.w500,
+                        fontSize: hasTitle ? 12 : 13,
+                        height: 1.25,
                       ),
                     ),
-                    if (snack.onTap != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap to open',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
+              if (canTap) ...[
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: AppColors.muted.withValues(alpha: 0.7),
+                ),
+              ],
             ],
           ),
         ),

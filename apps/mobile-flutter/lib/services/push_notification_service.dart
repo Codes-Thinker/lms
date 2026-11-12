@@ -166,9 +166,9 @@ class PushNotificationService {
 
     _ui?.showSnack(
       text,
-      title: title,
+      title: title.isNotEmpty ? title : null,
       tone: AppSnackTone.info,
-      duration: const Duration(seconds: 5),
+      duration: const Duration(seconds: 3, milliseconds: 500),
       onTap: isChat
           ? () {
               NotificationRouter.setPending(type: 'CHAT');

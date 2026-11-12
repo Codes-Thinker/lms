@@ -56,7 +56,7 @@ class UiProvider extends ChangeNotifier {
     String message, {
     String? title,
     AppSnackTone tone = AppSnackTone.success,
-    Duration duration = const Duration(seconds: 2, milliseconds: 600),
+    Duration duration = const Duration(seconds: 3),
     VoidCallback? onTap,
   }) {
     _snackTimer?.cancel();
