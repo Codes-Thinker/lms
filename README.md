@@ -19,3 +19,4 @@ Flutter (Provider) · Next.js · NestJS · Prisma · Postgres (Supabase) · Fire
 ## Roles
 
 Student · Intern · Teacher / Staff · Super Admin
+# lms
