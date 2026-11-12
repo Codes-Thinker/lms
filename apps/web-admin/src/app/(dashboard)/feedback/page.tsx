@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { useAdminActivity } from "@/components/ui/admin-activity-provider";
 
 type Ticket = {
   id: string;
@@ -29,6 +30,7 @@ type SurveyResponse = {
 
 export default function FeedbackPage() {
   const { show } = useSnackbar();
+  const { refresh: refreshBadges } = useAdminActivity();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [surveys, setSurveys] = useState<SurveyResponse[]>([]);
   const [live, setLive] = useState(false);
@@ -59,6 +61,7 @@ export default function FeedbackPage() {
       });
       show(`Ticket marked ${status}`);
       await load();
+      await refreshBadges();
     } catch (e) {
       show(e instanceof Error ? e.message : "Update failed", "error");
     }

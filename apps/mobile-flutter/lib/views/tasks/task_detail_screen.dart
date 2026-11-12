@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/live_countdown.dart';
 

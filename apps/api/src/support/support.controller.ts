@@ -79,13 +79,13 @@ export class SupportController {
   }
 
   @Get("chats/unread-summary")
-  @Roles("SUPER_ADMIN")
+  @Roles("SUPER_ADMIN", "STAFF")
   unreadSummary() {
     return this.support.unreadSummary();
   }
 
   @Get("chats")
-  @Roles("SUPER_ADMIN")
+  @Roles("SUPER_ADMIN", "STAFF")
   chats(@Query("kind") kind?: ChatKind) {
     return this.support.listChats(kind);
   }

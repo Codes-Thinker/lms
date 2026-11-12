@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { useAdminActivity } from "@/components/ui/admin-activity-provider";
 
 type FeeRow = {
   id: string;
@@ -29,6 +30,7 @@ function feeBadge(status: string) {
 export default function FeesPage() {
   const [rows, setRows] = useState<FeeRow[]>([]);
   const { show } = useSnackbar();
+  const { refresh: refreshBadges } = useAdminActivity();
 
   async function load() {
     setRows(await api<FeeRow[]>("/fees"));
@@ -93,7 +95,10 @@ export default function FeesPage() {
                           method: "PATCH",
                           body: JSON.stringify({ status: "PAID" }),
                         })
-                          .then(load)
+                          .then(async () => {
+                            await load();
+                            await refreshBadges();
+                          })
                           .catch((e) => show(String(e)))
                       }
                     >

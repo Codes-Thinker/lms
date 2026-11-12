@@ -21,7 +21,7 @@ import { api, getAdminUser } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/components/ui/notifications-provider";
-import { useChatInbox } from "@/components/ui/chat-inbox-provider";
+import { useAdminActivity } from "@/components/ui/admin-activity-provider";
 
 type Overview = {
   students: number;
@@ -88,7 +88,7 @@ type Activity = {
 
 export default function DashboardPage() {
   const { unread } = useNotifications();
-  const { unreadMessages } = useChatInbox();
+  const { chatUnread: unreadMessages } = useAdminActivity();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [fees, setFees] = useState<FeeRow[]>([]);

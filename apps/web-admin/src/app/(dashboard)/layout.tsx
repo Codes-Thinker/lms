@@ -29,9 +29,10 @@ import { SnackbarProvider } from "@/components/ui/snackbar";
 import { NotificationsProvider } from "@/components/ui/notifications-provider";
 import { NotificationsBell } from "@/components/ui/notifications-bell";
 import {
-  ChatInboxProvider,
-  useChatInbox,
-} from "@/components/ui/chat-inbox-provider";
+  AdminActivityProvider,
+  useAdminActivity,
+} from "@/components/ui/admin-activity-provider";
+import { useNotifications } from "@/components/ui/notifications-provider";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -54,7 +55,23 @@ function NavLinks({
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const { unreadMessages } = useChatInbox();
+  const activity = useAdminActivity();
+  const { notes } = useNotifications();
+  const surveyUnread = notes.filter(
+    (n) => !n.read && n.type === "survey"
+  ).length;
+  const feeNoteUnread = notes.filter(
+    (n) => !n.read && n.type === "fee"
+  ).length;
+
+  const badgeFor = (href: string): number => {
+    if (href === "/inbox") return activity.chatUnread;
+    if (href === "/feedback") return activity.openTickets + surveyUnread;
+    if (href === "/fees")
+      return Math.max(activity.feesAwaitingReview, feeNoteUnread);
+    return 0;
+  };
+
   return (
     <nav className="flex-1 space-y-1 overflow-y-auto">
       {nav.map((item) => {
@@ -62,7 +79,7 @@ function NavLinks({
           pathname === item.href ||
           (item.href !== "/" && pathname.startsWith(item.href));
         const Icon = item.icon;
-        const showBadge = item.href === "/inbox" && unreadMessages > 0;
+        const count = badgeFor(item.href);
         return (
           <Link
             key={item.href}
@@ -77,14 +94,14 @@ function NavLinks({
           >
             <Icon className="h-4 w-4 shrink-0" />
             <span className="flex-1 truncate">{item.label}</span>
-            {showBadge ? (
+            {count > 0 ? (
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
                   active ? "bg-white text-blue-700" : "bg-blue-600 text-white"
                 )}
               >
-                {unreadMessages > 99 ? "99+" : unreadMessages}
+                {count > 99 ? "99+" : count}
               </span>
             ) : null}
           </Link>
@@ -197,7 +214,7 @@ export default function DashboardLayout({
   return (
     <SnackbarProvider>
       <NotificationsProvider>
-        <ChatInboxProvider>
+        <AdminActivityProvider>
           <div className="dashboard-shell flex min-h-screen bg-[#F8FAFC]">
             {/* Desktop sidebar */}
             <aside className="fixed inset-y-0 left-0 z-30 hidden w-[250px] flex-col border-r border-slate-200 bg-white px-3 py-4 lg:flex">
@@ -276,7 +293,7 @@ export default function DashboardLayout({
               </main>
             </div>
           </div>
-        </ChatInboxProvider>
+        </AdminActivityProvider>
       </NotificationsProvider>
     </SnackbarProvider>
   );
