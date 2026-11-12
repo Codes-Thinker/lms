@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSnackbar } from "@/components/ui/snackbar";
-import { useNotifications } from "@/components/ui/notifications-provider";
+import {
+  hrefForNotification,
+  useNotifications,
+} from "@/components/ui/notifications-provider";
+import type { AppNotification } from "@/types";
 
 const TYPE_LABEL: Record<string, string> = {
   attendance: "Attendance",
@@ -21,20 +26,39 @@ const TYPE_LABEL: Record<string, string> = {
 
 export function NotificationsBell() {
   const [open, setOpen] = useState(false);
-  const { notes, unread, markAllRead } = useNotifications();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { notes, unread, markRead, markAllRead } = useNotifications();
   const { show } = useSnackbar();
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
 
   function onMarkAll() {
     markAllRead();
     show("Notifications marked as read");
   }
 
+  function openNote(n: AppNotification) {
+    markRead(n.id);
+    setOpen(false);
+    router.push(hrefForNotification(n));
+  }
+
   return (
-    <div className="relative">
+    <div className="relative" ref={rootRef}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="relative rounded-full border border-slate-200 bg-white p-2.5 transition hover:bg-slate-50"
+        aria-expanded={open}
+        aria-label="Notifications"
       >
         <Bell className="h-4 w-4 text-slate-700" />
         {unread > 0 ? (
@@ -44,28 +68,46 @@ export function NotificationsBell() {
         ) : null}
       </button>
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <p className="text-sm font-semibold">Notifications</p>
-            <button type="button" onClick={onMarkAll} className="text-xs font-medium text-blue-600">
+            <button
+              type="button"
+              onClick={onMarkAll}
+              className="text-xs font-medium text-blue-600"
+            >
               Mark all read
             </button>
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notes.length === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-400">No notifications</p>
+              <p className="px-4 py-6 text-center text-sm text-slate-400">
+                No notifications
+              </p>
             ) : (
               notes.map((n) => (
-                <div
+                <button
                   key={n.id}
-                  className={cn("border-b border-slate-50 px-4 py-3", !n.read && "bg-slate-50")}
+                  type="button"
+                  onClick={() => openNote(n)}
+                  className={cn(
+                    "block w-full border-b border-slate-50 px-4 py-3 text-left transition hover:bg-blue-50",
+                    !n.read && "bg-slate-50"
+                  )}
                 >
-                  {/* Title + type only — never show who received what */}
-                  <p className="text-sm font-semibold text-slate-900">{n.title}</p>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {TYPE_LABEL[n.type] ?? n.type} · {new Date(n.createdAt).toLocaleString()}
+                  <p className="text-sm font-semibold text-slate-900">
+                    {n.title}
                   </p>
-                </div>
+                  {n.body ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">
+                      {n.body}
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {TYPE_LABEL[n.type] ?? n.type} ·{" "}
+                    {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                </button>
               ))
             )}
           </div>

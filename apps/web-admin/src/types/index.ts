@@ -209,6 +209,7 @@ export interface AppNotification {
     | "general";
   createdAt: string;
   read: boolean;
+  data?: Record<string, string> | null;
 }
 
 export interface DashboardMetrics {

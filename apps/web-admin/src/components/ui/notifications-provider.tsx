@@ -33,6 +33,7 @@ type NotificationsContextValue = {
   notes: AppNotification[];
   unread: number;
   push: (input: NotifyInput) => void;
+  markRead: (id: string) => void;
   markAllRead: () => void;
   refresh: () => Promise<void>;
 };
@@ -56,14 +57,48 @@ function mapType(raw: string, data?: Record<string, string> | null): AppNotifica
 }
 
 function mapNote(n: ApiNote): AppNotification {
+  const data =
+    n.data && typeof n.data === "object"
+      ? Object.fromEntries(
+          Object.entries(n.data).map(([k, v]) => [k, String(v ?? "")])
+        )
+      : null;
   return {
     id: n.id,
     title: n.title,
     body: n.body,
-    type: mapType(n.type, n.data),
+    type: mapType(n.type, data),
     createdAt: n.createdAt,
     read: n.read,
+    data,
   };
+}
+
+/** Sidebar section (or deep link) for a notification tap. */
+export function hrefForNotification(n: AppNotification): string {
+  const d = n.data ?? {};
+  switch (n.type) {
+    case "attendance":
+      return "/attendance";
+    case "fee":
+      return "/fees";
+    case "chat":
+      return "/inbox";
+    case "report":
+    case "complain":
+    case "survey":
+    case "general":
+      return "/feedback";
+    case "task":
+      return "/tasks";
+    case "project":
+      return "/interns";
+    case "system":
+      if (d.kind === "ACCOUNT_DELETED") return "/users";
+      return "/";
+    default:
+      return "/";
+  }
 }
 
 export function NotificationsProvider({
@@ -113,6 +148,15 @@ export function NotificationsProvider({
     setNotes((prev) => [note, ...prev]);
   }, []);
 
+  const markRead = useCallback((id: string) => {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    if (!id.startsWith("local-")) {
+      void api(`/notifications/${id}/read`, { method: "POST" }).catch(() => {});
+    }
+  }, []);
+
   const markAllRead = useCallback(() => {
     setNotes((prev) => prev.map((n) => ({ ...n, read: true })));
     prevUnread.current = 0;
@@ -124,10 +168,11 @@ export function NotificationsProvider({
       notes,
       unread: notes.filter((n) => !n.read).length,
       push,
+      markRead,
       markAllRead,
       refresh,
     }),
-    [notes, push, markAllRead, refresh]
+    [notes, push, markRead, markAllRead, refresh]
   );
 
   return (
