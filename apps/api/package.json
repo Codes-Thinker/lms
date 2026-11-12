@@ -1,13 +1,20 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Codes Thinker LMS API",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "npm run build && node --watch dist/main.js",
+    "start": "npm run build && node dist/main.js",
+    "build": "tsc -p tsconfig.json",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts"
   },
-  "keywords": [],
-  "author": "",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -17,23 +24,37 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/platform-express": "^10.4.22",
     "@nestjs/throttler": "^5.2.0",
-    "@prisma/client": "^7.10.1",
+    "@prisma/client": "6.19.0",
     "argon2": "^0.45.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "dotenv": "^18.0.10",
+    "firebase-admin": "^13.6.0",
     "nodemailer": "^10.5.0",
+    "prisma": "6.19.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "uuid": "^14.0.3"
   },
   "devDependencies": {
+    "@swc/core": "^1.16.22",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "@types/nodemailer": "^8.0.2",
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.14",
-    "prisma": "^8.0.0-rc.33",
+    "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "unplugin-swc": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {
+    "prisma@6.19.0": true,
+    "@prisma/engines@6.19.0": true,
+    "@prisma/client@6.19.0": true,
+    "argon2@0.45.2": true
   }
 }

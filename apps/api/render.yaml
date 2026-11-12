@@ -1,0 +1,26 @@
+# Optional Blueprint — or create a Web Service manually in Render dashboard.
+services:
+  - type: web
+    name: codes-thinker-lms-api
+    runtime: node
+    rootDir: apps/api
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: PORT
+        value: "4000"
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: API_URL
+        sync: false

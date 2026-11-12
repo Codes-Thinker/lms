@@ -60,3 +60,6 @@ npm-debug.log*
 *.aab
 *.ipa
 .vercel
+apps/api/secrets/
+**/*firebase-adminsdk*.json
+**/firebase-service-account.json

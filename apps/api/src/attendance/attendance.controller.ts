@@ -1,0 +1,44 @@
+import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import { AuthUser, CurrentUser } from "../common/decorators/current-user.decorator";
+import { Roles } from "../common/decorators/roles.decorator";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../common/guards/roles.guard";
+import { AttendanceService } from "./attendance.service";
+
+@Controller("attendance")
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class AttendanceController {
+  constructor(private readonly attendance: AttendanceService) {}
+
+  @Get("me")
+  my(@CurrentUser() user: AuthUser) {
+    return this.attendance.myHistory(user.sub);
+  }
+
+  @Get("today")
+  today(@CurrentUser() user: AuthUser) {
+    return this.attendance.todayFor(user.sub);
+  }
+
+  @Get()
+  @Roles("SUPER_ADMIN", "STAFF")
+  list(
+    @Query("date") date?: string,
+    @Query("accountType") accountType?: string
+  ) {
+    return this.attendance.list({ date, accountType });
+  }
+
+  @Post("check-in")
+  checkIn(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { courseId?: string }
+  ) {
+    return this.attendance.checkIn(user.sub, body?.courseId);
+  }
+
+  @Post("check-out")
+  checkOut(@CurrentUser() user: AuthUser) {
+    return this.attendance.checkOut(user.sub);
+  }
+}
