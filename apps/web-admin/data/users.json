@@ -1,0 +1,62 @@
+[
+  {
+    "id": "u-1794431118156",
+    "fullName": "faheem",
+    "email": "f@gmail.com",
+    "password": "codesthinker",
+    "role": "INTERN",
+    "status": "ACTIVE",
+    "department": "Interns",
+    "batch": "",
+    "track": "INTERN",
+    "phone": "",
+    "attendancePercent": 0,
+    "createdAt": "2026-11-11T21:05:18.156Z",
+    "updatedAt": "2026-11-11T21:05:18.156Z"
+  },
+  {
+    "id": "u-student-1",
+    "fullName": "Ali Khan",
+    "email": "ali@codesthinker.com",
+    "password": "codesthinker",
+    "role": "STUDENT",
+    "status": "ACTIVE",
+    "department": "Paid Training",
+    "batch": "CT-STU-FLUTTER",
+    "track": "Flutter Development",
+    "phone": "+92 302 3333001",
+    "attendancePercent": 88,
+    "createdAt": "2026-08-01T10:00:00.000Z",
+    "updatedAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "u-intern-1",
+    "fullName": "Usman Tariq",
+    "email": "usman@codesthinker.com",
+    "password": "codesthinker",
+    "role": "INTERN",
+    "status": "ACTIVE",
+    "department": "Mobile Interns",
+    "batch": "CT-INTERN-A",
+    "track": "Flutter Internship",
+    "phone": "+92 301 2222001",
+    "attendancePercent": 90,
+    "createdAt": "2026-08-01T10:00:00.000Z",
+    "updatedAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "u-staff-1",
+    "fullName": "Hassan Raza",
+    "email": "hassan@codesthinker.com",
+    "password": "codesthinker",
+    "role": "STAFF",
+    "status": "ACTIVE",
+    "department": "Training Faculty",
+    "batch": "",
+    "track": "Flutter Mentor",
+    "phone": "+92 300 1111001",
+    "attendancePercent": 96,
+    "createdAt": "2025-03-01T10:00:00.000Z",
+    "updatedAt": "2026-11-12T00:00:00.000Z"
+  }
+]

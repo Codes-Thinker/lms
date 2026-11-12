@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+**/firebase_app_id_file.json
+
+# Build / cache
+dist/
+build/
+.next/
+out/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Flutter / Dart
+apps/mobile-flutter/.dart_tool/
+apps/mobile-flutter/.flutter-plugins
+apps/mobile-flutter/.flutter-plugins-dependencies
+apps/mobile-flutter/.packages
+apps/mobile-flutter/pubspec.lock
+apps/mobile-flutter/**/Generated.xcconfig
+apps/mobile-flutter/**/flutter_export_environment.sh
+apps/mobile-flutter/android/.gradle/
+apps/mobile-flutter/android/local.properties
+apps/mobile-flutter/android/app/debug/
+apps/mobile-flutter/android/app/profile/
+apps/mobile-flutter/android/app/release/
+apps/mobile-flutter/ios/Pods/
+apps/mobile-flutter/ios/.symlinks/
+apps/mobile-flutter/ios/Flutter/Flutter.framework
+apps/mobile-flutter/ios/Flutter/Flutter.podspec
+apps/mobile-flutter/*.iml
+apps/mobile-flutter/.idea/
+
+# Prisma / local DB
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# Logs / OS / IDE
+*.log
+npm-debug.log*
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Misc
+*.apk
+*.aab
+*.ipa
+.vercel

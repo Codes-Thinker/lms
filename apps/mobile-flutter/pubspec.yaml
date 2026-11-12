@@ -1,0 +1,36 @@
+name: mobile_flutter
+description: Codes Thinker LMS Flutter mobile app
+publish_to: "none"
+version: 1.2.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  flutter_markdown: ^0.7.4+1
+  cupertino_icons: ^1.0.8
+  flutter_spinkit: ^5.2.2
+  http: ^1.6.0
+  url_launcher: ^6.3.3
+  image_picker: ^1.2.4
+  image_cropper: ^12.2.1
+  path_provider: ^2.1.6
+  shared_preferences: ^2.5.6
+  path: ^1.9.1
+  liquid_glass_navbar: ^1.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/brand/codes_thinker_logo.png
+    - assets/brand/ct_mark.png
+    - assets/brand/ct_mark_hd.png
+    - assets/brand/logo-white.jpg

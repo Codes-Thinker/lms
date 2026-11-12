@@ -1,0 +1,10 @@
+{
+  "latestVersion": "1.2.0",
+  "minimumVersion": "1.2.0",
+  "forceUpdate": true,
+  "title": "Update required",
+  "message": "A new Code's Thinker LMS version is available. Please update to continue.",
+  "androidUrl": "https://play.google.com/store/apps",
+  "iosUrl": "https://apps.apple.com",
+  "updatedAt": "2026-11-12T00:00:00.000Z"
+}
