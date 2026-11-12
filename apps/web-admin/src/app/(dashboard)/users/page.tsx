@@ -24,20 +24,22 @@ type UserRow = {
 
 const ACCOUNT_TYPES = ["STUDENT", "INTERN", "STAFF"] as const;
 
+const emptyForm = {
+  fullName: "",
+  email: "",
+  password: "",
+  accountType: "STUDENT" as (typeof ACCOUNT_TYPES)[number],
+  track: "",
+  phone: "",
+};
+
 export default function UsersPage() {
   const { show } = useSnackbar();
   const [items, setItems] = useState<UserRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [accountType, setAccountType] =
-    useState<(typeof ACCOUNT_TYPES)[number]>("STUDENT");
-  const [track, setTrack] = useState("");
-  const [phone, setPhone] = useState("");
+  const [form, setForm] = useState(emptyForm);
   const [showPassword, setShowPassword] = useState(false);
 
   const load = useCallback(async () => {
@@ -58,6 +60,18 @@ export default function UsersPage() {
     void load();
   }, [load]);
 
+  function setField<K extends keyof typeof emptyForm>(
+    key: K,
+    value: (typeof emptyForm)[K]
+  ) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function resetForm() {
+    setForm(emptyForm);
+    setShowPassword(false);
+  }
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -65,25 +79,21 @@ export default function UsersPage() {
       await api("/users", {
         method: "POST",
         body: JSON.stringify({
-          fullName: fullName.trim(),
-          email: email.trim(),
-          accountType,
-          track: track.trim() || undefined,
-          phone: phone.trim() || undefined,
-          password: password.trim() || undefined,
-          sendInvitation: !password.trim(),
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          accountType: form.accountType,
+          track: form.track.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          password: form.password.trim() || undefined,
+          sendInvitation: !form.password.trim(),
         }),
       });
-      setFullName("");
-      setEmail("");
-      setPassword("");
-      setTrack("");
-      setPhone("");
-      show("User saved");
+      resetForm();
+      show("User created");
       await load();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not save user";
-      show(msg);
+      show(msg, "error");
     } finally {
       setSaving(false);
     }
@@ -101,40 +111,96 @@ export default function UsersPage() {
             {error}
             {error.toLowerCase().includes("unauthorized") ||
             error.toLowerCase().includes("session")
-              ? " — pehle /login se admin sign in karo."
+              ? " — sign in again from /login."
               : null}
           </p>
         ) : null}
       </div>
 
-      <form onSubmit={onCreate} className="glass-card space-y-4 p-5">
-        <h3 className="font-semibold">Add new user</h3>
-        <div className="grid gap-3 md:grid-cols-2">
+      <form
+        onSubmit={onCreate}
+        className="glass-card space-y-5 p-5"
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore="true"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Add new user</h3>
+            <p className="text-sm text-slate-500">
+              Empty form — enter the new person&apos;s details only
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={resetForm}
+          >
+            Clear form
+          </Button>
+        </div>
+
+        {/* Honeypot-style decoys so browsers don't dump admin login here */}
+        <input
+          type="text"
+          name="username"
+          autoComplete="username"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="pointer-events-none absolute h-0 w-0 opacity-0"
+          defaultValue=""
+        />
+        <input
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="pointer-events-none absolute h-0 w-0 opacity-0"
+          defaultValue=""
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Full name</Label>
+            <Label htmlFor="new-user-name">Full name</Label>
             <Input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              id="new-user-name"
+              name="new-user-full-name"
+              value={form.fullName}
+              onChange={(e) => setField("fullName", e.target.value)}
+              placeholder="e.g. Ali Khan"
               required
               minLength={2}
+              autoComplete="off"
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Email</Label>
+            <Label htmlFor="new-user-email">Email</Label>
             <Input
+              id="new-user-email"
+              name="new-user-email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={form.email}
+              onChange={(e) => setField("email", e.target.value)}
+              placeholder="name@codesthinker.com"
               required
+              autoComplete="off"
+              inputMode="email"
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Account type</Label>
+            <Label htmlFor="new-user-type">Account type</Label>
             <select
-              className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"
-              value={accountType}
+              id="new-user-type"
+              name="new-user-account-type"
+              className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              value={form.accountType}
               onChange={(e) =>
-                setAccountType(e.target.value as (typeof ACCOUNT_TYPES)[number])
+                setField(
+                  "accountType",
+                  e.target.value as (typeof ACCOUNT_TYPES)[number]
+                )
               }
             >
               {ACCOUNT_TYPES.map((t) => (
@@ -145,15 +211,20 @@ export default function UsersPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Password (optional — for immediate login)</Label>
+            <Label htmlFor="new-user-password">
+              Password{" "}
+              <span className="font-normal text-slate-400">(optional)</span>
+            </Label>
             <div className="flex gap-2">
               <Input
+                id="new-user-password"
+                name="new-user-password"
                 type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={form.password}
+                onChange={(e) => setField("password", e.target.value)}
                 minLength={8}
-                placeholder="Min 8 characters"
-                autoComplete="off"
+                placeholder="Leave blank to send invite"
+                autoComplete="new-password"
                 className="flex-1"
               />
               <Button
@@ -164,19 +235,52 @@ export default function UsersPage() {
                 {showPassword ? "Hide" : "Show"}
               </Button>
             </div>
+            <p className="text-xs text-slate-500">
+              Blank password = invitation email · set password for instant login
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label>Track (optional)</Label>
-            <Input value={track} onChange={(e) => setTrack(e.target.value)} />
+            <Label htmlFor="new-user-track">
+              Track <span className="font-normal text-slate-400">(optional)</span>
+            </Label>
+            <Input
+              id="new-user-track"
+              name="new-user-track"
+              value={form.track}
+              onChange={(e) => setField("track", e.target.value)}
+              placeholder="e.g. Flutter Development"
+              autoComplete="off"
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Phone (optional)</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <Label htmlFor="new-user-phone">
+              Phone <span className="font-normal text-slate-400">(optional)</span>
+            </Label>
+            <Input
+              id="new-user-phone"
+              name="new-user-phone"
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setField("phone", e.target.value)}
+              placeholder="03xx-xxxxxxx"
+              autoComplete="off"
+            />
           </div>
         </div>
-        <Button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Create user"}
-        </Button>
+
+        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+          <Button type="submit" disabled={saving}>
+            {saving ? "Creating…" : "Create user"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={saving}
+            onClick={resetForm}
+          >
+            Reset
+          </Button>
+        </div>
       </form>
 
       <div className="glass-card table-scroll overflow-hidden">
@@ -184,7 +288,12 @@ export default function UsersPage() {
           <h3 className="font-semibold">
             All users {loading ? "…" : `(${items.length})`}
           </h3>
-          <Button type="button" variant="secondary" size="sm" onClick={() => void load()}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => void load()}
+          >
             Refresh
           </Button>
         </div>
@@ -223,7 +332,9 @@ export default function UsersPage() {
                       </Link>
                     </td>
                     <td className="px-5 py-3.5">
-                      <Badge variant="secondary">{roleLabel(u.accountType)}</Badge>
+                      <Badge variant="secondary">
+                        {roleLabel(u.accountType)}
+                      </Badge>
                     </td>
                     <td className="px-5 py-3.5">{u.track || "—"}</td>
                     <td className="px-5 py-3.5">
@@ -234,7 +345,10 @@ export default function UsersPage() {
               })}
               {!loading && items.length === 0 && !error ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-slate-500">
+                  <td
+                    colSpan={4}
+                    className="px-5 py-8 text-center text-slate-500"
+                  >
                     No users yet
                   </td>
                 </tr>
