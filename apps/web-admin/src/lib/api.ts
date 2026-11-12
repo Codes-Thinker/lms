@@ -56,14 +56,6 @@ export async function api<T = unknown>(
     headers,
   });
 
-  if (res.status === 401) {
-    clearSession();
-    if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
-      window.location.href = "/login";
-    }
-    throw new Error("Unauthorized");
-  }
-
   const text = await res.text();
   let data: unknown = null;
   if (text) {
@@ -74,14 +66,32 @@ export async function api<T = unknown>(
     }
   }
 
+  const messageFromBody = () => {
+    if (typeof data === "object" && data && "message" in data) {
+      const m = (data as { message: unknown }).message;
+      if (Array.isArray(m) && m.length) return String(m[0]);
+      if (typeof m === "string" && m.trim()) return m;
+    }
+    if (typeof data === "object" && data && "error" in data) {
+      return String((data as { error: unknown }).error);
+    }
+    return `Request failed (${res.status})`;
+  };
+
+  if (res.status === 401) {
+    const onLogin = path.includes("/auth/login");
+    if (!onLogin) {
+      clearSession();
+      if (typeof window !== "undefined" && !window.location.pathname.includes("/login")) {
+        window.location.href = "/login";
+      }
+      throw new Error("Your session has expired. Please sign in again.");
+    }
+    throw new Error(messageFromBody());
+  }
+
   if (!res.ok) {
-    const msg =
-      typeof data === "object" && data && "message" in data
-        ? Array.isArray((data as { message: unknown }).message)
-          ? String((data as { message: string[] }).message[0])
-          : String((data as { message: string }).message)
-        : `Request failed (${res.status})`;
-    throw new Error(msg);
+    throw new Error(messageFromBody());
   }
 
   return data as T;
