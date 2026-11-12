@@ -51,6 +51,20 @@
   background: #F8FAFC;
 }
 
+/* Tables scroll on small screens instead of breaking the shell */
+.dashboard-shell .glass-card {
+  max-width: 100%;
+}
+
+.dashboard-shell table {
+  min-width: 640px;
+}
+
+.dashboard-shell .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Flat cards — no shadow, no blur */
 .glass-card {
   @apply rounded-2xl border border-slate-200 bg-white shadow-none;

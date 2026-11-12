@@ -6,6 +6,7 @@ import '../core/api_errors.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/avatar_service.dart';
+import '../services/local_cache.dart';
 
 enum LoginRole { student, intern, staff }
 
@@ -188,6 +189,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(_kToken);
     await prefs.remove(_kUser);
     ApiClient.instance.setToken(null);
+    await LocalCache.clearSession();
   }
 
   Future<void> _loadAvatar() async {
@@ -225,12 +227,16 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final uid = _user?.id;
     _user = null;
     _avatarPath = null;
     _error = null;
     _loginRole = LoginRole.student;
     _loading = false;
     await _clearPersisted();
+    if (uid != null) {
+      await AvatarService.clear(uid);
+    }
     notifyListeners();
   }
 

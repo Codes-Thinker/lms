@@ -52,7 +52,7 @@ export default function FeesPage() {
           profile for full history
         </p>
       </div>
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card table-scroll overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50/80 text-slate-500">
             <tr>

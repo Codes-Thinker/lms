@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/course.dart';
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
 
 class CourseProvider extends ChangeNotifier {
   List<Course> _courses = [];
@@ -50,23 +51,46 @@ class CourseProvider extends ChangeNotifier {
     );
   }
 
+  void _applyList(List<dynamic> data) {
+    _courses = data
+        .whereType<Map>()
+        .map((e) => Course.fromApi(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Cache-first, then live API refresh for smooth dashboard.
   Future<void> fetchEnrolledCourses() async {
     _loading = true;
     notifyListeners();
+
+    final cached = await LocalCache.getList(LocalCache.courses);
+    if (cached.isNotEmpty) {
+      _applyList(cached);
+      _loading = false;
+      notifyListeners();
+    }
+
     try {
       final data = await ApiClient.instance.get('/courses');
       if (data is List) {
-        _courses = data
-            .map((e) => Course.fromApi(e as Map<String, dynamic>))
-            .toList();
-      } else {
+        _applyList(data);
+        await LocalCache.setJson(LocalCache.courses, data);
+      } else if (cached.isEmpty) {
         _courses = [];
       }
     } catch (e) {
       debugPrint('Courses fetch failed: $e');
-      _courses = [];
+      if (cached.isEmpty) _courses = [];
     }
     _loading = false;
+    notifyListeners();
+  }
+
+  void clearMemory() {
+    _courses = [];
+    _activeCourse = null;
+    _markedAttendance.clear();
+    _selectedCategory = 'All';
     notifyListeners();
   }
 

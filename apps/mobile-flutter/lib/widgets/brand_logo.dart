@@ -23,6 +23,11 @@ class BrandLogoBanner extends StatelessWidget {
         alignment: Alignment.center,
         filterQuality: FilterQuality.high,
         gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => Image.asset(
+          AppBrand.appIconAsset,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const CtMark(size: 56),
+        ),
       ),
     );
   }

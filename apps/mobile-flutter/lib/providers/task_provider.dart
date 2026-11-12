@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/task.dart';
 import '../services/api_client.dart';
+import '../services/local_cache.dart';
 
 class TaskProvider extends ChangeNotifier {
   List<AssignedTask> _tasks = [];
@@ -25,18 +26,36 @@ class TaskProvider extends ChangeNotifier {
   Future<void> load() async {
     _loading = true;
     notifyListeners();
+
+    final cached = await LocalCache.getList(LocalCache.tasks);
+    if (cached.isNotEmpty) {
+      _tasks = cached
+          .whereType<Map>()
+          .map((e) => _fromApi(Map<String, dynamic>.from(e)))
+          .toList();
+      _loading = false;
+      notifyListeners();
+    }
+
     try {
       final data = await ApiClient.instance.get('/tasks/me');
       if (data is List) {
         _tasks = data.map((e) => _fromApi(e as Map<String, dynamic>)).toList();
-      } else {
+        await LocalCache.setJson(LocalCache.tasks, data);
+      } else if (cached.isEmpty) {
         _tasks = [];
       }
     } catch (e) {
       debugPrint('Tasks fetch failed: $e');
-      _tasks = [];
+      if (cached.isEmpty) _tasks = [];
     }
     _loading = false;
+    notifyListeners();
+  }
+
+  void clearMemory() {
+    stopTimer();
+    _tasks = [];
     notifyListeners();
   }
 

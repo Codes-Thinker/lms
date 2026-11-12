@@ -33,7 +33,7 @@ export default function AttendancePage() {
         <p className="text-sm text-slate-500">Live check-in / check-out from the Android app</p>
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       </div>
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card table-scroll overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50/80 text-slate-500">
             <tr>

@@ -179,7 +179,7 @@ export default function UsersPage() {
         </Button>
       </form>
 
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card table-scroll overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
           <h3 className="font-semibold">
             All users {loading ? "…" : `(${items.length})`}

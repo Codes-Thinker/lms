@@ -148,7 +148,7 @@ export default function StudentsPage() {
         </Button>
       </div>
 
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card table-scroll overflow-hidden">
         <div className="border-b border-slate-100 px-5 py-4">
           <h3 className="font-semibold">Student roster</h3>
         </div>
@@ -204,7 +204,7 @@ export default function StudentsPage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="glass-card overflow-hidden">
+        <div className="glass-card table-scroll overflow-hidden">
           <div className="border-b border-slate-100 px-5 py-4">
             <h3 className="font-semibold">Fee cases</h3>
           </div>

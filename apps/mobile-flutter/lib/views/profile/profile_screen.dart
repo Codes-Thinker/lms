@@ -6,10 +6,15 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/responsive.dart';
+import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/fee_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/avatar_service.dart';
+import '../../services/push_notification_service.dart';
 import '../auth/login_screen.dart';
 import '../help/help_hub_screen.dart';
 
@@ -321,8 +326,15 @@ class ProfileScreen extends StatelessWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                auth.logout();
+              onPressed: () async {
+                await PushNotificationService.instance.unregisterFromBackend();
+                context.read<CourseProvider>().clearMemory();
+                context.read<TaskProvider>().clearMemory();
+                context.read<FeeProvider>().clearMemory();
+                context.read<AttendanceProvider>().clearMemory();
+                context.read<NotificationProvider>().clearMemory();
+                await auth.logout();
+                if (!context.mounted) return;
                 context.read<UiProvider>().showSnack('Signed out');
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),

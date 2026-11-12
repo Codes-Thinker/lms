@@ -249,7 +249,8 @@ export class UsersService {
   }
 
   async resendInvitation(id: string, createdById?: string) {
-    const user = await this.getById(id);
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("User not found");
     if (user.status === AccountStatus.ACTIVE && user.passwordHash) {
       throw new BadRequestException("User already activated");
     }

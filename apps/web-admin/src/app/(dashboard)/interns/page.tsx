@@ -42,7 +42,7 @@ export default function InternsPage() {
         <h2 className="text-lg font-semibold">Interns</h2>
         <p className="text-sm text-slate-500">Roster + assigned projects</p>
       </div>
-      <div className="glass-card overflow-hidden">
+      <div className="glass-card table-scroll overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50/80 text-slate-500">
             <tr>
