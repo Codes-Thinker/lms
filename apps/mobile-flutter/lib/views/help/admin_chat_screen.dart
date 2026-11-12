@@ -63,11 +63,11 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Chat with admin',
+              "Code's Thinker",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             Text(
-              'Staff · Intern · Teacher · Student',
+              'Support chat · replies in real time',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.muted,
@@ -90,6 +90,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                     itemBuilder: (context, index) {
                       final msg = support.chat[index];
                       final mine = msg.senderRole == 'USER';
+                      final fromLabel = mine
+                          ? (auth.user?.name ?? 'You')
+                          : "Code's Thinker";
                       return Align(
                         alignment:
                             mine ? Alignment.centerRight : Alignment.centerLeft,
@@ -107,7 +110,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${msg.senderName} · ${msg.sentAt}',
+                                '$fromLabel · ${msg.sentAt}',
                                 style: TextStyle(
                                   color:
                                       mine ? Colors.white70 : AppColors.muted,
@@ -140,7 +143,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(auth, support),
                       decoration: InputDecoration(
-                        hintText: 'Message admin…',
+                        hintText: "Message Code's Thinker…",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(

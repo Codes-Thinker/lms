@@ -74,8 +74,8 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
         ),
       ),
       _HelpTile(
-        title: 'Chat with admin',
-        subtitle: 'Message admin · real-time replies',
+        title: "Chat with Code's Thinker",
+        subtitle: 'Direct support · real-time replies',
         icon: CupertinoIcons.chat_bubble_2,
         onTap: () => Navigator.of(context).push(
           AppMotion.fadeSlide(const AdminChatScreen()),

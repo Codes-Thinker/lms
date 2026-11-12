@@ -2,19 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/app_colors.dart';
+import 'core/notification_router.dart';
 import 'providers/attendance_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/course_provider.dart';
 import 'providers/fee_provider.dart';
+import 'providers/notification_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/support_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/ui_provider.dart';
 import 'providers/version_provider.dart';
+import 'services/push_notification_service.dart';
+import 'views/help/admin_chat_screen.dart';
+import 'views/shell/app_shell.dart';
 import 'views/splash/splash_screen.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/force_update_sheet.dart';
+
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,33 +34,93 @@ Future<void> main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+  try {
+    await PushNotificationService.instance.init();
+  } catch (e) {
+    debugPrint('Push init skipped: $e');
+  }
   runApp(const CodesThinkerApp());
 }
 
-class CodesThinkerApp extends StatelessWidget {
+class CodesThinkerApp extends StatefulWidget {
   const CodesThinkerApp({super.key});
+
+  @override
+  State<CodesThinkerApp> createState() => _CodesThinkerAppState();
+}
+
+class _CodesThinkerAppState extends State<CodesThinkerApp> {
+  late final UiProvider _ui;
+  late final AuthProvider _auth;
+
+  @override
+  void initState() {
+    super.initState();
+    _ui = UiProvider();
+    _auth = AuthProvider();
+    PushNotificationService.instance.bind(
+      ui: _ui,
+      currentUserId: () => _auth.user?.id,
+      onOpenInApp: _openFromNotification,
+    );
+  }
+
+  void _openFromNotification(String type) {
+    final upper = type.toUpperCase();
+    final tab = NotificationRouter.tabForType(type);
+    _ui.setNavIndex(tab);
+
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+
+    if (!_auth.isAuthenticated) {
+      // Session not ready — splash/login will consume pending type.
+      return;
+    }
+
+    // Jump to shell, then open Code's Thinker chat when it's a CHAT push.
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AppShell()),
+      (route) => false,
+    );
+
+    if (upper == 'CHAT') {
+      NotificationRouter.openAdminChat = true;
+      Future<void>.delayed(const Duration(milliseconds: 280), () {
+        final n = appNavigatorKey.currentState;
+        if (n == null) return;
+        n.push(
+          MaterialPageRoute(builder: (_) => const AdminChatScreen()),
+        );
+        NotificationRouter.takeOpenAdminChat();
+      });
+    }
+
+    NotificationRouter.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => UiProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider.value(value: _ui),
+        ChangeNotifierProvider.value(value: _auth),
         ChangeNotifierProvider(create: (_) => CourseProvider()),
         ChangeNotifierProvider(create: (_) => ProgressProvider()),
         ChangeNotifierProvider(create: (_) => TaskProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => FeeProvider()),
         ChangeNotifierProvider(create: (_) => SupportProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => VersionProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: appNavigatorKey,
         title: "Code's Thinker LMS",
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           brightness: Brightness.light,
           scaffoldBackgroundColor: AppColors.bg,
-          // Platform default font (original) — no custom family.
           fontFamily: null,
           colorScheme: const ColorScheme.light(
             primary: AppColors.blue,
@@ -135,7 +202,6 @@ class CodesThinkerApp extends StatelessWidget {
         ),
         builder: (context, child) {
           final ui = context.watch<UiProvider>();
-          // Single global loader only — never stack with button spinners.
           return ForceUpdateGate(
             child: AppSnackHost(
               child: AppLoadingOverlay(

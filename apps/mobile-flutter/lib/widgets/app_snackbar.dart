@@ -6,7 +6,7 @@ import '../core/constants/app_motion.dart';
 import '../core/responsive.dart';
 import '../providers/ui_provider.dart';
 
-/// Single custom animated snack for the whole app (bottom). No shadow.
+/// Single custom animated message strip (bottom). Not a system alert dialog.
 class AppSnackHost extends StatelessWidget {
   final Widget child;
 
@@ -63,48 +63,75 @@ class _SnackBanner extends StatelessWidget {
     }
   }
 
-  IconData get _icon {
-    switch (snack.tone) {
-      case AppSnackTone.success:
-        return Icons.check_circle_rounded;
-      case AppSnackTone.error:
-        return Icons.error_rounded;
-      case AppSnackTone.warning:
-        return Icons.warning_amber_rounded;
-      case AppSnackTone.info:
-        return Icons.info_rounded;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final title = snack.title?.trim();
     return Material(
       color: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.lg,
-          vertical: AppSpace.md,
-        ),
-        decoration: BoxDecoration(
-          color: _bg,
-          borderRadius: BorderRadius.circular(AppSpace.rMd),
-        ),
-        child: Row(
-          children: [
-            Icon(_icon, color: Colors.white, size: 20),
-            AppSpace.wMd,
-            Expanded(
-              child: Text(
-                snack.message,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                  height: 1.3,
+      child: InkWell(
+        onTap: snack.onTap == null
+            ? null
+            : () {
+                final tap = snack.onTap!;
+                context.read<UiProvider>().takeSnack();
+                tap();
+              },
+        borderRadius: BorderRadius.circular(AppSpace.rMd),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.md,
+          ),
+          decoration: BoxDecoration(
+            color: _bg,
+            borderRadius: BorderRadius.circular(AppSpace.rMd),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 20),
+              AppSpace.wMd,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (title != null && title.isNotEmpty) ...[
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                    ],
+                    Text(
+                      snack.message,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        height: 1.3,
+                      ),
+                    ),
+                    if (snack.onTap != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tap to open',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

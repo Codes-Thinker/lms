@@ -334,7 +334,7 @@ export class SupportService {
     if (isAdmin) {
       await this.notifications.notifyUser({
         userId: thread.userId,
-        title: "New message from admin",
+        title: "Code's Thinker",
         body: preview,
         type: NotificationType.CHAT,
         data: { threadId, kind: "CHAT" },

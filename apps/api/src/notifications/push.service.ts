@@ -97,18 +97,29 @@ export class PushService implements OnModuleInit {
     let sent = 0;
     for (const d of devices) {
       try {
+        const title =
+          payload.type === "CHAT" || /admin/i.test(payload.title)
+            ? "Code's Thinker"
+            : payload.title;
         await admin.messaging().send({
           token: d.token,
           notification: {
-            title: payload.title,
+            title,
             body: payload.body,
           },
-          data,
+          data: {
+            ...data,
+            title,
+            body: payload.body,
+          },
           android: {
             priority: "high",
             notification: {
               channelId: "lms_default",
+              icon: "ic_launcher",
+              color: "#2563EB",
               clickAction: "FLUTTER_NOTIFICATION_CLICK",
+              sound: "default",
             },
           },
         });

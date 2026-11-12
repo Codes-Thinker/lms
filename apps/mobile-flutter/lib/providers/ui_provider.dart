@@ -6,9 +6,16 @@ enum AppSnackTone { success, error, warning, info }
 
 class AppSnack {
   final String message;
+  final String? title;
   final AppSnackTone tone;
+  final VoidCallback? onTap;
 
-  const AppSnack(this.message, {this.tone = AppSnackTone.success});
+  const AppSnack(
+    this.message, {
+    this.title,
+    this.tone = AppSnackTone.success,
+    this.onTap,
+  });
 }
 
 class UiProvider extends ChangeNotifier {
@@ -53,14 +60,21 @@ class UiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// One custom animated snack for the whole app.
+  /// One custom animated snack for the whole app (message only — not a system alert).
   void showSnack(
     String message, {
+    String? title,
     AppSnackTone tone = AppSnackTone.success,
     Duration duration = const Duration(seconds: 2, milliseconds: 600),
+    VoidCallback? onTap,
   }) {
     _snackTimer?.cancel();
-    _activeSnack = AppSnack(message, tone: tone);
+    _activeSnack = AppSnack(
+      message,
+      title: title,
+      tone: tone,
+      onTap: onTap,
+    );
     notifyListeners();
     _snackTimer = Timer(duration, () {
       _activeSnack = null;
@@ -74,6 +88,8 @@ class UiProvider extends ChangeNotifier {
   String? takeSnack() {
     final msg = _activeSnack?.message;
     _activeSnack = null;
+    _snackTimer?.cancel();
+    notifyListeners();
     return msg;
   }
 
