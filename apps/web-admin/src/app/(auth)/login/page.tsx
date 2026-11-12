@@ -23,7 +23,23 @@ export default function LoginPage() {
       await loginAdmin(email.trim(), password);
       router.replace("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      const raw = err instanceof Error ? err.message : "Sign-in failed";
+      const lower = raw.toLowerCase();
+      if (lower.includes("no account") || lower.includes("not found")) {
+        setError("No account found with this email.");
+      } else if (lower.includes("incorrect password") || lower.includes("wrong password")) {
+        setError("Incorrect password. Please try again.");
+      } else if (lower.includes("not active")) {
+        setError("This account is not active. Please contact your admin.");
+      } else if (lower.includes("email") && lower.includes("valid")) {
+        setError("Please enter a valid email address.");
+      } else if (lower.includes("password") && (lower.includes("8") || lower.includes("longer"))) {
+        setError("Password must be at least 8 characters.");
+      } else if (lower.includes("admin access")) {
+        setError("This portal is for admins only.");
+      } else {
+        setError(raw.length < 120 ? raw : "Sign-in failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -32,7 +48,13 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#FAFAF7] px-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
+        <CardHeader className="items-center text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/brand/app_icon.png"
+            alt="Code's Thinker LMS"
+            className="mb-3 h-16 w-16 rounded-2xl object-cover shadow-sm"
+          />
           <CardTitle>Code&apos;s Thinker LMS</CardTitle>
           <CardDescription>Admin sign in</CardDescription>
         </CardHeader>
