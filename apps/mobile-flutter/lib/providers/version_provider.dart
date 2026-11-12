@@ -1,8 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import '../core/constants/api_config.dart';
+import '../services/api_client.dart';
 
 class RemoteVersionInfo {
   final String latestVersion;
@@ -26,18 +23,19 @@ class RemoteVersionInfo {
   factory RemoteVersionInfo.fromJson(Map<String, dynamic> json) {
     return RemoteVersionInfo(
       latestVersion: json['latestVersion'] as String? ?? '1.0.0',
-      minimumVersion: json['minimumVersion'] as String? ?? '1.0.0',
-      forceUpdate: json['forceUpdate'] as bool? ?? true,
+      minimumVersion:
+          (json['minimumVersion'] ?? json['minVersion']) as String? ?? '1.0.0',
+      forceUpdate: json['forceUpdate'] as bool? ?? false,
       title: json['title'] as String? ?? 'Update required',
       message: json['message'] as String? ?? 'Please update the app.',
-      androidUrl: json['androidUrl'] as String? ?? '',
+      androidUrl:
+          (json['androidUrl'] ?? json['storeUrlAndroid']) as String? ?? '',
       iosUrl: json['iosUrl'] as String? ?? '',
     );
   }
 }
 
 class VersionProvider extends ChangeNotifier {
-  /// Keep in sync with pubspec.yaml version (before +build).
   static const String appVersion = '1.2.0';
 
   RemoteVersionInfo? _remote;
@@ -58,7 +56,6 @@ class VersionProvider extends ChangeNotifier {
     return _compare(appVersion, _remote!.latestVersion) >= 0;
   }
 
-  /// -1 if a < b, 0 equal, 1 if a > b
   static int _compare(String a, String b) {
     final pa = a.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final pb = b.split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -78,15 +75,11 @@ class VersionProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      final res = await http
-          .get(Uri.parse('${ApiConfig.baseUrl}/api/app-version'))
-          .timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body) as Map<String, dynamic>;
-        _remote = RemoteVersionInfo.fromJson(body['data'] as Map<String, dynamic>);
+      final body = await ApiClient.instance.get('/system/app-version');
+      if (body is Map<String, dynamic>) {
+        _remote = RemoteVersionInfo.fromJson(body);
       }
     } catch (_) {
-      // Offline: don't block app
       _remote = null;
     }
     _checked = true;

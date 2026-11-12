@@ -4,11 +4,16 @@ import '../../core/app_space.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
+import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
+import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/fee_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../services/push_notification_service.dart';
 import '../../widgets/ct_mark.dart';
 import '../shell/app_shell.dart';
 
@@ -26,23 +31,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _obscure = ValueNotifier<bool>(true);
 
   @override
-  void initState() {
-    super.initState();
-    _fillDemo(LoginRole.student);
-  }
-
-  @override
   void dispose() {
     _email.dispose();
     _password.dispose();
     _obscure.dispose();
     super.dispose();
-  }
-
-  void _fillDemo(LoginRole role) {
-    final demo = AuthProvider.demoAccounts[role]!;
-    _email.text = demo.email;
-    _password.text = demo.password;
   }
 
   Future<void> _submit(BuildContext context) async {
@@ -61,11 +54,24 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Full catalog + tasks for every role (student / intern / teacher-staff).
+      // Full catalog + tasks + fees + attendance for every role.
+      final fees = context.read<FeeProvider>();
+      final attendance = context.read<AttendanceProvider>();
+      final notes = context.read<NotificationProvider>();
       await courses.fetchEnrolledCourses();
       await tasks.load();
+      await fees.load();
+      await attendance.loadMine();
+      await PushNotificationService.instance.registerWithBackend();
+      await notes.load();
       if (!context.mounted) return;
-      ui.setNavIndex(0);
+      final pendingType = NotificationRouter.pendingType;
+      ui.setNavIndex(
+        pendingType != null
+            ? NotificationRouter.tabForType(pendingType)
+            : 0,
+      );
+      NotificationRouter.clear();
       ui.showSnack('Welcome ${auth.user?.firstName ?? ''} · ${auth.user?.roleLabel}');
       Navigator.of(context).pushReplacement(AppMotion.fadeSlide(const AppShell()));
     } finally {
@@ -124,30 +130,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                 label: 'Student',
                                 icon: Icons.school_rounded,
                                 selected: auth.loginRole == LoginRole.student,
-                                onTap: () {
-                                  auth.selectLoginRole(LoginRole.student);
-                                  _fillDemo(LoginRole.student);
-                                },
+                                onTap: () => auth.selectLoginRole(LoginRole.student),
                               ),
                               AppSpace.wSm,
                               _roleChip(
                                 label: 'Intern',
                                 icon: Icons.workspace_premium_rounded,
                                 selected: auth.loginRole == LoginRole.intern,
-                                onTap: () {
-                                  auth.selectLoginRole(LoginRole.intern);
-                                  _fillDemo(LoginRole.intern);
-                                },
+                                onTap: () => auth.selectLoginRole(LoginRole.intern),
                               ),
                               AppSpace.wSm,
                               _roleChip(
                                 label: 'Teacher / Staff',
                                 icon: Icons.badge_rounded,
                                 selected: auth.loginRole == LoginRole.staff,
-                                onTap: () {
-                                  auth.selectLoginRole(LoginRole.staff);
-                                  _fillDemo(LoginRole.staff);
-                                },
+                                onTap: () => auth.selectLoginRole(LoginRole.staff),
                               ),
                             ],
                           ),
@@ -166,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               return _field(
                                 controller: _password,
                                 label: 'Password',
-                                hint: 'Must include codesthinker',
+                                hint: 'Your password',
                                 obscure: obscure,
                                 icon: Icons.lock_outline_rounded,
                                 suffix: IconButton(

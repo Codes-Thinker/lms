@@ -11,6 +11,10 @@ const sans = Inter({
 export const metadata: Metadata = {
   title: "Code's Thinker LMS",
   description: "Attendance, daily tasks, employment & courses",
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/icon-192.png", sizes: "192x192" }],
+    apple: [{ url: "/apple-touch-icon.png" }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
