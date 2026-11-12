@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -24,7 +25,8 @@ export class CoursesController {
     @CurrentUser() user: AuthUser,
     @Query("all") all?: string
   ) {
-    const publishedOnly = all !== "1" || !["SUPER_ADMIN", "STAFF"].includes(user.accountType);
+    const publishedOnly =
+      all !== "1" || !["SUPER_ADMIN", "STAFF"].includes(user.accountType);
     return this.courses.list(user.sub, publishedOnly);
   }
 
@@ -57,5 +59,11 @@ export class CoursesController {
   @Roles("SUPER_ADMIN", "STAFF")
   update(@Param("id") id: string, @Body() body: Record<string, unknown>) {
     return this.courses.update(id, body as never);
+  }
+
+  @Delete(":id")
+  @Roles("SUPER_ADMIN", "STAFF")
+  remove(@Param("id") id: string) {
+    return this.courses.remove(id);
   }
 }

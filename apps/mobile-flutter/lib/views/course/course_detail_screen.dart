@@ -5,6 +5,7 @@ import '../../core/constants/time_utils.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
+import '../../widgets/course_cover.dart';
 
 class CourseDetailScreen extends StatelessWidget {
   final String courseId;
@@ -36,29 +37,15 @@ class CourseDetailScreen extends StatelessWidget {
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.network(
-              course.thumbnailUrl,
-              height: 170,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  height: 170,
-                  color: AppColors.softBlue,
-                  child: const Center(child: AppLoader(size: 36)),
-                );
-              },
-              errorBuilder: (_, __, ___) => Container(
-                height: 170,
-                color: AppColors.softBlue,
-                child: const Center(child: AppLoader(size: 36)),
-              ),
-            ),
-          ),
+          CourseCover(url: course.thumbnailUrl, height: 180),
           const SizedBox(height: 14),
+          if (course.description.isNotEmpty) ...[
+            Text(
+              course.description,
+              style: const TextStyle(color: AppColors.muted, height: 1.45),
+            ),
+            const SizedBox(height: 14),
+          ],
           if (course.nextClassAt != null)
             Container(
               padding: const EdgeInsets.all(14),
@@ -80,7 +67,7 @@ class CourseDetailScreen extends StatelessWidget {
             ),
           const SizedBox(height: 12),
           Text(
-            '${course.topicsDone}/${course.topicsTotal} topics · ${course.topicsRemaining} remaining',
+            '${course.topicsDone}/${course.topicsTotal} lectures · ${course.topicsRemaining} remaining',
             style: const TextStyle(color: AppColors.muted),
           ),
           const SizedBox(height: 8),
@@ -96,16 +83,19 @@ class CourseDetailScreen extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              _chip('Fee', 'Rs ${course.monthlyFee}/mo'),
+              _chip('Monthly', 'Rs ${course.monthlyFee}'),
               const SizedBox(width: 8),
-              _chip('Attend', '${course.attendancePercent.toStringAsFixed(0)}%'),
+              _chip(
+                '${course.installmentCount}× inst.',
+                'Rs ${course.installmentFee}',
+              ),
               const SizedBox(width: 8),
-              _chip('Status', course.feeStatus),
+              _chip('Complete', 'Rs ${course.totalFee}'),
             ],
           ),
           const SizedBox(height: 20),
           const Text(
-            'Course outline',
+            'Roadmap',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),

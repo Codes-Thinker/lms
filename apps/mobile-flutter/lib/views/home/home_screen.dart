@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/constants/time_utils.dart';
@@ -12,6 +13,7 @@ import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/course_cover.dart';
 import '../course/course_detail_screen.dart';
 import '../fees/fees_screen.dart';
 import '../tasks/task_detail_screen.dart';
@@ -70,7 +72,7 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
-                            "Code's Thinker",
+                            AppBrand.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -608,19 +610,10 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
+            CourseCover(
+              url: course.thumbnailUrl,
+              height: 124,
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                course.thumbnailUrl,
-                height: 124,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  height: 124,
-                  color: AppColors.softBlue,
-                  child: const Center(child: AppLoader(size: 28)),
-                ),
-              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -658,20 +651,11 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Row(
           children: [
-            ClipRRect(
+            CourseCover(
+              url: course.thumbnailUrl,
+              height: 56,
+              width: 56,
               borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                course.thumbnailUrl,
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 56,
-                  height: 56,
-                  color: AppColors.softBlue,
-                  child: const Center(child: AppLoader(size: 20)),
-                ),
-              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -689,7 +673,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Mo Rs ${course.monthlyFee} · Inst Rs ${course.installmentFee}',
+                    'Mo Rs ${course.monthlyFee} · ${course.installmentCount}× Rs ${course.installmentFee}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

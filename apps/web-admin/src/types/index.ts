@@ -41,6 +41,8 @@ export interface Course {
   totalFee: number;
   /** Suggested installment amount (e.g. half of monthly or custom) */
   installmentFee: number;
+  installmentCount: number;
+  thumbnailUrl?: string;
   published: boolean;
   startMonth: string;
   outline: OutlineSection[];

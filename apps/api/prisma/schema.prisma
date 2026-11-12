@@ -185,27 +185,28 @@ model Invitation {
 }
 
 model Course {
-  id              String         @id @default(cuid())
-  title           String
-  category        String
-  description     String?
-  thumbnailUrl    String?
-  durationMonths  Int            @default(3)
-  monthlyFee      Int            @default(0)
-  totalFee        Int            @default(0)
-  installmentFee  Int            @default(0)
-  published       Boolean        @default(false)
-  startMonth      String?
-  rating          Float          @default(4.5)
-  batchId         String?
-  batch           Batch?         @relation(fields: [batchId], references: [id])
-  batchLabel      String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  sections        CourseSection[]
-  enrollments     Enrollment[]
-  feeCases        FeeCase[]
-  attendance      AttendanceRecord[]
+  id               String         @id @default(cuid())
+  title            String
+  category         String
+  description      String?
+  thumbnailUrl     String?
+  durationMonths   Int            @default(3)
+  monthlyFee       Int            @default(0)
+  totalFee         Int            @default(0)
+  installmentFee   Int            @default(0)
+  installmentCount Int            @default(2)
+  published        Boolean        @default(false)
+  startMonth       String?
+  rating           Float          @default(4.5)
+  batchId          String?
+  batch            Batch?         @relation(fields: [batchId], references: [id])
+  batchLabel       String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sections         CourseSection[]
+  enrollments      Enrollment[]
+  feeCases         FeeCase[]
+  attendance       AttendanceRecord[]
 }
 
 model CourseSection {
@@ -222,6 +223,7 @@ model CourseTopic {
   sectionId String
   section   CourseSection   @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   title     String
+  minutes   Int             @default(45)
   sortOrder Int             @default(0)
   progress  TopicProgress[]
 }

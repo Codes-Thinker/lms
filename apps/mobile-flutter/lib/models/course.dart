@@ -35,6 +35,7 @@ class Course {
   final int monthlyFee;
   final int totalFee;
   final int installmentFee;
+  final int installmentCount;
   final String description;
   final bool published;
   int paidAmount;
@@ -63,6 +64,7 @@ class Course {
     required this.progressPercent,
     required this.outline,
     this.installmentFee = 0,
+    this.installmentCount = 2,
     this.description = '',
     this.published = true,
     this.rating = 4.5,
@@ -91,5 +93,48 @@ class Course {
       }
     }
     return null;
+  }
+
+  factory Course.fromApi(Map<String, dynamic> json) {
+    final outlineRaw = (json['outline'] as List?) ?? const [];
+    return Course(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? '',
+      category: json['category'] as String? ?? 'Coding',
+      track: json['title'] as String? ?? '',
+      batch: json['batch'] as String? ?? '',
+      thumbnailUrl: json['thumbnailUrl'] as String? ??
+          'https://picsum.photos/seed/${json['id']}/800/500',
+      durationMonths: (json['durationMonths'] as num?)?.toInt() ?? 3,
+      monthlyFee: (json['monthlyFee'] as num?)?.toInt() ?? 0,
+      totalFee: (json['totalFee'] as num?)?.toInt() ?? 0,
+      installmentFee: (json['installmentFee'] as num?)?.toInt() ?? 0,
+      installmentCount: (json['installmentCount'] as num?)?.toInt() ?? 2,
+      description: json['description'] as String? ?? '',
+      published: json['published'] as bool? ?? true,
+      paidAmount: (json['paidAmount'] as num?)?.toInt() ?? 0,
+      feeStatus: json['feeStatus'] as String? ?? 'DUE',
+      attendancePercent: (json['attendancePercent'] as num?)?.toDouble() ?? 0,
+      progressPercent: (json['progressPercent'] as num?)?.toDouble() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
+      enrolled: json['enrolled'] as bool? ?? false,
+      outline: outlineRaw.map((s) {
+        final section = s as Map<String, dynamic>;
+        final topics = (section['topics'] as List?) ?? const [];
+        return OutlineSection(
+          id: section['id'] as String? ?? '',
+          title: section['title'] as String? ?? '',
+          topics: topics.map((t) {
+            final topic = t as Map<String, dynamic>;
+            return Topic(
+              id: topic['id'] as String? ?? '',
+              title: topic['title'] as String? ?? '',
+              completed: topic['completed'] as bool? ?? false,
+              minutes: (topic['minutes'] as num?)?.toInt() ?? 45,
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
   }
 }
