@@ -151,7 +151,28 @@ export class UsersService {
       },
     });
     if (!u) throw new NotFoundException("User not found");
-    return u;
+    return {
+      id: u.id,
+      name: u.fullName,
+      fullName: u.fullName,
+      email: u.email,
+      role: u.accountType,
+      accountType: u.accountType,
+      status: u.status,
+      designation: u.designation,
+      phone: u.phone,
+      track: u.track,
+      department: u.department?.name ?? null,
+      departmentId: u.departmentId,
+      batch: u.batch?.code ?? null,
+      batchId: u.batchId,
+      roles: u.roles.map((r) => r.role.code),
+      invitedAt: u.invitedAt,
+      activatedAt: u.activatedAt,
+      lastLoginAt: u.lastLoginAt,
+      createdAt: u.createdAt,
+      invitations: u.invitations,
+    };
   }
 
   async create(dto: CreateUserDto, createdById?: string) {

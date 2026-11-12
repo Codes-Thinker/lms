@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_errors.dart';
-import '../core/mock_data.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/avatar_service.dart';
@@ -31,12 +30,6 @@ class AuthProvider extends ChangeNotifier {
   bool get asTeacher => _loginRole == LoginRole.staff;
   String get trackLabel => _user?.track ?? 'Unassigned track';
   bool get hydrated => _hydrated;
-
-  static const demoAccounts = <LoginRole, ({String email, String password})>{
-    LoginRole.student: (email: 'ali@codesthinker.com', password: 'codesthinker'),
-    LoginRole.intern: (email: 'usman@codesthinker.com', password: 'codesthinker'),
-    LoginRole.staff: (email: 'hassan@codesthinker.com', password: 'codesthinker'),
-  };
 
   static const _kToken = 'lms_access_token';
   static const _kUser = 'lms_user_json';
@@ -145,18 +138,11 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } on ApiException catch (e) {
-      // Offline demo fallback only for known demo accounts
-      if (_tryDemoFallback(normalized, pass)) {
-        return true;
-      }
       _error = ApiErrors.fromApi(e);
       _loading = false;
       notifyListeners();
       return false;
     } catch (e) {
-      if (_tryDemoFallback(normalized, pass)) {
-        return true;
-      }
       _error = ApiErrors.friendly(e);
       _loading = false;
       notifyListeners();
@@ -166,37 +152,6 @@ class AuthProvider extends ChangeNotifier {
 
   bool _looksLikeEmail(String value) {
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value);
-  }
-
-  bool _tryDemoFallback(String email, String pass) {
-    for (final entry in demoAccounts.entries) {
-      if (entry.value.email == email && entry.value.password == pass) {
-        if (entry.key != _loginRole) {
-          _error =
-              'Please select the correct role for this account and try again.';
-          _loading = false;
-          notifyListeners();
-          return false;
-        }
-        _loginRole = entry.key;
-        switch (entry.key) {
-          case LoginRole.staff:
-            _user = MockData.staff;
-            break;
-          case LoginRole.intern:
-            _user = MockData.intern;
-            break;
-          case LoginRole.student:
-            _user = MockData.student;
-            break;
-        }
-        ApiClient.instance.setToken(null);
-        _loading = false;
-        notifyListeners();
-        return true;
-      }
-    }
-    return false;
   }
 
   String get _roleApi {
@@ -279,19 +234,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Test-only helper — never used by production login.
   void useDemoSession([LoginRole? role]) {
     _loginRole = role ?? _loginRole;
-    switch (_loginRole) {
-      case LoginRole.staff:
-        _user = MockData.staff;
-        break;
-      case LoginRole.intern:
-        _user = MockData.intern;
-        break;
-      case LoginRole.student:
-        _user = MockData.student;
-        break;
-    }
+    _user = AppUser(
+      id: 'test-${_loginRole.name}',
+      name: 'Test ${_loginRole.name}',
+      email: 'test-${_loginRole.name}@codesthinker.com',
+      role: _roleApi,
+      track: 'Test',
+      enrolledCourses: 0,
+      department: 'QA',
+    );
     _error = null;
     _loading = false;
     _avatarPath = null;

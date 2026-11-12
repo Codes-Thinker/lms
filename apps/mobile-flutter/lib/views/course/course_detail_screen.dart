@@ -37,7 +37,11 @@ class CourseDetailScreen extends StatelessWidget {
           20 + MediaQuery.paddingOf(context).bottom,
         ),
         children: [
-          CourseCover(url: course.thumbnailUrl, height: 180),
+          CourseCover(
+            url: course.thumbnailUrl,
+            title: course.title,
+            height: 180,
+          ),
           const SizedBox(height: 14),
           if (course.description.isNotEmpty) ...[
             Text(

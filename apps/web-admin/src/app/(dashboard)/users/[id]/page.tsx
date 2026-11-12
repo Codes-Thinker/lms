@@ -58,6 +58,54 @@ type Report = {
   }>;
 };
 
+type RawUser = {
+  id: string;
+  fullName?: string;
+  name?: string;
+  email: string;
+  accountType?: string;
+  status?: string;
+  track?: string | null;
+  designation?: string | null;
+  department?: { name?: string } | string | null;
+  batch?: { code?: string } | string | null;
+  phone?: string | null;
+  lastLoginAt?: string | null;
+  createdAt?: string;
+};
+
+function emptyReportFromUser(u: RawUser): Report {
+  const dept =
+    typeof u.department === "string"
+      ? u.department
+      : u.department?.name ?? null;
+  const batch =
+    typeof u.batch === "string" ? u.batch : u.batch?.code ?? null;
+  return {
+    user: {
+      id: u.id,
+      fullName: u.fullName || u.name || u.email,
+      email: u.email,
+      accountType: u.accountType || "STUDENT",
+      status: u.status,
+      track: u.track,
+      designation: u.designation,
+      department: dept,
+      batch,
+      phone: u.phone,
+      lastLoginAt: u.lastLoginAt,
+      createdAt: u.createdAt,
+    },
+    attendancePercent: 0,
+    feesPending: 0,
+    feesPaid: 0,
+    courses: [],
+    recentAttendance: [],
+    fees: [],
+    tasks: [],
+  };
+}
+
 export default function UserProfilePage() {
   const params = useParams<{ id: string }>();
   const [report, setReport] = useState<Report | null>(null);
@@ -65,9 +113,30 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     if (!params?.id) return;
-    api<Report>(`/reports/users/${params.id}`)
-      .then(setReport)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api<Report>(`/reports/users/${params.id}`);
+        if (!cancelled) setReport(data);
+      } catch (reportErr) {
+        try {
+          // Fallback: core user row (live API) if report endpoint is stale/down.
+          const user = await api<RawUser>(`/users/${params.id}`);
+          if (!cancelled) setReport(emptyReportFromUser(user));
+        } catch {
+          if (!cancelled) {
+            setError(
+              reportErr instanceof Error
+                ? reportErr.message
+                : "Could not load this user"
+            );
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [params?.id]);
 
   if (error) {

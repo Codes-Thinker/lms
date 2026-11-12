@@ -612,6 +612,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             CourseCover(
               url: course.thumbnailUrl,
+              title: course.title,
               height: 124,
               borderRadius: BorderRadius.circular(12),
             ),

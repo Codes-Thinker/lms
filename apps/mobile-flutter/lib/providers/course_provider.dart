@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../core/mock_data.dart';
 import '../models/course.dart';
+import '../services/api_client.dart';
 
 class CourseProvider extends ChangeNotifier {
   List<Course> _courses = [];
@@ -25,52 +25,6 @@ class CourseProvider extends ChangeNotifier {
 
   List<Course> get featuredCourses =>
       courses.where((c) => !c.enrolled || c.progressPercent < 100).take(3).toList();
-
-  /// Simulates admin dashboard → app catalog sync (new published course).
-  void syncAdminCourse({
-    required String title,
-    required String category,
-    required int durationMonths,
-    required int totalFee,
-    required int monthlyFee,
-    required int installmentFee,
-    String description = '',
-  }) {
-    final id = 'c-admin-${DateTime.now().millisecondsSinceEpoch}';
-    _courses.insert(
-      0,
-      Course(
-        id: id,
-        title: title,
-        category: category,
-        track: title,
-        batch: 'CT-APP-${DateTime.now().month}',
-        thumbnailUrl: 'https://picsum.photos/seed/$id/800/500',
-        durationMonths: durationMonths,
-        monthlyFee: monthlyFee,
-        totalFee: totalFee,
-        installmentFee: installmentFee,
-        description: description.isEmpty ? 'Added from admin dashboard' : description,
-        published: true,
-        paidAmount: 0,
-        feeStatus: 'DUE',
-        attendancePercent: 0,
-        progressPercent: 0,
-        enrolled: false,
-        outline: [
-          OutlineSection(
-            id: '$id-s1',
-            title: 'Month 1 — Getting started',
-            topics: [
-              Topic(id: '$id-t1', title: 'Orientation'),
-              Topic(id: '$id-t2', title: 'Setup & basics'),
-            ],
-          ),
-        ],
-      ),
-    );
-    notifyListeners();
-  }
 
   Course? get continueCourse {
     final enrolled = enrolledCourses;
@@ -99,13 +53,19 @@ class CourseProvider extends ChangeNotifier {
   Future<void> fetchEnrolledCourses() async {
     _loading = true;
     notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    seedMockCourses();
-  }
-
-  /// Sync seed for tests / offline boot (no timers).
-  void seedMockCourses() {
-    _courses = MockData.courses();
+    try {
+      final data = await ApiClient.instance.get('/courses');
+      if (data is List) {
+        _courses = data
+            .map((e) => Course.fromApi(e as Map<String, dynamic>))
+            .toList();
+      } else {
+        _courses = [];
+      }
+    } catch (e) {
+      debugPrint('Courses fetch failed: $e');
+      _courses = [];
+    }
     _loading = false;
     notifyListeners();
   }
@@ -120,7 +80,7 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void markTopicComplete(String courseId, String topicId) {
+  Future<void> markTopicComplete(String courseId, String topicId) async {
     final course = _courses.firstWhere((c) => c.id == courseId);
     for (final section in course.outline) {
       for (final topic in section.topics) {
@@ -130,6 +90,11 @@ class CourseProvider extends ChangeNotifier {
     course.progressPercent =
         course.topicsTotal == 0 ? 0 : (course.topicsDone / course.topicsTotal) * 100;
     notifyListeners();
+    try {
+      await ApiClient.instance.post('/courses/topics/$topicId/progress', body: {
+        'completed': true,
+      });
+    } catch (_) {}
   }
 
   void markStudentAttendance(String studentKey, String status) {

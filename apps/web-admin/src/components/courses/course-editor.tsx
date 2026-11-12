@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { CourseDocCover } from "@/components/courses/course-doc-cover";
 
 export type EditorTopic = {
   key: string;
@@ -321,7 +322,7 @@ export function CourseEditor({
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+          <div className="h-36 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
             {value.thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -330,9 +331,7 @@ export function CourseEditor({
                 className="h-36 w-full object-cover"
               />
             ) : (
-              <div className="flex h-36 items-center justify-center text-xs text-slate-400">
-                No cover yet
-              </div>
+              <CourseDocCover title={value.title || "Course"} />
             )}
           </div>
           <div className="space-y-3">

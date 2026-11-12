@@ -103,8 +103,7 @@ class Course {
       category: json['category'] as String? ?? 'Coding',
       track: json['title'] as String? ?? '',
       batch: json['batch'] as String? ?? '',
-      thumbnailUrl: json['thumbnailUrl'] as String? ??
-          'https://picsum.photos/seed/${json['id']}/800/500',
+      thumbnailUrl: (json['thumbnailUrl'] as String?)?.trim() ?? '',
       durationMonths: (json['durationMonths'] as num?)?.toInt() ?? 3,
       monthlyFee: (json['monthlyFee'] as num?)?.toInt() ?? 0,
       totalFee: (json['totalFee'] as num?)?.toInt() ?? 0,

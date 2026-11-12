@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CourseDocCover } from "@/components/courses/course-doc-cover";
 
 type Course = {
   id: string;
@@ -87,9 +88,7 @@ export default function CoursesPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                      No cover
-                    </div>
+                    <CourseDocCover title={c.title} />
                   )}
                   <div className="absolute right-3 top-3">
                     <Badge variant={c.published ? "success" : "secondary"}>

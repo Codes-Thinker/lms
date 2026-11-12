@@ -2,10 +2,10 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/constants/time_utils.dart';
-import '../../core/mock_data.dart';
 import '../../core/responsive.dart';
 import '../../models/course.dart';
 import '../../providers/attendance_provider.dart';
@@ -46,7 +46,19 @@ class TeacherHomeScreen extends StatelessWidget {
     final bottom = AppResponsive.shellBottom(context);
 
     final batches = courses.courses;
-    final sessions = MockData.teacherSessions();
+    // Live catalog only — no mock class schedule.
+    final sessions = batches
+        .take(5)
+        .map(
+          (c) => (
+            id: c.id,
+            courseTitle: c.title,
+            batch: c.batch.isEmpty ? c.category : c.batch,
+            present: 0,
+            total: 0,
+          ),
+        )
+        .toList();
     final staffId = auth.user?.id ?? '';
     final myTasks = tasks.tasksForUser(staffId);
     final openTasks = myTasks.where((t) => t.status != 'DONE').toList();
@@ -75,7 +87,7 @@ class TeacherHomeScreen extends StatelessWidget {
                         const SizedBox(width: 10),
                         const Expanded(
                           child: Text(
-                            "Code's Thinker",
+                            AppBrand.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -229,33 +241,41 @@ class TeacherHomeScreen extends StatelessWidget {
                   children: [
                     const _Section('UPCOMING CLASSES'),
                     const SizedBox(height: 2),
-                    ...List.generate(sessions.length, (i) {
-                      final s = sessions[i];
-                      final course = _courseByTitle(batches, s.courseTitle);
-                      return Column(
-                        children: [
-                          _row(
-                            icon: CupertinoIcons.time,
-                            title: s.courseTitle,
-                            subtitle:
-                                '${s.batch} · Marked ${s.present}/${s.total}',
-                            trailing: TimeUtils.countdown(s.startsAt, now),
-                            onTap: () {
-                              if (course == null) {
-                                ui.showSnack('${s.courseTitle} · ${s.batch}');
-                                return;
-                              }
-                              courses.selectCourse(course);
-                              _push(
-                                context,
-                                CourseDetailScreen(courseId: course.id),
-                              );
-                            },
-                          ),
-                          if (i < sessions.length - 1) const _Line(),
-                        ],
-                      );
-                    }),
+                    if (sessions.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'No live courses yet — publish from admin.',
+                          style: TextStyle(color: AppColors.muted, fontSize: 13),
+                        ),
+                      )
+                    else
+                      ...List.generate(sessions.length, (i) {
+                        final s = sessions[i];
+                        final course = _courseByTitle(batches, s.courseTitle);
+                        return Column(
+                          children: [
+                            _row(
+                              icon: CupertinoIcons.time,
+                              title: s.courseTitle,
+                              subtitle: '${s.batch} · Live catalog',
+                              trailing: 'Open',
+                              onTap: () {
+                                if (course == null) {
+                                  ui.showSnack('${s.courseTitle} · ${s.batch}');
+                                  return;
+                                }
+                                courses.selectCourse(course);
+                                _push(
+                                  context,
+                                  CourseDetailScreen(courseId: course.id),
+                                );
+                              },
+                            ),
+                            if (i < sessions.length - 1) const _Line(),
+                          ],
+                        );
+                      }),
                   ],
                 ),
               ),

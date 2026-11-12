@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import '../core/mock_data.dart';
 import '../models/task.dart';
+import '../services/api_client.dart';
 
 class TaskProvider extends ChangeNotifier {
   List<AssignedTask> _tasks = [];
@@ -25,14 +25,50 @@ class TaskProvider extends ChangeNotifier {
   Future<void> load() async {
     _loading = true;
     notifyListeners();
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    seedMockTasks();
-  }
-
-  void seedMockTasks() {
-    _tasks = MockData.assignedTasks();
+    try {
+      final data = await ApiClient.instance.get('/tasks/me');
+      if (data is List) {
+        _tasks = data.map((e) => _fromApi(e as Map<String, dynamic>)).toList();
+      } else {
+        _tasks = [];
+      }
+    } catch (e) {
+      debugPrint('Tasks fetch failed: $e');
+      _tasks = [];
+    }
     _loading = false;
     notifyListeners();
+  }
+
+  AssignedTask _fromApi(Map<String, dynamic> json) {
+    final statusRaw = json['status'] as String? ?? 'ASSIGNED';
+    final status = statusRaw == 'ASSIGNED' ? 'PENDING' : statusRaw;
+    final chat = ((json['chat'] as List?) ?? const []).map((m) {
+      final msg = m as Map<String, dynamic>;
+      return TaskChatMessage(
+        id: msg['id'] as String? ?? '',
+        senderName: msg['senderName'] as String? ?? '',
+        senderRole: msg['senderRole'] as String? ?? 'USER',
+        text: msg['text'] as String? ?? '',
+        sentAt: msg['sentAt'] as String? ?? '',
+      );
+    }).toList();
+    return AssignedTask(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      studyNotes: json['studyNotes'] as String? ?? '',
+      courseTitle: 'Staff Ops',
+      assignedToId: json['assignedToId'] as String? ?? '',
+      assignedToName: json['assignedToName'] as String? ?? '',
+      assignedBy: json['assignedBy'] as String? ?? '',
+      status: status,
+      dueAt: DateTime.tryParse(json['dueAt'] as String? ?? '') ?? DateTime.now(),
+      timerMinutes: (json['timerMinutes'] as num?)?.toInt() ?? 0,
+      spentSeconds: ((json['spentMinutes'] as num?)?.toInt() ?? 0) * 60,
+      updatedAt: json['updatedAt'] as String? ?? '',
+      chat: chat,
+    );
   }
 
   AssignedTask? byId(String id) {
@@ -82,12 +118,18 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void completeTask(String taskId) {
+  Future<void> completeTask(String taskId) async {
     final task = byId(taskId);
     if (task == null) return;
     if (_activeTimerTaskId == taskId) stopTimer();
     task.status = 'DONE';
     notifyListeners();
+    try {
+      await ApiClient.instance.patch('/tasks/$taskId', body: {
+        'status': 'DONE',
+        'spentMinutes': task.spentSeconds ~/ 60,
+      });
+    } catch (_) {}
   }
 
   void sendChat({

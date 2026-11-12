@@ -62,7 +62,7 @@ export class ReportsService {
     });
     if (!user) throw new NotFoundException("User not found");
 
-    const [attendance, fees, courseList] = await Promise.all([
+    const [attendance, fees] = await Promise.all([
       this.prisma.attendanceRecord.findMany({
         where: { userId },
         orderBy: { date: "desc" },
@@ -73,8 +73,15 @@ export class ReportsService {
         where: { studentId: userId },
         orderBy: { dueDate: "desc" },
       }),
-      this.courses.list(userId, true),
     ]);
+
+    let courseList: Awaited<ReturnType<CoursesService["list"]>> = [];
+    try {
+      // Include drafts so admin profile still shows enrollments.
+      courseList = await this.courses.list(userId, false);
+    } catch {
+      courseList = [];
+    }
 
     const enrolled = courseList.filter((c) => c.enrolled);
     const present = attendance.filter(
