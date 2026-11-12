@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +11,7 @@ import '../../core/responsive.dart';
 import '../../models/course.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
@@ -23,11 +26,11 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   static const categories = [
-    ('All', CupertinoIcons.square_grid_2x2),
-    ('Coding', CupertinoIcons.chevron_left_slash_chevron_right),
-    ('Design', CupertinoIcons.paintbrush),
-    ('Business', CupertinoIcons.briefcase),
-    ('Education', CupertinoIcons.book),
+    ('All', Icons.grid_view_rounded),
+    ('Coding', Icons.code_rounded),
+    ('Design', Icons.brush_rounded),
+    ('Business', Icons.work_outline_rounded),
+    ('Education', Icons.menu_book_rounded),
   ];
 
   @override
@@ -35,6 +38,7 @@ class HomeScreen extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
     final tasks = context.watch<TaskProvider>();
+    final notes = context.watch<NotificationProvider>();
     final ui = context.watch<UiProvider>();
     final now = ui.now;
     final pad = AppResponsive.pagePad(context);
@@ -45,6 +49,10 @@ class HomeScreen extends StatelessWidget {
     final nextTopic = continueCourse?.nextTopic;
     final filtered = courses.filteredCourses;
     final featured = courses.featuredCourses;
+    final displayName = auth.user?.name.trim().isNotEmpty == true
+        ? auth.user!.name.trim()
+        : 'Student';
+    final unread = notes.unreadCount;
 
     if (courses.loading && courses.courses.isEmpty) {
       return const Scaffold(
@@ -59,77 +67,49 @@ class HomeScreen extends StatelessWidget {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // Header
+            // 1 — Top bar
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 8, pad, 0),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        const BrandMark(size: 36),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            AppBrand.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.ink,
-                            ),
-                          ),
+                    const BrandMark(size: 34),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        AppBrand.shortName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
+                          letterSpacing: -0.2,
                         ),
-                        IconButton(
-                          onPressed: () {
-                            ui.showSnack(
-                              myTasks.isEmpty
-                                  ? 'No new notifications'
-                                  : '${myTasks.length} assigned task${myTasks.length == 1 ? '' : 's'}',
-                            );
-                          },
-                          icon: Badge(
-                            isLabelVisible: myTasks.isNotEmpty,
-                            smallSize: 8,
-                            backgroundColor: AppColors.danger,
-                            child: const Icon(
-                              CupertinoIcons.bell,
-                              color: AppColors.ink,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      TimeUtils.greeting(now),
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      auth.user?.name ?? 'Learner',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    Text(
-                      auth.user?.roleLabel ?? '',
-                      style: const TextStyle(
-                        color: AppColors.blue,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                    IconButton(
+                      tooltip: 'Notifications',
+                      onPressed: () {
+                        ui.showSnack(
+                          unread == 0
+                              ? 'No new notifications'
+                              : '$unread unread notification${unread == 1 ? '' : 's'}',
+                          tone: AppSnackTone.info,
+                        );
+                      },
+                      icon: Badge(
+                        isLabelVisible: unread > 0,
+                        label: Text(
+                          unread > 9 ? '9+' : '$unread',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        backgroundColor: AppColors.danger,
+                        child: const Icon(
+                          Icons.notifications_none_rounded,
+                          color: AppColors.ink,
+                          size: 24,
+                        ),
                       ),
                     ),
                   ],
@@ -137,30 +117,132 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Stats — clear soft containers (same blue sequence)
+            // 2 — Name only (no greeting / role line)
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
+              sliver: SliverToBoxAdapter(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                    letterSpacing: -0.5,
+                    height: 1.15,
+                  ),
+                ),
+              ),
+            ),
+
+            // 3 — Continue learning (primary)
+            if (continueCourse != null)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
+                sliver: SliverToBoxAdapter(
+                  child: InkWell(
+                    onTap: () {
+                      courses.selectCourse(continueCourse);
+                      Navigator.of(context).push(
+                        AppMotion.fadeSlide(
+                          CourseDetailScreen(courseId: continueCourse.id),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: Ink(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.softBlue,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          CourseCover(
+                            url: continueCourse.thumbnailUrl,
+                            title: continueCourse.title,
+                            height: 52,
+                            width: 52,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Continue',
+                                  style: TextStyle(
+                                    color: AppColors.blue,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  continueCourse.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                                Text(
+                                  nextTopic?.title ??
+                                      '${continueCourse.progressPercent.toStringAsFixed(0)}% complete',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.play_circle_fill_rounded,
+                            color: AppColors.blue,
+                            size: 28,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // 4 — Overview stats
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Row(
                   children: [
                     Expanded(
                       child: _statBox(
-                        'Courses',
-                        '${courses.enrolledCourses.length}',
+                        icon: Icons.menu_book_rounded,
+                        label: 'Courses',
+                        value: '${courses.enrolledCourses.length}',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _statBox(
-                        'Attend',
-                        '${courses.overallAttendance.toStringAsFixed(0)}%',
+                        icon: Icons.fingerprint_rounded,
+                        label: 'Attendance',
+                        value:
+                            '${courses.overallAttendance.toStringAsFixed(0)}%',
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _statBox(
-                        'Due',
-                        'Rs ${courses.totalFeeDue}',
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Due',
+                        value: 'Rs ${courses.totalFeeDue}',
                       ),
                     ),
                   ],
@@ -168,7 +250,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Timers — flat rows
+            // 5 — Upcoming class / fee
             if (continueCourse?.nextClassAt != null ||
                 continueCourse?.feeDueAt != null)
               SliverPadding(
@@ -177,19 +259,11 @@ class HomeScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'UPCOMING',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
+                      const _SectionLabel('Upcoming'),
                       if (continueCourse?.nextClassAt != null) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         _timerRow(
-                          icon: CupertinoIcons.time,
+                          icon: Icons.schedule_rounded,
                           title: 'Next class',
                           subtitle:
                               '${continueCourse!.title} · ${nextTopic?.title ?? 'Continue'}',
@@ -209,13 +283,23 @@ class HomeScreen extends StatelessWidget {
                       ],
                       if (continueCourse?.nextClassAt != null &&
                           continueCourse?.feeDueAt != null)
-                        const Divider(height: 1, thickness: 0.5, color: AppColors.line),
+                        const Divider(
+                          height: 1,
+                          thickness: 0.5,
+                          color: AppColors.line,
+                        ),
                       if (continueCourse?.feeDueAt != null)
                         _timerRow(
-                          icon: CupertinoIcons.money_dollar_circle,
+                          icon: Icons.payments_outlined,
                           title: 'Fee due · Rs ${continueCourse!.monthlyFee}',
-                          subtitle: TimeUtils.dueLabel(continueCourse.feeDueAt!, now),
-                          timer: TimeUtils.countdown(continueCourse.feeDueAt!, now),
+                          subtitle: TimeUtils.dueLabel(
+                            continueCourse.feeDueAt!,
+                            now,
+                          ),
+                          timer: TimeUtils.countdown(
+                            continueCourse.feeDueAt!,
+                            now,
+                          ),
                           onTap: () {
                             Navigator.of(context).push(
                               AppMotion.fadeSlide(const FeesScreen()),
@@ -227,7 +311,123 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            // Assigned tasks
+            // 6 — My courses
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(child: _SectionLabel('My courses')),
+                        Text(
+                          '${filtered.length}',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 36,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: categories.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final item = categories[index];
+                          final selected =
+                              courses.selectedCategory == item.$1;
+                          return GestureDetector(
+                            onTap: () => courses.setCategory(item.$1),
+                            child: AnimatedContainer(
+                              duration: AppMotion.fast,
+                              curve: AppMotion.curve,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? AppColors.blue
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(100),
+                                border: Border.all(
+                                  color: selected
+                                      ? AppColors.blue
+                                      : AppColors.line,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    item.$2,
+                                    size: 15,
+                                    color: selected
+                                        ? Colors.white
+                                        : AppColors.muted,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    item.$1,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (filtered.isEmpty)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
+                sliver: const SliverToBoxAdapter(
+                  child: Text(
+                    'No courses in this category',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 4, pad, 0),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final course = filtered[index];
+                      return Column(
+                        children: [
+                          _courseRow(context, course, courses),
+                          if (index < filtered.length - 1)
+                            const Divider(
+                              height: 1,
+                              thickness: 0.5,
+                              color: AppColors.line,
+                            ),
+                        ],
+                      );
+                    },
+                    childCount: filtered.length,
+                  ),
+                ),
+              ),
+
+            // 7 — Tasks
             if (previewTasks.isNotEmpty)
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
@@ -237,17 +437,7 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Expanded(
-                            child: Text(
-                              'ASSIGNED TO ME',
-                              style: TextStyle(
-                                color: AppColors.muted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ),
+                          const Expanded(child: _SectionLabel('Tasks')),
                           if (myTasks.length > 3)
                             GestureDetector(
                               onTap: () {
@@ -280,18 +470,24 @@ class HomeScreen extends StatelessWidget {
                                 );
                               },
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
                                 child: Row(
                                   children: [
-                                    const Icon(
-                                      CupertinoIcons.checkmark_seal,
-                                      color: AppColors.blue,
+                                    Icon(
+                                      task.status == 'DONE'
+                                          ? Icons.check_circle_rounded
+                                          : Icons.radio_button_unchecked,
+                                      color: task.status == 'DONE'
+                                          ? AppColors.blue
+                                          : AppColors.muted,
                                       size: 22,
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             task.title,
@@ -304,7 +500,7 @@ class HomeScreen extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${task.status} · ${task.timerMinutes}m timer',
+                                            '${task.status} · ${task.timerMinutes}m',
                                             style: const TextStyle(
                                               color: AppColors.muted,
                                               fontSize: 12,
@@ -314,9 +510,9 @@ class HomeScreen extends StatelessWidget {
                                       ),
                                     ),
                                     const Icon(
-                                      CupertinoIcons.chevron_forward,
+                                      Icons.chevron_right_rounded,
                                       color: AppColors.muted,
-                                      size: 18,
+                                      size: 22,
                                     ),
                                   ],
                                 ),
@@ -336,88 +532,12 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            // Categories
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'CATEGORIES',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 36,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: categories.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final item = categories[index];
-                          final selected = courses.selectedCategory == item.$1;
-                          return GestureDetector(
-                            onTap: () => courses.setCategory(item.$1),
-                            child: AnimatedContainer(
-                              duration: AppMotion.fast,
-                              curve: AppMotion.curve,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: selected ? AppColors.blue : Colors.transparent,
-                                borderRadius: BorderRadius.circular(100),
-                                border: Border.all(
-                                  color: selected ? AppColors.blue : AppColors.line,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    item.$2,
-                                    size: 15,
-                                    color: selected ? Colors.white : AppColors.muted,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    item.$1,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: selected ? Colors.white : AppColors.ink,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Featured
+            // 8 — Browse / featured catalog
             if (featured.isNotEmpty) ...[
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
                 sliver: const SliverToBoxAdapter(
-                  child: Text(
-                    'FEATURED',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
+                  child: _SectionLabel('Browse'),
                 ),
               ),
               SliverToBoxAdapter(
@@ -436,96 +556,40 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
 
-            // My courses
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'MY COURSES',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${filtered.length}',
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (filtered.isEmpty)
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 24, pad, bottom),
-                sliver: const SliverToBoxAdapter(
-                  child: Center(
-                    child: Text(
-                      'No courses in this category',
-                      style: TextStyle(color: AppColors.muted),
-                    ),
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 4, pad, bottom),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final course = filtered[index];
-                      return Column(
-                        children: [
-                          _courseRow(context, course, courses),
-                          if (index < filtered.length - 1)
-                            const Divider(
-                              height: 1,
-                              thickness: 0.5,
-                              color: AppColors.line,
-                            ),
-                        ],
-                      );
-                    },
-                    childCount: filtered.length,
-                  ),
-                ),
-              ),
+            SliverToBoxAdapter(child: SizedBox(height: bottom + 8)),
           ],
         ),
       ),
     );
   }
 
-  Widget _statBox(String label, String value) {
+  Widget _statBox({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.softBlue,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(icon, size: 18, color: AppColors.blue),
+          const SizedBox(height: 8),
           Text(
             label,
             style: const TextStyle(
-              color: AppColors.blue,
-              fontSize: 12,
+              color: AppColors.muted,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 2),
           Text(
             value,
             maxLines: 1,
@@ -533,7 +597,7 @@ class HomeScreen extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.ink,
               fontWeight: FontWeight.w700,
-              fontSize: 16,
+              fontSize: 15,
             ),
           ),
         ],
@@ -625,7 +689,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              'Rs ${course.monthlyFee} · ${course.durationMonths} mo · ${course.rating}★',
+              'Rs ${course.monthlyFee}/mo · ${course.durationMonths} mo',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: AppColors.muted, fontSize: 12),
@@ -654,6 +718,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             CourseCover(
               url: course.thumbnailUrl,
+              title: course.title,
               height: 56,
               width: 56,
               borderRadius: BorderRadius.circular(10),
@@ -674,7 +739,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Mo Rs ${course.monthlyFee} · ${course.installmentCount}× Rs ${course.installmentFee}',
+                    'Rs ${course.monthlyFee}/mo · ${course.installmentCount}× Rs ${course.installmentFee}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -696,25 +761,46 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Progress ${course.progressPercent.toStringAsFixed(0)}% · Attend ${course.attendancePercent.toStringAsFixed(0)}%',
-                      style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                      '${course.progressPercent.toStringAsFixed(0)}% · Attendance ${course.attendancePercent.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                      ),
                     ),
                   ] else
-                    Text(
-                      'Not enrolled · ${course.rating}★',
-                      style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                    const Text(
+                      'Available to enroll',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
                     ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             const Icon(
-              CupertinoIcons.chevron_forward,
+              Icons.chevron_right_rounded,
               color: AppColors.muted,
-              size: 18,
+              size: 22,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        color: AppColors.muted,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.7,
       ),
     );
   }
