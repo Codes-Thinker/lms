@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
+import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../fees/fees_screen.dart';
@@ -12,8 +13,26 @@ import 'complain_screen.dart';
 import 'report_issue_screen.dart';
 import 'survey_screen.dart';
 
-class HelpHubScreen extends StatelessWidget {
+class HelpHubScreen extends StatefulWidget {
   const HelpHubScreen({super.key});
+
+  @override
+  State<HelpHubScreen> createState() => _HelpHubScreenState();
+}
+
+class _HelpHubScreenState extends State<HelpHubScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (NotificationRouter.takeOpenAdminChat()) {
+        Navigator.of(context).push(
+          AppMotion.fadeSlide(const AdminChatScreen()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +75,7 @@ class HelpHubScreen extends StatelessWidget {
       ),
       _HelpTile(
         title: 'Chat with admin',
-        subtitle: 'Direct chat · Ayaz Aslam only',
+        subtitle: 'Message admin · real-time replies',
         icon: CupertinoIcons.chat_bubble_2,
         onTap: () => Navigator.of(context).push(
           AppMotion.fadeSlide(const AdminChatScreen()),

@@ -13,12 +13,16 @@ import { AuthUser, CurrentUser } from "../common/decorators/current-user.decorat
 import { Roles } from "../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
+import { PrismaService } from "../prisma/prisma.service";
 import { SupportService } from "./support.service";
 
 @Controller("support")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SupportController {
-  constructor(private readonly support: SupportService) {}
+  constructor(
+    private readonly support: SupportService,
+    private readonly prisma: PrismaService
+  ) {}
 
   @Get("tickets/me")
   myTickets(@CurrentUser() user: AuthUser) {
@@ -68,8 +72,14 @@ export class SupportController {
     return this.support.listSurveyResponses();
   }
 
+  @Get("chats/unread-summary")
+  @Roles("SUPER_ADMIN")
+  unreadSummary() {
+    return this.support.unreadSummary();
+  }
+
   @Get("chats")
-  @Roles("SUPER_ADMIN", "STAFF")
+  @Roles("SUPER_ADMIN")
   chats(@Query("kind") kind?: ChatKind) {
     return this.support.listChats(kind);
   }
@@ -79,22 +89,45 @@ export class SupportController {
     @CurrentUser() user: AuthUser,
     @Query("kind") kind?: ChatKind
   ) {
+    // Student, intern, staff, teacher — all can open admin chat.
     return this.support.myChat(user.sub, kind ?? ChatKind.ADMIN);
   }
 
+  @Get("chats/:id")
+  @Roles("SUPER_ADMIN")
+  getChat(@Param("id") id: string) {
+    return this.support.getThread(id);
+  }
+
+  @Post("chats/:id/read")
+  @Roles("SUPER_ADMIN")
+  markRead(@Param("id") id: string) {
+    return this.support.markReadByAdmin(id);
+  }
+
   @Post("chats/:id/messages")
-  postMessage(
+  async postMessage(
     @Param("id") id: string,
     @CurrentUser() user: AuthUser,
     @Body() body: { text: string }
   ) {
     const isAdmin =
       user.accountType === "SUPER_ADMIN" || user.roles?.includes("SUPER_ADMIN");
+
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { fullName: true, email: true },
+    });
+    const senderName =
+      dbUser?.fullName?.trim() ||
+      dbUser?.email ||
+      (isAdmin ? "Admin" : "User");
+
     return this.support.postMessage(id, {
       senderId: user.sub,
-      senderName: user.email,
+      senderName,
       senderRole: isAdmin ? "ADMIN" : "USER",
-      text: body.text,
+      text: body.text ?? "",
     });
   }
 }

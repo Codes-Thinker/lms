@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/ui_provider.dart';
 import '../../providers/support_provider.dart';
+import '../../providers/ui_provider.dart';
 
 class AdminChatScreen extends StatefulWidget {
   const AdminChatScreen({super.key});
@@ -14,11 +16,39 @@ class AdminChatScreen extends StatefulWidget {
 
 class _AdminChatScreenState extends State<AdminChatScreen> {
   final _controller = TextEditingController();
+  final _scroll = ScrollController();
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<SupportProvider>().loadAdminChat();
+      _scrollToEnd();
+    });
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) async {
+      if (!mounted) return;
+      await context.read<SupportProvider>().loadAdminChat();
+    });
+  }
 
   @override
   void dispose() {
+    _poll?.cancel();
     _controller.dispose();
+    _scroll.dispose();
     super.dispose();
+  }
+
+  void _scrollToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      _scroll.animateTo(
+        _scroll.position.maxScrollExtent + 80,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   @override
@@ -32,8 +62,18 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Chat with admin', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-            Text('Ayaz Aslam only', style: TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w500)),
+            Text(
+              'Chat with admin',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              'Staff · Intern · Teacher · Student',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
         backgroundColor: AppColors.bg,
@@ -41,44 +81,53 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: support.chat.length,
-              itemBuilder: (context, index) {
-                final msg = support.chat[index];
-                final mine = msg.senderRole == 'USER';
-                return Align(
-                  alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    decoration: BoxDecoration(
-                      color: mine ? AppColors.blue : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: mine ? null : Border.all(color: AppColors.line),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${msg.senderName} · ${msg.sentAt}',
-                          style: TextStyle(
-                            color: mine ? Colors.white70 : AppColors.muted,
-                            fontSize: 11,
+            child: support.loading && support.chat.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: support.chat.length,
+                    itemBuilder: (context, index) {
+                      final msg = support.chat[index];
+                      final mine = msg.senderRole == 'USER';
+                      return Align(
+                        alignment:
+                            mine ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          decoration: BoxDecoration(
+                            color: mine ? AppColors.blue : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border:
+                                mine ? null : Border.all(color: AppColors.line),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${msg.senderName} · ${msg.sentAt}',
+                                style: TextStyle(
+                                  color:
+                                      mine ? Colors.white70 : AppColors.muted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                msg.text,
+                                style: TextStyle(
+                                  color: mine ? Colors.white : AppColors.ink,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          msg.text,
-                          style: TextStyle(color: mine ? Colors.white : AppColors.ink, height: 1.35),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           SafeArea(
             child: Padding(
@@ -88,6 +137,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _send(auth, support),
                       decoration: InputDecoration(
                         hintText: 'Message admin…',
                         filled: true,
@@ -101,17 +152,10 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: () async {
-                      final text = _controller.text;
-                      _controller.clear();
-                      await context.read<SupportProvider>().sendChat(
-                            senderName: auth.user?.name ?? 'User',
-                            text: text,
-                          );
-                      if (!context.mounted) return;
-                      context.read<UiProvider>().showSnack('Sent · appears in admin Chat inbox', tone: AppSnackTone.info);
-                    },
-                    style: IconButton.styleFrom(backgroundColor: AppColors.blue),
+                    onPressed: () => _send(auth, support),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.blue,
+                    ),
                     icon: const Icon(Icons.send_rounded, color: Colors.white),
                   ),
                 ],
@@ -121,5 +165,23 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _send(AuthProvider auth, SupportProvider support) async {
+    final text = _controller.text;
+    if (text.trim().isEmpty) return;
+    _controller.clear();
+    final ok = await support.sendChat(
+      senderName: auth.user?.name ?? 'User',
+      text: text,
+    );
+    if (!mounted) return;
+    _scrollToEnd();
+    final ui = context.read<UiProvider>();
+    if (ok) {
+      ui.showSnack('Message sent', tone: AppSnackTone.success);
+    } else {
+      ui.showSnack('Could not send message. Try again.', tone: AppSnackTone.error);
+    }
   }
 }

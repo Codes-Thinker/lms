@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ChatKind, TicketKind, TicketStatus } from "@prisma/client";
+import { ChatKind, NotificationType, TicketKind, TicketStatus } from "@prisma/client";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService
+  ) {}
 
   async listTickets(userId?: string) {
     const rows = await this.prisma.supportTicket.findMany({
@@ -35,7 +39,6 @@ export class SupportService {
         kind: data.kind,
         title: data.title,
         body: data.body,
-        status: TicketStatus.OPEN,
       },
       include: { user: true },
     });
@@ -53,14 +56,35 @@ export class SupportService {
   }
 
   async updateTicketStatus(id: string, status: TicketStatus) {
-    return this.prisma.supportTicket.update({ where: { id }, data: { status } });
+    const t = await this.prisma.supportTicket.update({
+      where: { id },
+      data: { status },
+      include: { user: true },
+    });
+    return {
+      id: t.id,
+      kind: t.kind,
+      userId: t.userId,
+      userName: t.user.fullName,
+      userRole: t.user.accountType,
+      title: t.title,
+      body: t.body,
+      status: t.status,
+      createdAt: t.createdAt.toISOString(),
+    };
   }
 
   async activeSurvey() {
-    return this.prisma.survey.findFirst({
+    const s = await this.prisma.survey.findFirst({
       where: { active: true },
       orderBy: { createdAt: "desc" },
     });
+    if (!s) return null;
+    return {
+      id: s.id,
+      title: s.title,
+      questions: s.questions,
+    };
   }
 
   async submitSurvey(
@@ -68,17 +92,19 @@ export class SupportService {
     surveyId: string,
     answers: Record<string, string>
   ) {
-    return this.prisma.surveyResponse.upsert({
+    await this.prisma.surveyResponse.upsert({
       where: { surveyId_userId: { surveyId, userId } },
       update: { answers },
       create: { surveyId, userId, answers },
     });
+    return { ok: true };
   }
 
   async listSurveyResponses() {
     const rows = await this.prisma.surveyResponse.findMany({
       include: { user: true, survey: true },
       orderBy: { submittedAt: "desc" },
+      take: 200,
     });
     return rows.map((r) => ({
       id: r.id,
@@ -86,7 +112,6 @@ export class SupportService {
       surveyTitle: r.survey.title,
       userId: r.userId,
       userName: r.user.fullName,
-      userRole: r.user.accountType,
       answers: r.answers,
       submittedAt: r.submittedAt.toISOString(),
     }));
@@ -102,6 +127,22 @@ export class SupportService {
       orderBy: { updatedAt: "desc" },
     });
     return rows.map((t) => this.mapThread(t));
+  }
+
+  /** Total unread for admin sidebar badge. */
+  async unreadSummary() {
+    const agg = await this.prisma.chatThread.aggregate({
+      _sum: { unreadByAdmin: true },
+      _count: { _all: true },
+    });
+    const threads = await this.prisma.chatThread.count({
+      where: { unreadByAdmin: { gt: 0 } },
+    });
+    return {
+      unreadMessages: agg._sum.unreadByAdmin ?? 0,
+      unreadThreads: threads,
+      totalThreads: agg._count._all,
+    };
   }
 
   async myChat(userId: string, kind: ChatKind = ChatKind.ADMIN) {
@@ -121,6 +162,37 @@ export class SupportService {
         },
       });
     }
+    // Opening own thread clears user unread.
+    if (thread.unreadByUser > 0) {
+      thread = await this.prisma.chatThread.update({
+        where: { id: thread.id },
+        data: { unreadByUser: 0 },
+        include: {
+          user: true,
+          messages: { orderBy: { createdAt: "asc" } },
+        },
+      });
+    }
+    return this.mapThread(thread);
+  }
+
+  async markReadByAdmin(threadId: string) {
+    await this.prisma.chatThread.update({
+      where: { id: threadId },
+      data: { unreadByAdmin: 0 },
+    });
+    return this.getThread(threadId);
+  }
+
+  async getThread(threadId: string) {
+    const thread = await this.prisma.chatThread.findUnique({
+      where: { id: threadId },
+      include: {
+        user: true,
+        messages: { orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!thread) throw new NotFoundException("Thread not found");
     return this.mapThread(thread);
   }
 
@@ -133,8 +205,12 @@ export class SupportService {
       text: string;
     }
   ) {
+    const text = input.text.trim();
+    if (!text) throw new NotFoundException("Message required");
+
     const thread = await this.prisma.chatThread.findUnique({
       where: { id: threadId },
+      include: { user: true },
     });
     if (!thread) throw new NotFoundException("Thread not found");
 
@@ -144,7 +220,7 @@ export class SupportService {
         senderId: input.senderId,
         senderName: input.senderName,
         senderRole: input.senderRole,
-        text: input.text,
+        text,
       },
     });
 
@@ -152,20 +228,37 @@ export class SupportService {
     await this.prisma.chatThread.update({
       where: { id: threadId },
       data: {
-        lastMessage: input.text,
+        lastMessage: text,
         unreadByAdmin: isAdmin ? 0 : { increment: 1 },
         unreadByUser: isAdmin ? { increment: 1 } : 0,
       },
     });
 
-    const updated = await this.prisma.chatThread.findUniqueOrThrow({
-      where: { id: threadId },
-      include: {
-        user: true,
-        messages: { orderBy: { createdAt: "asc" } },
-      },
-    });
-    return this.mapThread(updated);
+    // Push + in-app notification
+    const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text;
+    if (isAdmin) {
+      await this.notifications.notifyUser({
+        userId: thread.userId,
+        title: "New message from admin",
+        body: preview,
+        type: NotificationType.CHAT,
+        data: { threadId, kind: "CHAT" },
+      });
+    } else {
+      await this.notifications.notifyAdmins({
+        title: `Chat · ${thread.user.fullName}`,
+        body: preview,
+        type: NotificationType.CHAT,
+        data: {
+          threadId,
+          kind: "CHAT",
+          fromUserId: thread.userId,
+          fromRole: thread.user.accountType,
+        },
+      });
+    }
+
+    return this.getThread(threadId);
   }
 
   private mapThread(t: {
@@ -174,6 +267,7 @@ export class SupportService {
     kind: ChatKind;
     lastMessage: string | null;
     unreadByAdmin: number;
+    unreadByUser?: number;
     updatedAt: Date;
     user: { fullName: string; accountType: string };
     messages: {
@@ -194,6 +288,7 @@ export class SupportService {
       lastMessage: t.lastMessage,
       updatedAt: t.updatedAt.toISOString(),
       unreadByAdmin: t.unreadByAdmin,
+      unreadByUser: t.unreadByUser ?? 0,
       messages: t.messages.map((m) => ({
         id: m.id,
         senderId: m.senderId,

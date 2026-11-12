@@ -26,6 +26,10 @@ import { PageEnter } from "@/components/ui/page-enter";
 import { SnackbarProvider } from "@/components/ui/snackbar";
 import { NotificationsProvider } from "@/components/ui/notifications-provider";
 import { NotificationsBell } from "@/components/ui/notifications-bell";
+import {
+  ChatInboxProvider,
+  useChatInbox,
+} from "@/components/ui/chat-inbox-provider";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -40,6 +44,46 @@ const nav = [
   { href: "/feedback", label: "Feedback", icon: ClipboardList },
   { href: "/system", label: "System", icon: Settings2 },
 ];
+
+function NavLinks({ pathname }: { pathname: string }) {
+  const { unreadMessages } = useChatInbox();
+  return (
+    <nav className="flex-1 space-y-1">
+      {nav.map((item) => {
+        const active =
+          pathname === item.href ||
+          (item.href !== "/" && pathname.startsWith(item.href));
+        const Icon = item.icon;
+        const showBadge = item.href === "/inbox" && unreadMessages > 0;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+              active
+                ? "bg-[#2563EB] text-white"
+                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            <span className="flex-1 truncate">{item.label}</span>
+            {showBadge ? (
+              <span
+                className={cn(
+                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                  active ? "bg-white text-blue-700" : "bg-blue-600 text-white"
+                )}
+              >
+                {unreadMessages > 99 ? "99+" : unreadMessages}
+              </span>
+            ) : null}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -69,46 +113,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SnackbarProvider>
       <NotificationsProvider>
+        <ChatInboxProvider>
         <div className="dashboard-shell flex min-h-screen bg-[#F8FAFC]">
           <aside className="fixed inset-y-0 left-0 z-20 flex w-[220px] flex-col border-r border-slate-200 bg-white px-3 py-4 md:w-[250px]">
             <div className="mb-6 flex items-center gap-2.5 px-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/brand/ct_mark.png"
-                alt="CT"
-                className="h-10 w-10 rounded-full bg-[#0A1228] object-contain p-1"
+                src="/brand/app_icon.png"
+                alt="Code's Thinker LMS"
+                className="h-10 w-10 rounded-xl object-cover"
               />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
-                  Code&apos;s Thinker
+                  Code&apos;s Thinker LMS
                 </p>
-                <p className="text-[11px] font-medium text-slate-500">LMS Admin</p>
+                <p className="text-[11px] font-medium text-slate-500">Admin</p>
               </div>
             </div>
 
-            <nav className="flex-1 space-y-1">
-              {nav.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname.startsWith(item.href));
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      "nav-link flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
-                      active
-                        ? "bg-[#2563EB] text-white"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
+            <NavLinks pathname={pathname} />
 
             <div className="mt-auto border-t border-slate-200 pt-3">
               <div className="flex items-center gap-3 px-2">
@@ -161,6 +184,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </main>
           </div>
         </div>
+        </ChatInboxProvider>
       </NotificationsProvider>
     </SnackbarProvider>
   );
