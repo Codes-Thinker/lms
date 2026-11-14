@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { AccountType, TaskStatus } from "@prisma/client";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { AccountType, NotificationType, TaskStatus } from "@prisma/client";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -19,6 +19,7 @@ export class TasksService {
       include: {
         assignee: true,
         createdBy: true,
+        course: { select: { id: true, title: true } },
         messages: { orderBy: { createdAt: "asc" } },
       },
       orderBy: { updatedAt: "desc" },
@@ -36,6 +37,15 @@ export class TasksService {
       dueAt: t.dueAt?.toISOString() ?? null,
       timerMinutes: t.timerMinutes,
       spentMinutes: t.spentMinutes,
+      courseId: t.courseId,
+      courseTitle: t.course?.title ?? null,
+      submissionText: t.submissionText,
+      submissionFileName: t.submissionFileName,
+      submittedAt: t.submittedAt?.toISOString() ?? null,
+      reviewerId: t.reviewerId,
+      reviewedAt: t.reviewedAt?.toISOString() ?? null,
+      feedback: t.feedback,
+      reviewStatus: t.reviewStatus,
       createdAt: t.createdAt.toISOString(),
       updatedAt: t.updatedAt.toISOString(),
       chat: t.messages.map((m) => ({
@@ -57,15 +67,17 @@ export class TasksService {
     createdById?: string;
     dueAt?: string;
     timerMinutes?: number;
+    courseId?: string;
   }) {
     const t = await this.prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
         studyNotes: data.studyNotes,
-        audience: data.audience ?? AccountType.STAFF,
+        audience: data.audience ?? AccountType.STUDENT,
         assigneeId: data.assigneeId,
         createdById: data.createdById,
+        courseId: data.courseId,
         dueAt: data.dueAt ? new Date(data.dueAt) : undefined,
         timerMinutes: data.timerMinutes ?? 0,
         status: TaskStatus.ASSIGNED,
@@ -74,13 +86,105 @@ export class TasksService {
     if (data.assigneeId) {
       await this.notifications.notifyUser({
         userId: data.assigneeId,
-        title: "New task",
+        title: "New assignment",
         body: data.title,
-        type: "TASK",
+        type: NotificationType.TASK,
         data: { taskId: t.id },
       });
     }
     return (await this.listTasks()).find((x) => x.id === t.id);
+  }
+
+  /** Student submits an assignment (text response + optional file). */
+  async submitAssignment(
+    taskId: string,
+    userId: string,
+    data: { submissionText?: string; submissionFileData?: string; submissionFileName?: string },
+  ) {
+    const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) throw new NotFoundException("Assignment not found");
+    if (task.assigneeId !== userId) {
+      throw new ForbiddenException("This assignment is not assigned to you");
+    }
+
+    await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        submissionText: data.submissionText ?? null,
+        submissionFileData: data.submissionFileData ?? null,
+        submissionFileName: data.submissionFileName ?? null,
+        submittedAt: new Date(),
+        status: TaskStatus.SUBMITTED,
+      },
+    });
+
+    // Notify the creator (teacher/admin)
+    if (task.createdById) {
+      await this.notifications.notifyUser({
+        userId: task.createdById,
+        title: "Assignment submitted",
+        body: `${task.title} has been submitted`,
+        type: NotificationType.TASK,
+        data: { taskId, event: "submitted" },
+      });
+    }
+
+    return (await this.listTasks()).find((x) => x.id === taskId);
+  }
+
+  /** Teacher/admin reviews a submission — approve, reject, or request revision. */
+  async reviewAssignment(
+    taskId: string,
+    reviewerId: string,
+    data: { reviewStatus: string; feedback?: string },
+  ) {
+    const task = await this.prisma.task.findUnique({ where: { id: taskId } });
+    if (!task) throw new NotFoundException("Assignment not found");
+
+    const statusMap: Record<string, TaskStatus> = {
+      APPROVED: TaskStatus.DONE,
+      REJECTED: TaskStatus.ASSIGNED,
+      REVISION_REQUESTED: TaskStatus.ASSIGNED,
+      REVIEWED: TaskStatus.REVIEWED,
+    };
+    const newStatus = statusMap[data.reviewStatus] ?? TaskStatus.REVIEWED;
+
+    await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        reviewStatus: data.reviewStatus,
+        feedback: data.feedback ?? null,
+        reviewedAt: new Date(),
+        reviewerId,
+        status: newStatus,
+      },
+    });
+
+    // Notify the student
+    if (task.assigneeId) {
+      const titleMap: Record<string, string> = {
+        APPROVED: "Assignment approved",
+        REJECTED: "Assignment rejected",
+        REVISION_REQUESTED: "Revision requested",
+        REVIEWED: "Assignment reviewed",
+      };
+      await this.notifications.notifyUser({
+        userId: task.assigneeId,
+        title: titleMap[data.reviewStatus] ?? "Assignment reviewed",
+        body: data.feedback
+          ? `${task.title}: ${data.feedback}`
+          : task.title,
+        type: NotificationType.TASK,
+        data: { taskId, event: "reviewed", reviewStatus: data.reviewStatus },
+      });
+    }
+
+    return (await this.listTasks()).find((x) => x.id === taskId);
+  }
+
+  /** Get tasks for a specific student (admin view). */
+  async tasksForStudent(studentId: string) {
+    return this.listTasks({ assigneeId: studentId });
   }
 
   async updateTask(

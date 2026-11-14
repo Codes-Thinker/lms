@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { FeeStatus } from "@prisma/client";
@@ -35,15 +36,62 @@ export class FeesController {
     return this.fees.list();
   }
 
+  /** Admin: list pending payment submissions. */
+  @Get("submissions")
+  @Roles("SUPER_ADMIN", "STAFF")
+  submissions(@Query("status") status?: string) {
+    return this.fees.listSubmissions(status);
+  }
+
+  /** Admin: configure monthly fee for a student. */
+  @Post("configure")
+  @Roles("SUPER_ADMIN", "STAFF")
+  configure(@Body() body: {
+    studentId: string;
+    monthlyFee?: number;
+    feeStartDate?: string;
+    feeDueDay?: number;
+    courseId?: string;
+  }) {
+    return this.fees.configureStudentFee(body.studentId, body);
+  }
+
   @Get(":id")
   get(@Param("id") id: string) {
     return this.fees.get(id);
+  }
+
+  /** Get payment submissions for a fee case. */
+  @Get(":id/submissions")
+  feeSubmissions(@Param("id") id: string) {
+    return this.fees.submissionsForFee(id);
   }
 
   @Patch(":id/status")
   @Roles("SUPER_ADMIN", "STAFF")
   status(@Param("id") id: string, @Body() body: { status: FeeStatus }) {
     return this.fees.updateStatus(id, body.status);
+  }
+
+  /** Student: submit payment with screenshot proof. */
+  @Post(":id/submit-payment")
+  submitPayment(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { amount: number; screenshotData?: string; screenshotName?: string },
+  ) {
+    return this.fees.submitPayment(id, user.sub, body);
+  }
+
+  /** Admin: verify or reject a payment. */
+  @Patch(":id/verify")
+  @Roles("SUPER_ADMIN", "STAFF")
+  verifyPayment(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { approved: boolean; rejectionReason?: string },
+  ) {
+    return this.fees.verifyPayment(id, user.sub, body);
   }
 
   @Post(":id/messages")

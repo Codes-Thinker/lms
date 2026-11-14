@@ -43,6 +43,13 @@ export class UsersController {
     return this.users.getById(id);
   }
 
+  /** Comprehensive student detail for admin dashboard. */
+  @Get(":id/detail")
+  @Roles("SUPER_ADMIN", "STAFF")
+  detail(@Param("id") id: string) {
+    return this.users.getStudentDetail(id);
+  }
+
   @Post()
   @Roles("SUPER_ADMIN", "STAFF")
   create(@Body() dto: CreateUserDto, @CurrentUser() actor: AuthUser) {

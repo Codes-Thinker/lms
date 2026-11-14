@@ -30,9 +30,30 @@ export class CoursesController {
     return this.courses.list(user.sub, publishedOnly);
   }
 
+  /** Dynamic course categories from the database. */
+  @Get("categories")
+  categories() {
+    return this.courses.categories();
+  }
+
   @Get(":id")
   get(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.courses.get(id, user.sub);
+  }
+
+  /**
+   * Get course content with enrollment-based access control.
+   * Non-enrolled users receive only public info (no outline/lessons).
+   */
+  @Get(":id/content")
+  getContent(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.courses.getContent(id, user.sub);
+  }
+
+  /** Check enrollment status for the current user. */
+  @Get(":id/enrollment")
+  checkEnrollment(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.courses.checkEnrollment(user.sub, id);
   }
 
   @Post(":id/enroll")

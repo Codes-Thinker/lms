@@ -126,6 +126,10 @@ export class UsersService {
         designation: u.designation,
         phone: u.phone,
         track: u.track,
+        profileImage: u.profileImage,
+        monthlyFee: u.monthlyFee,
+        feeStartDate: u.feeStartDate,
+        feeDueDay: u.feeDueDay,
         department: u.department?.name ?? u.department,
         departmentId: u.departmentId,
         batch: u.batch?.code ?? u.batch,
@@ -170,6 +174,10 @@ export class UsersService {
       designation: u.designation,
       phone: u.phone,
       track: u.track,
+      profileImage: u.profileImage,
+      monthlyFee: u.monthlyFee,
+      feeStartDate: u.feeStartDate,
+      feeDueDay: u.feeDueDay,
       department: u.department?.name ?? null,
       departmentId: u.departmentId,
       batch: u.batch?.code ?? null,
@@ -180,6 +188,188 @@ export class UsersService {
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
       invitations: u.invitations,
+    };
+  }
+
+  /** Comprehensive student detail for the admin dashboard. */
+  async getStudentDetail(id: string) {
+    const u = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        roles: { include: { role: true } },
+        department: true,
+        batch: true,
+        enrollments: {
+          include: {
+            course: {
+              include: {
+                sections: { include: { topics: true } },
+              },
+            },
+          },
+        },
+        attendanceRecords: {
+          include: { course: true },
+          orderBy: { date: "desc" },
+          take: 30,
+        },
+        assignedTasks: {
+          include: {
+            course: { select: { title: true } },
+            createdBy: { select: { fullName: true } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        feeCases: {
+          include: { messages: { orderBy: { createdAt: "asc" } } },
+          orderBy: { dueDate: "desc" },
+        },
+        staffSchedule: true,
+      },
+    });
+    if (!u) throw new NotFoundException("User not found");
+
+    // Compute topic progress per enrollment
+    const progress = await this.prisma.topicProgress.findMany({
+      where: { userId: id, completed: true },
+      select: { topicId: true },
+    });
+    const completedIds = new Set(progress.map((p) => p.topicId));
+
+    const enrolledCourses = u.enrollments.map((enr) => {
+      const topics = enr.course.sections.flatMap((s) => s.topics);
+      const done = topics.filter((t) => completedIds.has(t.id)).length;
+      return {
+        id: enr.course.id,
+        title: enr.course.title,
+        category: enr.course.category,
+        enrolledAt: enr.enrolledAt.toISOString().slice(0, 10),
+        feeStatus: enr.feeStatus,
+        paidAmount: enr.paidAmount,
+        monthlyFee: enr.course.monthlyFee,
+        totalFee: enr.course.totalFee,
+        progressPercent: topics.length === 0 ? 0 : Math.round((done / topics.length) * 100),
+        topicsDone: done,
+        topicsTotal: topics.length,
+      };
+    });
+
+    const attendance = u.attendanceRecords.map((r) => {
+      const checkIn = r.checkInAt;
+      const checkOut = r.checkOutAt;
+      let durationMinutes: number | null = null;
+      if (checkIn && checkOut) {
+        durationMinutes = Math.round((checkOut.getTime() - checkIn.getTime()) / 60000);
+      }
+      return {
+        id: r.id,
+        date: r.date.toISOString().slice(0, 10),
+        checkInAt: checkIn?.toISOString() ?? null,
+        checkOutAt: checkOut?.toISOString() ?? null,
+        status: r.status,
+        autoCheckout: r.autoCheckout,
+        durationMinutes,
+        shiftStart: r.shiftStart,
+        shiftEnd: r.shiftEnd,
+        courseTitle: r.course?.title ?? null,
+      };
+    });
+
+    const tasks = u.assignedTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      status: t.status,
+      courseTitle: t.course?.title ?? null,
+      assignedBy: t.createdBy?.fullName ?? null,
+      dueAt: t.dueAt?.toISOString() ?? null,
+      submittedAt: t.submittedAt?.toISOString() ?? null,
+      reviewStatus: t.reviewStatus,
+      feedback: t.feedback,
+      createdAt: t.createdAt.toISOString(),
+    }));
+
+    const fees = u.feeCases.map((f) => ({
+      id: f.id,
+      courseTitle: f.courseTitle,
+      month: f.month,
+      amount: f.amount,
+      status: f.status,
+      dueDate: f.dueDate.toISOString().slice(0, 10),
+      monthlyFee: f.monthlyFee,
+      paymentSubmittedAt: f.paymentSubmittedAt?.toISOString() ?? null,
+      rejectionReason: f.rejectionReason,
+      messages: f.messages.map((m) => ({
+        id: m.id,
+        senderName: m.senderName,
+        senderRole: m.senderRole,
+        text: m.text,
+        hasScreenshot: m.hasScreenshot,
+        sentAt: m.createdAt.toISOString(),
+      })),
+    }));
+
+    const outstandingAmount = u.feeCases
+      .filter((f) => f.status !== "PAID")
+      .reduce((sum, f) => sum + f.amount, 0);
+
+    // Today's attendance summary
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayRecord = u.attendanceRecords.find((r) => {
+      const rDate = new Date(r.date);
+      rDate.setHours(0, 0, 0, 0);
+      return rDate.getTime() === today.getTime();
+    });
+
+    return {
+      id: u.id,
+      name: u.fullName,
+      fullName: u.fullName,
+      email: u.email,
+      role: u.accountType,
+      accountType: u.accountType,
+      status: u.status,
+      designation: u.designation,
+      phone: u.phone,
+      track: u.track,
+      profileImage: u.profileImage,
+      department: u.department?.name ?? null,
+      batch: u.batch?.code ?? null,
+      roles: u.roles.map((r) => r.role.code),
+      createdAt: u.createdAt,
+      monthlyFee: u.monthlyFee,
+      feeStartDate: u.feeStartDate,
+      feeDueDay: u.feeDueDay,
+      // Sections
+      personalInfo: {
+        name: u.fullName,
+        email: u.email,
+        phone: u.phone,
+        status: u.status,
+        designation: u.designation,
+        track: u.track,
+        department: u.department?.name ?? null,
+        batch: u.batch?.code ?? null,
+        profileImage: u.profileImage,
+        createdAt: u.createdAt.toISOString().slice(0, 10),
+      },
+      enrolledCourses,
+      attendanceHistory: attendance,
+      assignments: tasks,
+      feeHistory: fees,
+      outstandingAmount,
+      todayAttendance: todayRecord
+        ? {
+            checkInAt: todayRecord.checkInAt?.toISOString() ?? null,
+            checkOutAt: todayRecord.checkOutAt?.toISOString() ?? null,
+            status: todayRecord.status,
+            autoCheckout: todayRecord.autoCheckout,
+          }
+        : null,
+      schedule: u.staffSchedule
+        ? { startTime: u.staffSchedule.startTime, endTime: u.staffSchedule.endTime }
+        : null,
     };
   }
 
@@ -245,6 +435,12 @@ export class UsersService {
         fullName: dto.fullName?.trim(),
         status: dto.status,
         designation: dto.designation,
+        phone: dto.phone,
+        track: dto.track,
+        profileImage: dto.profileImage,
+        monthlyFee: dto.monthlyFee,
+        feeStartDate: dto.feeStartDate ? new Date(dto.feeStartDate) : undefined,
+        feeDueDay: dto.feeDueDay,
         departmentId: dto.departmentId === undefined ? undefined : dto.departmentId,
         batchId: dto.batchId === undefined ? undefined : dto.batchId,
       },

@@ -42,7 +42,36 @@ export class TasksController {
       createdById: user.sub,
       dueAt: body.dueAt as string | undefined,
       timerMinutes: body.timerMinutes as number | undefined,
+      courseId: body.courseId as string | undefined,
     });
+  }
+
+  /** Get tasks for a specific student (admin view). */
+  @Get("tasks/student/:userId")
+  @Roles("SUPER_ADMIN", "STAFF")
+  studentTasks(@Param("userId") userId: string) {
+    return this.tasks.tasksForStudent(userId);
+  }
+
+  /** Student submits an assignment. */
+  @Post("tasks/:id/submit")
+  submitAssignment(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { submissionText?: string; submissionFileData?: string; submissionFileName?: string },
+  ) {
+    return this.tasks.submitAssignment(id, user.sub, body);
+  }
+
+  /** Teacher/admin reviews a submission. */
+  @Patch("tasks/:id/review")
+  @Roles("SUPER_ADMIN", "STAFF")
+  reviewAssignment(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { reviewStatus: string; feedback?: string },
+  ) {
+    return this.tasks.reviewAssignment(id, user.sub, body);
   }
 
   @Patch("tasks/:id")

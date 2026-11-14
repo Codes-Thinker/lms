@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -167,6 +168,31 @@ export class CoursesService {
   }
 
   async toggleTopic(userId: string, topicId: string, completed: boolean) {
+    // Verify enrollment before allowing progress marking
+    const topic = await this.prisma.courseTopic.findUnique({
+      where: { id: topicId },
+      include: { section: { select: { courseId: true } } },
+    });
+    if (!topic) throw new NotFoundException("Topic not found");
+
+    const courseId = topic.section.courseId;
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+
+    // SUPER_ADMIN and STAFF can mark progress on any course
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { accountType: true },
+    });
+    const isStaff = user?.accountType === "SUPER_ADMIN" || user?.accountType === "STAFF";
+
+    if (!enrollment && !isStaff) {
+      throw new ForbiddenException(
+        "You must be enrolled in this course to mark progress.",
+      );
+    }
+
     return this.prisma.topicProgress.upsert({
       where: { userId_topicId: { userId, topicId } },
       update: {
@@ -180,6 +206,128 @@ export class CoursesService {
         completedAt: completed ? new Date() : null,
       },
     });
+  }
+
+  /** Dynamic course categories from the database. */
+  async categories() {
+    return this.prisma.courseCategory.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: "asc" },
+    });
+  }
+
+  /**
+   * Get course content with enrollment-based access control.
+   * - Enrolled users (or staff) get the full outline with topics.
+   * - Non-enrolled users get only public info (title, thumbnail, description,
+   *   duration, fees, enrollment status) — NO outline/topics/lessons.
+   */
+  async getContent(id: string, userId: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id },
+      include: {
+        sections: {
+          include: { topics: true },
+          orderBy: { sortOrder: "asc" },
+        },
+        enrollments: { where: { userId } },
+        _count: { select: { enrollments: true } },
+      },
+    });
+
+    if (!course) throw new NotFoundException("Course not found");
+    if (!course.published) {
+      // Only staff can see unpublished courses
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { accountType: true },
+      });
+      if (user?.accountType !== "SUPER_ADMIN" && user?.accountType !== "STAFF") {
+        throw new NotFoundException("Course not found");
+      }
+    }
+
+    const enrollment = course.enrollments[0] ?? null;
+    const isEnrolled = Boolean(enrollment);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { accountType: true },
+    });
+    const isStaff = user?.accountType === "SUPER_ADMIN" || user?.accountType === "STAFF";
+
+    // Public fields always returned
+    const publicInfo = {
+      id: course.id,
+      title: course.title,
+      category: course.category,
+      description: course.description,
+      thumbnailUrl: course.thumbnailUrl,
+      durationMonths: course.durationMonths,
+      monthlyFee: course.monthlyFee,
+      totalFee: course.totalFee,
+      installmentFee: course.installmentFee,
+      installmentCount: course.installmentCount,
+      published: course.published,
+      startMonth: course.startMonth,
+      rating: course.rating,
+      batch: course.batchLabel,
+      enrolledCount: course._count.enrollments,
+      enrolled: isEnrolled,
+      paidAmount: enrollment?.paidAmount ?? 0,
+      feeStatus: enrollment?.feeStatus ?? null,
+    };
+
+    // Non-enrolled (non-staff) users get ONLY public info — no outline
+    if (!isEnrolled && !isStaff) {
+      return {
+        ...publicInfo,
+        progressPercent: 0,
+        outline: [],
+        locked: true,
+        message:
+          "You are not enrolled in this course. Enroll to access the full content.",
+      };
+    }
+
+    // Enrolled or staff: return full content with progress
+    const progress = await this.prisma.topicProgress.findMany({
+      where: { userId, completed: true },
+      select: { topicId: true },
+    });
+    const completedIds = new Set(progress.map((p) => p.topicId));
+
+    const topics = course.sections.flatMap((s) => s.topics);
+    const done = topics.filter((t) => completedIds.has(t.id)).length;
+    const percent = topics.length === 0 ? 0 : Math.round((done / topics.length) * 100);
+
+    return {
+      ...publicInfo,
+      progressPercent: percent,
+      outline: course.sections.map((s) => ({
+        id: s.id,
+        title: s.title,
+        order: s.sortOrder,
+        topics: s.topics
+          .sort((a, b) => a.sortOrder - b.sortOrder)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            minutes: t.minutes,
+            order: t.sortOrder,
+            completed: completedIds.has(t.id),
+          })),
+      })),
+      locked: false,
+    };
+  }
+
+  /** Check if a user is enrolled in a course. */
+  async checkEnrollment(userId: string, courseId: string) {
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+    return { enrolled: Boolean(enrollment), enrollment };
   }
 
   private async replaceOutline(courseId: string, outline: OutlineSectionInput[]) {

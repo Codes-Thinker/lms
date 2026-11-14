@@ -790,6 +790,63 @@ async function main() {
     },
   });
 
+  // ── Office geofence configuration (singleton row) ──
+  await prisma.officeConfig.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      latitude: 29.3931779,
+      longitude: 71.6924333,
+      radiusMeters: 100,
+      timezone: "Asia/Karachi",
+    },
+  });
+
+  // ── Dynamic course categories ──
+  const categoryNames = [
+    { name: "Programming", icon: "code", sortOrder: 1 },
+    { name: "Flutter Development", icon: "phone_android", sortOrder: 2 },
+    { name: "Web Development", icon: "web", sortOrder: 3 },
+    { name: "UI/UX Design", icon: "design_services", sortOrder: 4 },
+    { name: "Graphic Design", icon: "brush", sortOrder: 5 },
+    { name: "Backend Development", icon: "dns", sortOrder: 6 },
+  ];
+  for (const cat of categoryNames) {
+    await prisma.courseCategory.upsert({
+      where: { name: cat.name },
+      update: { icon: cat.icon, sortOrder: cat.sortOrder },
+      create: cat,
+    });
+  }
+
+  // Link existing courses to categories by matching category string
+  const allCourses = await prisma.course.findMany();
+  const allCategories = await prisma.courseCategory.findMany();
+  for (const course of allCourses) {
+    const matched = allCategories.find(
+      (c) => c.name.toLowerCase() === course.category.toLowerCase()
+    );
+    if (matched && !course.categoryId) {
+      await prisma.course.update({
+        where: { id: course.id },
+        data: { categoryId: matched.id },
+      });
+    }
+  }
+
+  // ── Staff work schedules ──
+  const staffUsers = await prisma.user.findMany({
+    where: { accountType: AccountType.STAFF },
+  });
+  for (const staff of staffUsers) {
+    await prisma.staffSchedule.upsert({
+      where: { userId: staff.id },
+      update: {},
+      create: { userId: staff.id, startTime: "08:00", endTime: "17:00" },
+    });
+  }
+
   console.log("Seed complete:", {
     admin: admin.email,
     demoPassword: DEMO_PASSWORD,

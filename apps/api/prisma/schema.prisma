@@ -33,11 +33,14 @@ enum FeeStatus {
   PAID
   PARTIAL
   OVERDUE
+  REJECTED
 }
 
 enum TaskStatus {
   ASSIGNED
   IN_PROGRESS
+  SUBMITTED
+  REVIEWED
   DONE
   BLOCKED
 }
@@ -132,6 +135,7 @@ model User {
   feeCases           FeeCase[]           @relation("FeeStudent")
   assignedTasks      Task[]              @relation("TaskAssignee")
   createdTasks       Task[]              @relation("TaskCreator")
+  reviewedTasks      Task[]              @relation("TaskReviewer")
   projects           Project[]           @relation("ProjectIntern")
   createdProjects    Project[]           @relation("ProjectCreator")
   tickets            SupportTicket[]
@@ -142,6 +146,15 @@ model User {
   feeMessages        FeeMessage[]
   taskMessages       TaskMessage[]
   fcmDevices         FcmDevice[]
+  staffSchedule      StaffSchedule?
+  paymentSubmissions PaymentSubmission[]  @relation("PaymentSubStudent")
+  reviewedPayments   PaymentSubmission[]  @relation("PaymentReviewer")
+  attendanceReminders AttendanceReminder[]
+
+  profileImage    String?
+  monthlyFee      Int?
+  feeStartDate    DateTime?  @db.Date
+  feeDueDay       Int        @default(15)
 }
 
 model FcmDevice {
@@ -201,12 +214,15 @@ model Course {
   batchId          String?
   batch            Batch?         @relation(fields: [batchId], references: [id])
   batchLabel       String?
+  categoryId       String?
+  categoryRef      CourseCategory? @relation(fields: [categoryId], references: [id])
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   sections         CourseSection[]
   enrollments      Enrollment[]
   feeCases         FeeCase[]
   attendance       AttendanceRecord[]
+  tasks            Task[]
 }
 
 model CourseSection {
@@ -254,18 +270,24 @@ model TopicProgress {
 }
 
 model AttendanceRecord {
-  id         String           @id @default(cuid())
-  userId     String
-  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  courseId   String?
-  course     Course?          @relation(fields: [courseId], references: [id])
-  date       DateTime         @db.Date
-  checkInAt  DateTime?
-  checkOutAt DateTime?
-  status     AttendanceStatus @default(PRESENT)
-  source     String           @default("APP")
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String?
+  course          Course?          @relation(fields: [courseId], references: [id])
+  date            DateTime         @db.Date
+  checkInAt       DateTime?
+  checkOutAt      DateTime?
+  status          AttendanceStatus @default(PRESENT)
+  source          String           @default("APP")
+  checkInLat      Float?
+  checkInLng      Float?
+  checkInDistance Float?
+  autoCheckout    Boolean          @default(false)
+  shiftStart      String?
+  shiftEnd        String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@index([userId, date])
   @@index([date])
@@ -282,9 +304,16 @@ model FeeCase {
   amount     Int
   status     FeeStatus    @default(DUE)
   dueDate    DateTime
+  monthlyFee       Int?
+  billingStart     DateTime?  @db.Date
+  dueDay           Int        @default(15)
+  paymentScreenshotData String?
+  paymentSubmittedAt     DateTime?
+  rejectionReason        String?
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   messages   FeeMessage[]
+  submissions PaymentSubmission[]
 }
 
 model FeeMessage {
@@ -314,6 +343,17 @@ model Task {
   assignee      User?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
   createdById   String?
   createdBy     User?         @relation("TaskCreator", fields: [createdById], references: [id])
+  reviewerId    String?
+  reviewer      User?         @relation("TaskReviewer", fields: [reviewerId], references: [id])
+  courseId      String?
+  course        Course?       @relation(fields: [courseId], references: [id])
+  submissionText     String?
+  submissionFileData String?
+  submissionFileName String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  feedback           String?
+  reviewStatus       String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   messages      TaskMessage[]
@@ -444,4 +484,68 @@ model PaymentInfo {
   bankTitle   String?
   bankAccount String?
   updatedAt   DateTime @updatedAt
+}
+
+model OfficeConfig {
+  id           Int      @id @default(1)
+  latitude     Float    @default(29.3931779)
+  longitude    Float    @default(71.6924333)
+  radiusMeters Int      @default(100)
+  timezone     String   @default("Asia/Karachi")
+  updatedAt    DateTime @updatedAt
+}
+
+model StaffSchedule {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startTime String   @default("08:00")
+  endTime   String   @default("17:00")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId])
+}
+
+model CourseCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  courses   Course[]
+}
+
+model PaymentSubmission {
+  id             String   @id @default(cuid())
+  feeCaseId      String
+  feeCase        FeeCase  @relation(fields: [feeCaseId], references: [id], onDelete: Cascade)
+  studentId      String
+  student        User     @relation("PaymentSubStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  amount         Int
+  screenshotData String?
+  screenshotName String?
+  status         String   @default("PENDING_VERIFICATION")
+  rejectionReason String?
+  reviewedById   String?
+  reviewedBy     User?    @relation("PaymentReviewer", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([feeCaseId])
+  @@index([studentId])
+}
+
+model AttendanceReminder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
 }

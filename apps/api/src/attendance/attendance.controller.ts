@@ -24,21 +24,42 @@ export class AttendanceController {
   @Roles("SUPER_ADMIN", "STAFF")
   list(
     @Query("date") date?: string,
-    @Query("accountType") accountType?: string
+    @Query("accountType") accountType?: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+    @Query("status") status?: string,
   ) {
-    return this.attendance.list({ date, accountType });
+    return this.attendance.list({ date, accountType, startDate, endDate, status });
   }
 
   @Post("check-in")
   checkIn(
     @CurrentUser() user: AuthUser,
-    @Body() body: { courseId?: string }
+    @Body() body: { courseId?: string; lat?: number; lng?: number },
   ) {
-    return this.attendance.checkIn(user.sub, body?.courseId);
+    return this.attendance.checkIn(user.sub, body);
   }
 
   @Post("check-out")
   checkOut(@CurrentUser() user: AuthUser) {
     return this.attendance.checkOut(user.sub);
+  }
+
+  /** Verify if the user is inside the geofence (Flutter uses this to enable/disable check-in). */
+  @Post("verify-location")
+  verifyLocation(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { lat: number; lng: number },
+  ) {
+    return this.attendance.verifyLocation(user.sub, body.lat, body.lng);
+  }
+
+  /** Process geofence arrival — sends at most one reminder per day. */
+  @Post("arrival-reminder")
+  arrivalReminder(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { lat: number; lng: number },
+  ) {
+    return this.attendance.processArrivalReminder(user.sub, body.lat, body.lng);
   }
 }

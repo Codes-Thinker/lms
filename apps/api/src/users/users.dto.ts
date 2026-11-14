@@ -69,11 +69,35 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  track?: string;
+
+  @IsOptional()
+  @IsString()
+  profileImage?: string;
+
+  @IsOptional()
+  @IsString()
   departmentId?: string | null;
 
   @IsOptional()
   @IsString()
   batchId?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  monthlyFee?: number;
+
+  @IsOptional()
+  @IsString()
+  feeStartDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  feeDueDay?: number;
 }
 
 export class ListUsersQueryDto {
