@@ -428,28 +428,98 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto) {
-    await this.getById(id);
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        fullName: dto.fullName?.trim(),
-        status: dto.status,
-        designation: dto.designation,
-        phone: dto.phone,
-        track: dto.track,
-        profileImage: dto.profileImage,
-        monthlyFee: dto.monthlyFee,
-        feeStartDate: dto.feeStartDate ? new Date(dto.feeStartDate) : undefined,
-        feeDueDay: dto.feeDueDay,
-        departmentId: dto.departmentId === undefined ? undefined : dto.departmentId,
-        batchId: dto.batchId === undefined ? undefined : dto.batchId,
-      },
-      include: {
-        roles: { include: { role: true } },
-        department: true,
-        batch: true,
-      },
-    });
+    const existing = await this.prisma.user.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("User not found");
+
+    if (dto.email) {
+      const email = dto.email.toLowerCase().trim();
+      const clash = await this.prisma.user.findFirst({
+        where: { email, NOT: { id } },
+      });
+      if (clash) throw new ConflictException("Email already registered");
+    }
+
+    if (dto.accountType === AccountType.SUPER_ADMIN) {
+      throw new BadRequestException("Cannot set SUPER_ADMIN via this endpoint");
+    }
+
+    const data: Prisma.UserUpdateInput = {};
+    if (dto.fullName !== undefined) data.fullName = dto.fullName.trim();
+    if (dto.email !== undefined) data.email = dto.email.toLowerCase().trim();
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.designation !== undefined) data.designation = dto.designation;
+    if (dto.phone !== undefined) data.phone = dto.phone?.trim() || null;
+    if (dto.track !== undefined) data.track = dto.track?.trim() || null;
+    if (dto.profileImage !== undefined) data.profileImage = dto.profileImage;
+    if (dto.monthlyFee !== undefined) data.monthlyFee = dto.monthlyFee;
+    if (dto.feeStartDate !== undefined) {
+      data.feeStartDate = dto.feeStartDate ? new Date(dto.feeStartDate) : null;
+    }
+    if (dto.feeDueDay !== undefined) data.feeDueDay = dto.feeDueDay;
+    if (dto.departmentId !== undefined) {
+      data.department = dto.departmentId
+        ? { connect: { id: dto.departmentId } }
+        : { disconnect: true };
+    }
+    if (dto.batchId !== undefined) {
+      data.batch = dto.batchId
+        ? { connect: { id: dto.batchId } }
+        : { disconnect: true };
+    }
+    if (dto.password?.trim()) {
+      data.passwordHash = await argon2.hash(dto.password.trim(), {
+        type: argon2.argon2id,
+      });
+      if (existing.status !== AccountStatus.ACTIVE) {
+        data.status = AccountStatus.ACTIVE;
+        data.activatedAt = new Date();
+      }
+    }
+
+    if (dto.accountType && dto.accountType !== existing.accountType) {
+      data.accountType = dto.accountType;
+      const role = await this.prisma.role.findUnique({
+        where: { code: this.roleCodeFor(dto.accountType) },
+      });
+      if (role) {
+        await this.prisma.userRole.deleteMany({ where: { userId: id } });
+        await this.prisma.userRole.create({
+          data: { userId: id, roleId: role.id },
+        });
+      }
+    }
+
+    await this.prisma.user.update({ where: { id }, data });
+
+    if (dto.courseIds !== undefined) {
+      const wanted = Array.from(
+        new Set(dto.courseIds.filter((x) => typeof x === "string" && x.trim()))
+      );
+      const current = await this.prisma.enrollment.findMany({
+        where: { userId: id },
+        select: { courseId: true },
+      });
+      const currentIds = new Set(current.map((c) => c.courseId));
+      const wantedSet = new Set(wanted);
+      const toRemove = [...currentIds].filter((cid) => !wantedSet.has(cid));
+      const toAdd = wanted.filter((cid) => !currentIds.has(cid));
+      if (toRemove.length) {
+        await this.prisma.enrollment.deleteMany({
+          where: { userId: id, courseId: { in: toRemove } },
+        });
+      }
+      for (const courseId of toAdd) {
+        const course = await this.prisma.course.findUnique({
+          where: { id: courseId },
+        });
+        if (!course) continue;
+        await this.prisma.enrollment.create({
+          data: { userId: id, courseId },
+        });
+      }
+    }
+
+    return this.getById(id);
   }
 
   async resendInvitation(id: string, createdById?: string) {

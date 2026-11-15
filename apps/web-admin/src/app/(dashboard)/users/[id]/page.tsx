@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
@@ -11,6 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
+
+const ACCOUNT_TYPES = ["STUDENT", "INTERN", "STAFF"] as const;
+const STATUSES = ["ACTIVE", "INVITED", "INACTIVE"] as const;
 
 type Report = {
   user: {
@@ -119,6 +122,37 @@ export default function UserProfilePage() {
   const [shiftStart, setShiftStart] = useState("09:00");
   const [shiftEnd, setShiftEnd] = useState("17:00");
   const [shiftSaving, setShiftSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [catalog, setCatalog] = useState<Array<{ id: string; title: string }>>(
+    []
+  );
+  const [form, setForm] = useState({
+    fullName: "",
+    email: "",
+    accountType: "STUDENT",
+    status: "ACTIVE",
+    phone: "",
+    track: "",
+    designation: "",
+    password: "",
+    courseIds: [] as string[],
+  });
+
+  function hydrateForm(r: Report) {
+    setForm({
+      fullName: r.user.fullName || "",
+      email: r.user.email || "",
+      accountType: r.user.accountType || "STUDENT",
+      status: r.user.status || "ACTIVE",
+      phone: r.user.phone || "",
+      track: r.user.track || "",
+      designation: r.user.designation || "",
+      password: "",
+      courseIds: r.courses.map((c) => c.id),
+    });
+  }
 
   useEffect(() => {
     if (!params?.id) return;
@@ -126,11 +160,18 @@ export default function UserProfilePage() {
     (async () => {
       try {
         const data = await api<Report>(`/reports/users/${params.id}`);
-        if (!cancelled) setReport(data);
+        if (!cancelled) {
+          setReport(data);
+          hydrateForm(data);
+        }
       } catch (reportErr) {
         try {
           const user = await api<RawUser>(`/users/${params.id}`);
-          if (!cancelled) setReport(emptyReportFromUser(user));
+          if (!cancelled) {
+            const r = emptyReportFromUser(user);
+            setReport(r);
+            hydrateForm(r);
+          }
         } catch {
           if (!cancelled) {
             setError(
@@ -151,6 +192,20 @@ export default function UserProfilePage() {
         }
       } catch {
         /* role defaults apply */
+      }
+      try {
+        const courses = await api<Array<{ id: string; title: string }>>(
+          "/courses?all=1"
+        );
+        if (!cancelled) {
+          setCatalog(
+            courses.map((c) => ({ id: c.id, title: c.title })).sort((a, b) =>
+              a.title.localeCompare(b.title)
+            )
+          );
+        }
+      } catch {
+        /* optional */
       }
     })();
     return () => {
@@ -203,6 +258,47 @@ export default function UserProfilePage() {
     }
   }
 
+  async function saveUser(e: FormEvent) {
+    e.preventDefault();
+    if (!params?.id) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        accountType: form.accountType,
+        status: form.status,
+        phone: form.phone.trim() || null,
+        track: form.track.trim() || null,
+        designation: form.designation.trim() || null,
+        courseIds: form.courseIds,
+      };
+      if (form.password.trim()) body.password = form.password.trim();
+      await api(`/users/${params.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      show("User saved");
+      setEditing(false);
+      setForm((f) => ({ ...f, password: "" }));
+      // Reload profile
+      try {
+        const data = await api<Report>(`/reports/users/${params.id}`);
+        setReport(data);
+        hydrateForm(data);
+      } catch {
+        const user = await api<RawUser>(`/users/${params.id}`);
+        const r = emptyReportFromUser(user);
+        setReport(r);
+        hydrateForm(r);
+      }
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Save failed", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="glass-card flex flex-wrap items-start justify-between gap-4 p-5">
@@ -236,18 +332,203 @@ export default function UserProfilePage() {
             <Link href={backHref}>Back</Link>
           </Button>
           {u.accountType !== "SUPER_ADMIN" ? (
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={deleting}
-              onClick={() => void deleteUserForever()}
-            >
-              {deleting ? "Deleting…" : "Delete account"}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  hydrateForm(report);
+                  setEditing((v) => !v);
+                }}
+              >
+                {editing ? "Cancel edit" : "Edit user"}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={deleting}
+                onClick={() => void deleteUserForever()}
+              >
+                {deleting ? "Deleting…" : "Delete account"}
+              </Button>
+            </>
           ) : null}
         </div>
       </div>
+
+      {editing ? (
+        <form
+          onSubmit={saveUser}
+          className="glass-card space-y-4 p-5"
+          autoComplete="off"
+        >
+          <div>
+            <h3 className="font-semibold">Edit user</h3>
+            <p className="text-xs text-slate-500">
+              Name, email, type, password, track, phone &amp; course enrollments
+            </p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Full name</Label>
+              <Input
+                value={form.fullName}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, fullName: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, email: e.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                value={form.accountType}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, accountType: e.target.value }))
+                }
+              >
+                {ACCOUNT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {roleLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                value={form.status}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, status: e.target.value }))
+                }
+              >
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phone: e.target.value }))
+                }
+                placeholder="03xx-xxxxxxx"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Track</Label>
+              <Input
+                value={form.track}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, track: e.target.value }))
+                }
+                placeholder="Flutter / Frontend / teaching track"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Designation</Label>
+              <Input
+                value={form.designation}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, designation: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New password (optional)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, password: e.target.value }))
+                  }
+                  placeholder="Leave blank to keep current"
+                  minLength={8}
+                  autoComplete="new-password"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Courses (enrollment)</Label>
+            <p className="text-xs text-slate-500">
+              Select courses this user should be enrolled in
+            </p>
+            <div className="grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-slate-100 p-3 sm:grid-cols-2">
+              {catalog.map((c) => {
+                const checked = form.courseIds.includes(c.id);
+                return (
+                  <label
+                    key={c.id}
+                    className="flex cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() =>
+                        setForm((f) => ({
+                          ...f,
+                          courseIds: checked
+                            ? f.courseIds.filter((id) => id !== c.id)
+                            : [...f.courseIds, c.id],
+                        }))
+                      }
+                    />
+                    <span>{c.title}</span>
+                  </label>
+                );
+              })}
+              {catalog.length === 0 ? (
+                <p className="text-sm text-slate-400">No courses in catalog</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save changes"}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                hydrateForm(report);
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Stat label="Attendance" value={`${report.attendancePercent}%`} />

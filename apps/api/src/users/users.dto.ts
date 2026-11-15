@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsEnum,
@@ -60,8 +61,22 @@ export class UpdateUserDto {
   fullName?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsEnum(AccountType)
+  accountType?: AccountType;
+
+  @IsOptional()
   @IsEnum(AccountStatus)
   status?: AccountStatus;
+
+  /** If set (min 8 chars), replaces login password. */
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  password?: string;
 
   @IsOptional()
   @IsString()
@@ -98,6 +113,12 @@ export class UpdateUserDto {
   @IsOptional()
   @IsInt()
   feeDueDay?: number;
+
+  /** Replace student enrollments with these course IDs. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  courseIds?: string[];
 }
 
 export class ListUsersQueryDto {
