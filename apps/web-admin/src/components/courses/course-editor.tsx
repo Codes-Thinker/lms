@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, GripVertical } from "lucide-react";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -175,6 +176,19 @@ export function CourseEditor({
 }: Props) {
   const [coverBusy, setCoverBusy] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    api<Array<{ name: string }>>("/system/categories")
+      .then((rows) => setCategories(rows.map((r) => r.name).filter(Boolean)))
+      .catch(() =>
+        api<Array<{ name: string }>>("/courses/categories")
+          .then((rows) =>
+            setCategories(rows.map((r) => r.name).filter(Boolean))
+          )
+          .catch(() => {})
+      );
+  }, []);
 
   const suggestedTotal = useMemo(
     () => value.monthlyFee * Math.max(1, value.durationMonths),
@@ -184,6 +198,12 @@ export function CourseEditor({
     const count = Math.max(1, value.installmentCount || 2);
     return Math.round((value.monthlyFee || 0) / count);
   }, [value.monthlyFee, value.installmentCount]);
+
+  const categoryOptions = useMemo(() => {
+    const names = new Set(categories);
+    if (value.category.trim()) names.add(value.category.trim());
+    return Array.from(names);
+  }, [categories, value.category]);
 
   const set = <K extends keyof CourseEditorValue>(
     key: K,
@@ -229,12 +249,29 @@ export function CourseEditor({
           />
         </div>
         <div className="space-y-2">
-          <Label>Category</Label>
-          <Input
-            value={value.category}
-            onChange={(e) => set("category", e.target.value)}
-            placeholder="Flutter / MERN / Design"
-          />
+          <Label>Category (student app tabs)</Label>
+          {categoryOptions.length > 0 ? (
+            <select
+              className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+              value={value.category}
+              onChange={(e) => set("category", e.target.value)}
+            >
+              {categoryOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <Input
+              value={value.category}
+              onChange={(e) => set("category", e.target.value)}
+              placeholder="Flutter / Frontend / Dot Net"
+            />
+          )}
+          <p className="text-[11px] text-slate-400">
+            Manage tab names in System → Course categories
+          </p>
         </div>
         <div className="space-y-2">
           <Label>Batch code</Label>

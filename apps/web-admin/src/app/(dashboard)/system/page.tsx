@@ -41,6 +41,13 @@ const defaultOffice: OfficeConfig = {
   internEndTime: "18:00",
 };
 
+type CategoryRow = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+};
+
 export default function SystemPage() {
   const [version, setVersion] = useState<Version>({
     minVersion: "1.0.0",
@@ -50,7 +57,15 @@ export default function SystemPage() {
     message: "",
   });
   const [office, setOffice] = useState<OfficeConfig>(defaultOffice);
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [newCategory, setNewCategory] = useState("");
+  const [catBusy, setCatBusy] = useState(false);
   const { show } = useSnackbar();
+
+  async function loadCategories() {
+    const rows = await api<CategoryRow[]>("/system/categories/all");
+    setCategories(rows);
+  }
 
   useEffect(() => {
     api<Version>("/system/app-version")
@@ -73,6 +88,7 @@ export default function SystemPage() {
         })
       )
       .catch(() => {});
+    loadCategories().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -83,6 +99,93 @@ export default function SystemPage() {
         <p className="text-sm text-slate-500">
           Force-update, office geofence &amp; role shift times
         </p>
+      </div>
+
+      <div className="glass-card max-w-xl space-y-3 p-5">
+        <h3 className="font-semibold">Course categories (student tabs)</h3>
+        <p className="text-xs text-slate-500">
+          These names appear under All courses on the student home — All,
+          Flutter, Frontend, Dot Net, …
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            placeholder="e.g. Flutter Development"
+          />
+          <Button
+            type="button"
+            disabled={catBusy || !newCategory.trim()}
+            onClick={() => {
+              setCatBusy(true);
+              api("/system/categories", {
+                method: "POST",
+                body: JSON.stringify({
+                  name: newCategory.trim(),
+                  sortOrder: categories.length + 1,
+                }),
+              })
+                .then(() => {
+                  setNewCategory("");
+                  show("Category added");
+                  return loadCategories();
+                })
+                .catch((e) => show(String(e), "error"))
+                .finally(() => setCatBusy(false));
+            }}
+          >
+            Add
+          </Button>
+        </div>
+        <ul className="divide-y divide-slate-100 text-sm">
+          {categories.map((c) => (
+            <li
+              key={c.id}
+              className="flex items-center justify-between gap-2 py-2"
+            >
+              <span className={c.active ? "font-medium" : "text-slate-400"}>
+                {c.name}
+                {!c.active ? " (hidden)" : ""}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    api(`/system/categories/${c.id}`, {
+                      method: "PATCH",
+                      body: JSON.stringify({ active: !c.active }),
+                    })
+                      .then(loadCategories)
+                      .catch((e) => show(String(e), "error"))
+                  }
+                >
+                  {c.active ? "Hide" : "Show"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    if (!window.confirm(`Delete category “${c.name}”?`)) return;
+                    api(`/system/categories/${c.id}`, { method: "DELETE" })
+                      .then(() => {
+                        show("Category deleted");
+                        return loadCategories();
+                      })
+                      .catch((e) => show(String(e), "error"));
+                  }}
+                >
+                  Delete
+                </Button>
+              </div>
+            </li>
+          ))}
+          {categories.length === 0 ? (
+            <li className="py-3 text-slate-500">No categories yet</li>
+          ) : null}
+        </ul>
       </div>
 
       <div className="glass-card max-w-xl space-y-3 p-5">

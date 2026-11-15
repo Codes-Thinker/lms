@@ -300,7 +300,7 @@ class HomeScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Expanded(child: _SectionLabel('My courses')),
+                        const Expanded(child: _SectionLabel('All courses')),
                         GestureDetector(
                           onTap: () {
                             Navigator.of(context).push(
@@ -308,7 +308,7 @@ class HomeScreen extends StatelessWidget {
                             );
                           },
                           child: const Text(
-                            'View All',
+                            'View all',
                             style: TextStyle(
                               color: AppColors.blue,
                               fontWeight: FontWeight.w600,

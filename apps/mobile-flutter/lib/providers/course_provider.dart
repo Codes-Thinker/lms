@@ -49,16 +49,28 @@ class CourseProvider extends ChangeNotifier {
   Map<String, String> get markedAttendance =>
       Map.unmodifiable(_markedAttendance);
 
-  /// Category names for the chip row — always includes "All" at the start.
-  List<String> get categoryNames => [
-        'All',
-        ..._categories.map((c) => c.name),
-      ];
+  /// Chips: All + admin categories, then any extra labels found on courses.
+  List<String> get categoryNames {
+    final fromAdmin = _categories.map((c) => c.name.trim()).where((n) => n.isNotEmpty);
+    final fromCourses = courses
+        .map((c) => c.category.trim())
+        .where((n) => n.isNotEmpty);
+    final seen = <String>{};
+    final tabs = <String>['All'];
+    for (final name in [...fromAdmin, ...fromCourses]) {
+      final key = name.toLowerCase();
+      if (seen.add(key)) tabs.add(name);
+    }
+    return tabs;
+  }
 
   List<Course> get filteredCourses {
     var result = courses;
     if (_selectedCategory != 'All') {
-      result = result.where((c) => c.category == _selectedCategory).toList();
+      final selected = _selectedCategory.toLowerCase();
+      result = result
+          .where((c) => c.category.trim().toLowerCase() == selected)
+          .toList();
     }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();

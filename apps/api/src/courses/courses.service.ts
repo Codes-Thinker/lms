@@ -410,15 +410,37 @@ export class CoursesService {
     }
   }
 
+  /** Resolve admin category tab name → CourseCategory row (create if missing). */
+  private async resolveCategory(name: string) {
+    const trimmed = name.trim() || "General";
+    const existing = await this.prisma.courseCategory.findFirst({
+      where: { name: { equals: trimmed, mode: "insensitive" } },
+    });
+    if (existing) {
+      if (!existing.active) {
+        await this.prisma.courseCategory.update({
+          where: { id: existing.id },
+          data: { active: true },
+        });
+      }
+      return { id: existing.id, name: existing.name };
+    }
+    const created = await this.prisma.courseCategory.create({
+      data: { name: trimmed, active: true, sortOrder: 99 },
+    });
+    return { id: created.id, name: created.name };
+  }
+
   async create(data: CourseWriteInput) {
     const title = (data.title || "").trim();
-    const category = (data.category || "").trim() || "General";
     if (!title) throw new BadRequestException("Title is required");
+    const cat = await this.resolveCategory(data.category || "General");
 
     const course = await this.prisma.course.create({
       data: {
         title,
-        category,
+        category: cat.name,
+        categoryId: cat.id,
         description: data.description ?? null,
         thumbnailUrl: data.thumbnailUrl ?? null,
         durationMonths: data.durationMonths ?? 3,
@@ -444,7 +466,11 @@ export class CoursesService {
 
     const patch: Record<string, unknown> = {};
     if (data.title !== undefined) patch.title = data.title.trim();
-    if (data.category !== undefined) patch.category = data.category.trim();
+    if (data.category !== undefined) {
+      const cat = await this.resolveCategory(data.category);
+      patch.category = cat.name;
+      patch.categoryId = cat.id;
+    }
     if (data.description !== undefined) patch.description = data.description;
     if (data.thumbnailUrl !== undefined) patch.thumbnailUrl = data.thumbnailUrl;
     if (data.durationMonths !== undefined)
