@@ -115,13 +115,13 @@ class _EnrolledContent extends StatelessWidget {
         const Text('Roadmap',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
-        ...course.outline.map((section) {
+        ...course.outline.map<Widget>((section) {
           return ExpansionTile(
             initiallyExpanded: true,
             tilePadding: EdgeInsets.zero,
             title: Text(section.title,
                 style: const TextStyle(fontWeight: FontWeight.w700)),
-            children: section.topics.map((topic) {
+            children: section.topics.map<Widget>((topic) {
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
