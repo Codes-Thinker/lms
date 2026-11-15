@@ -28,8 +28,26 @@ export class AttendanceController {
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
     @Query("status") status?: string,
+    @Query("courseId") courseId?: string,
   ) {
-    return this.attendance.list({ date, accountType, startDate, endDate, status });
+    return this.attendance.list({
+      date,
+      accountType,
+      startDate,
+      endDate,
+      status,
+      courseId,
+    });
+  }
+
+  /** Admin dashboard board: course tabs + every enrolled student for the day. */
+  @Get("board")
+  @Roles("SUPER_ADMIN", "STAFF")
+  board(
+    @Query("date") date?: string,
+    @Query("courseId") courseId?: string,
+  ) {
+    return this.attendance.board({ date, courseId });
   }
 
   @Post("check-in")

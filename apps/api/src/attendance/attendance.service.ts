@@ -77,6 +77,7 @@ export class AttendanceService implements OnModuleInit {
     startDate?: string;
     endDate?: string;
     status?: string;
+    courseId?: string;
   }) {
     const where: Record<string, unknown> = {};
     if (filters?.date) {
@@ -105,13 +106,137 @@ export class AttendanceService implements OnModuleInit {
     if (filters?.status) {
       where.status = filters.status as AttendanceStatus;
     }
+    if (filters?.courseId) {
+      where.OR = [
+        { courseId: filters.courseId },
+        { user: { enrollments: { some: { courseId: filters.courseId } } } },
+      ];
+    }
     const rows = await this.prisma.attendanceRecord.findMany({
       where,
-      include: { course: true, user: true },
+      include: {
+        course: true,
+        user: {
+          include: {
+            enrollments: {
+              include: { course: { select: { id: true, title: true, category: true } } },
+            },
+          },
+        },
+      },
       orderBy: [{ date: "desc" }, { checkInAt: "desc" }],
       take: 500,
     });
     return rows.map((r) => this.map(r));
+  }
+
+  /**
+   * Admin board: tabs = courses with enrollments; rows = every enrolled
+   * student for the selected course (or all marked attendance when All).
+   */
+  async board(filters?: { date?: string; courseId?: string }) {
+    const day = filters?.date
+      ? (() => {
+          const d = new Date(filters.date!);
+          d.setHours(0, 0, 0, 0);
+          return d;
+        })()
+      : this.todayDate();
+    const dateStr = day.toISOString().slice(0, 10);
+
+    const courses = await this.prisma.course.findMany({
+      where: {
+        published: true,
+        enrollments: { some: {} },
+      },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { title: "asc" },
+    });
+
+    const courseTabs = courses.map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      enrolledCount: c._count.enrollments,
+    }));
+
+    if (filters?.courseId) {
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { courseId: filters.courseId },
+        include: {
+          user: true,
+          course: { select: { id: true, title: true, category: true } },
+        },
+        orderBy: { user: { fullName: "asc" } },
+      });
+      const userIds = enrollments.map((e) => e.userId);
+      const marks = await this.prisma.attendanceRecord.findMany({
+        where: { date: day, userId: { in: userIds } },
+        include: {
+          course: true,
+          user: {
+            include: {
+              enrollments: {
+                include: {
+                  course: { select: { id: true, title: true, category: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+      const byUser = new Map(marks.map((m) => [m.userId, m]));
+      const courseMeta = enrollments[0]?.course;
+      const rows = enrollments.map((enr) => {
+        const mark = byUser.get(enr.userId);
+        if (mark) return this.map(mark);
+        return this.mapAbsent({
+          userId: enr.userId,
+          fullName: enr.user.fullName,
+          accountType: enr.user.accountType,
+          date: day,
+          courseId: courseMeta?.id ?? enr.courseId,
+          courseTitle: courseMeta?.title ?? null,
+          courses: [
+            {
+              id: enr.course.id,
+              title: enr.course.title,
+              category: enr.course.category,
+            },
+          ],
+        });
+      });
+      return { date: dateStr, courses: courseTabs, rows };
+    }
+
+    // All tab — every attendance mark for the day (app-sourced), enriched
+    const marks = await this.prisma.attendanceRecord.findMany({
+      where: { date: day },
+      include: {
+        course: true,
+        user: {
+          include: {
+            enrollments: {
+              include: {
+                course: { select: { id: true, title: true, category: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ checkInAt: "desc" }],
+      take: 500,
+    });
+    return {
+      date: dateStr,
+      courses: courseTabs,
+      rows: marks.map((r) => this.map(r)),
+    };
   }
 
   async checkIn(
@@ -149,10 +274,32 @@ export class AttendanceService implements OnModuleInit {
     const shiftStart = shift.startTime;
     const shiftEnd = shift.endTime;
 
+    let courseId = opts?.courseId ?? existing?.courseId ?? null;
+    if (!courseId) {
+      const enr = await this.prisma.enrollment.findFirst({
+        where: { userId },
+        orderBy: { enrolledAt: "asc" },
+      });
+      courseId = enr?.courseId ?? null;
+    }
+
     const now = new Date();
     const status = this.isLate(now, shiftStart)
       ? AttendanceStatus.LATE
       : AttendanceStatus.PRESENT;
+
+    const includeFull = {
+      course: true,
+      user: {
+        include: {
+          enrollments: {
+            include: {
+              course: { select: { id: true, title: true, category: true } },
+            },
+          },
+        },
+      },
+    } as const;
 
     if (existing) {
       return this.map(
@@ -162,7 +309,7 @@ export class AttendanceService implements OnModuleInit {
             checkInAt: now,
             checkOutAt: null,
             status,
-            courseId: opts?.courseId ?? existing.courseId,
+            courseId,
             checkInLat: opts?.lat ?? null,
             checkInLng: opts?.lng ?? null,
             checkInDistance: distance,
@@ -170,7 +317,7 @@ export class AttendanceService implements OnModuleInit {
             shiftStart,
             shiftEnd,
           },
-          include: { course: true, user: true },
+          include: includeFull,
         }),
       );
     }
@@ -178,7 +325,7 @@ export class AttendanceService implements OnModuleInit {
     const row = await this.prisma.attendanceRecord.create({
       data: {
         userId,
-        courseId: opts?.courseId,
+        courseId,
         date,
         checkInAt: now,
         status,
@@ -189,7 +336,7 @@ export class AttendanceService implements OnModuleInit {
         shiftStart,
         shiftEnd,
       },
-      include: { course: true, user: true },
+      include: includeFull,
     });
 
     await this.notifications.notifyAdmins({
@@ -231,7 +378,18 @@ export class AttendanceService implements OnModuleInit {
           status: AttendanceStatus.CHECKED_OUT,
           autoCheckout: false,
         },
-        include: { course: true, user: true },
+        include: {
+          course: true,
+          user: {
+            include: {
+              enrollments: {
+                include: {
+                  course: { select: { id: true, title: true, category: true } },
+                },
+              },
+            },
+          },
+        },
       }),
     );
   }
@@ -377,6 +535,60 @@ export class AttendanceService implements OnModuleInit {
     }
   }
 
+  private formatDuration(minutes: number | null): string | null {
+    if (minutes == null || minutes < 0) return null;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h <= 0) return `${m} min`;
+    if (m === 0) return `${h} hr`;
+    return `${h} hr ${m} min`;
+  }
+
+  private durationMinutes(
+    checkInAt: Date | null,
+    checkOutAt: Date | null,
+  ): number | null {
+    if (!checkInAt) return null;
+    const end = checkOutAt ?? new Date();
+    return Math.max(0, Math.round((end.getTime() - checkInAt.getTime()) / 60000));
+  }
+
+  private mapAbsent(input: {
+    userId: string;
+    fullName: string;
+    accountType: string;
+    date: Date;
+    courseId?: string | null;
+    courseTitle?: string | null;
+    courses?: { id: string; title: string; category: string }[];
+  }) {
+    return {
+      id: `absent-${input.userId}-${input.date.toISOString().slice(0, 10)}`,
+      personId: input.userId,
+      personName: input.fullName,
+      role: input.accountType,
+      date: input.date.toISOString().slice(0, 10),
+      markedAt: null,
+      checkInAt: null,
+      checkOutAt: null,
+      status: "ABSENT",
+      source: "BOARD",
+      autoCheckout: false,
+      shiftStart: null,
+      shiftEnd: null,
+      checkInLat: null,
+      checkInLng: null,
+      checkInDistance: null,
+      courseId: input.courseId ?? null,
+      courseTitle: input.courseTitle ?? null,
+      courses: input.courses ?? [],
+      durationMinutes: null,
+      durationLabel: null,
+      note: "No check-in today",
+      stillInOffice: false,
+    };
+  }
+
   private map(r: {
     id: string;
     userId: string;
@@ -391,9 +603,34 @@ export class AttendanceService implements OnModuleInit {
     checkInLat: number | null;
     checkInLng: number | null;
     checkInDistance: number | null;
-    course: { title: string } | null;
-    user: { fullName: string; accountType: string };
+    courseId?: string | null;
+    course: { id?: string; title: string } | null;
+    user: {
+      fullName: string;
+      accountType: string;
+      enrollments?: {
+        course: { id: string; title: string; category: string };
+      }[];
+    };
   }) {
+    const mins = this.durationMinutes(r.checkInAt, r.checkOutAt);
+    const stillIn =
+      Boolean(r.checkInAt) && !r.checkOutAt && r.status !== AttendanceStatus.ABSENT;
+    const enrolled =
+      r.user.enrollments?.map((e) => ({
+        id: e.course.id,
+        title: e.course.title,
+        category: e.course.category,
+      })) ?? [];
+    let note: string | null = null;
+    if (r.autoCheckout) {
+      note = r.shiftEnd
+        ? `Auto checkout at ${r.shiftEnd}`
+        : "Auto checkout at shift end";
+    } else if (stillIn) {
+      note = "Still in office";
+    }
+
     return {
       id: r.id,
       personId: r.userId,
@@ -411,7 +648,15 @@ export class AttendanceService implements OnModuleInit {
       checkInLat: r.checkInLat,
       checkInLng: r.checkInLng,
       checkInDistance: r.checkInDistance,
-      courseTitle: r.course?.title ?? null,
+      courseId: r.courseId ?? r.course?.id ?? null,
+      courseTitle:
+        r.course?.title ??
+        (enrolled.length === 1 ? enrolled[0].title : null),
+      courses: enrolled,
+      durationMinutes: mins,
+      durationLabel: this.formatDuration(mins),
+      note,
+      stillInOffice: stillIn,
     };
   }
 }
