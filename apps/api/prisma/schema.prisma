@@ -487,12 +487,19 @@ model PaymentInfo {
 }
 
 model OfficeConfig {
-  id           Int      @id @default(1)
-  latitude     Float    @default(29.3931779)
-  longitude    Float    @default(71.6924333)
-  radiusMeters Int      @default(100)
-  timezone     String   @default("Asia/Karachi")
-  updatedAt    DateTime @updatedAt
+  id                Int      @id @default(1)
+  /// Port Singer / Gohe Tone office — keep static unless admin overrides.
+  latitude          Float    @default(29.3931779)
+  longitude         Float    @default(71.6924333)
+  radiusMeters      Int      @default(50)
+  timezone          String   @default("Asia/Karachi")
+  studentStartTime  String   @default("09:00")
+  studentEndTime    String   @default("14:00")
+  staffStartTime    String   @default("08:00")
+  staffEndTime      String   @default("17:00")
+  internStartTime   String   @default("10:00")
+  internEndTime     String   @default("18:00")
+  updatedAt         DateTime @updatedAt
 }
 
 model StaffSchedule {

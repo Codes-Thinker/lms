@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   OnModuleInit,
 } from "@nestjs/common";
@@ -54,10 +53,12 @@ export class AttendanceService implements OnModuleInit {
     return d;
   }
 
-  private isLate(now: Date): boolean {
-    return (
-      now.getHours() > 10 || (now.getHours() === 10 && now.getMinutes() > 5)
-    );
+  private isLate(now: Date, shiftStart: string | null): boolean {
+    const [h, m] = (shiftStart ?? "10:00").split(":").map(Number);
+    // 5-minute grace after shift start
+    const cutoff = new Date(now);
+    cutoff.setHours(h ?? 10, (m ?? 0) + 5, 0, 0);
+    return now.getTime() > cutoff.getTime();
   }
 
   async myHistory(userId: string) {
@@ -125,36 +126,31 @@ export class AttendanceService implements OnModuleInit {
       throw new BadRequestException("Already checked in");
     }
 
-    // Validate geofence if lat/lng provided
-    let distance: number | null = null;
-    let shiftStart: string | null = null;
-    let shiftEnd: string | null = null;
-    if (opts?.lat != null && opts?.lng != null) {
-      const config = await this.system.getOfficeConfig();
-      distance = haversine(
-        opts.lat!,
-        opts.lng!,
-        config.latitude,
-        config.longitude,
+    if (opts?.lat == null || opts?.lng == null) {
+      throw new BadRequestException(
+        "Location required for check-in. Enable GPS and try again.",
       );
-      if (distance > config.radiusMeters) {
-        throw new BadRequestException(
-          `You must be within the office location to check in. You are ${Math.round(distance)}m away.`,
-        );
-      }
     }
 
-    // Get shift info from schedule
-    const schedule = await this.prisma.staffSchedule.findUnique({
-      where: { userId },
-    });
-    if (schedule) {
-      shiftStart = schedule.startTime;
-      shiftEnd = schedule.endTime;
+    const config = await this.system.getOfficeConfig();
+    const distance = haversine(
+      opts.lat,
+      opts.lng,
+      config.latitude,
+      config.longitude,
+    );
+    if (distance > config.radiusMeters) {
+      throw new BadRequestException(
+        `You must be within ${config.radiusMeters}m of the office to check in. You are ${Math.round(distance)}m away.`,
+      );
     }
+
+    const shift = await this.system.resolveShiftTimes(userId);
+    const shiftStart = shift.startTime;
+    const shiftEnd = shift.endTime;
 
     const now = new Date();
-    const status = this.isLate(now)
+    const status = this.isLate(now, shiftStart)
       ? AttendanceStatus.LATE
       : AttendanceStatus.PRESENT;
 
@@ -291,11 +287,10 @@ export class AttendanceService implements OnModuleInit {
       return { inside: true, reminderSent: false };
     }
 
-    // Send the notification
     await this.notifications.notifyUser({
       userId,
-      title: "Office Arrival",
-      body: "You have arrived at the office. Please remember to check in for today's attendance.",
+      title: "Attendance reminder",
+      body: "You are at the office. Check in now — you can mark attendance from the Attend tab.",
       type: "ATTENDANCE",
       data: { event: "arrival_reminder" },
     });
@@ -322,16 +317,12 @@ export class AttendanceService implements OnModuleInit {
     });
 
     for (const record of openRecords) {
-      // Determine the scheduled shift end for this user
       let shiftEndStr = record.shiftEnd;
       if (!shiftEndStr) {
-        const schedule = await this.prisma.staffSchedule.findUnique({
-          where: { userId: record.userId },
-        });
-        shiftEndStr = schedule?.endTime ?? "17:00";
+        const shift = await this.system.resolveShiftTimes(record.userId);
+        shiftEndStr = shift.endTime;
       }
 
-      // Parse "HH:MM" and build today's checkout deadline
       const [h, m] = shiftEndStr.split(":").map(Number);
       const shiftEndDate = new Date(today);
       shiftEndDate.setHours(h ?? 17, m ?? 0, 0, 0);
@@ -348,17 +339,13 @@ export class AttendanceService implements OnModuleInit {
 
         await this.notifications.notifyUser({
           userId: record.userId,
-          title: "Auto Checkout",
-          body: "Your attendance has been automatically checked out at your scheduled shift end time.",
+          title: "Auto checkout",
+          body: "Your attendance was checked out automatically at shift end.",
           type: "ATTENDANCE",
           data: { event: "auto_checkout", attendanceId: record.id },
         });
       }
     }
-
-    // Also check yesterday's open records (in case the server was down)
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
 
     const staleRecords = await this.prisma.attendanceRecord.findMany({
       where: {
@@ -369,12 +356,10 @@ export class AttendanceService implements OnModuleInit {
     });
 
     for (const record of staleRecords) {
-      let shiftEndStr = record.shiftEnd ?? "17:00";
-      if (!record.shiftEnd) {
-        const schedule = await this.prisma.staffSchedule.findUnique({
-          where: { userId: record.userId },
-        });
-        shiftEndStr = schedule?.endTime ?? "17:00";
+      let shiftEndStr = record.shiftEnd;
+      if (!shiftEndStr) {
+        const shift = await this.system.resolveShiftTimes(record.userId);
+        shiftEndStr = shift.endTime;
       }
 
       const [h, m] = shiftEndStr.split(":").map(Number);

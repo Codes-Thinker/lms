@@ -15,6 +15,7 @@ import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
 import '../../widgets/live_countdown.dart';
 import '../course/course_detail_screen.dart';
+import '../course/all_courses_screen.dart';
 import '../fees/fees_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../tasks/task_detail_screen.dart';
@@ -22,14 +23,6 @@ import '../tasks/tasks_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  static const categories = [
-    ('All', Icons.grid_view_rounded),
-    ('Coding', Icons.code_rounded),
-    ('Design', Icons.brush_rounded),
-    ('Business', Icons.work_outline_rounded),
-    ('Education', Icons.menu_book_rounded),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +38,6 @@ class HomeScreen extends StatelessWidget {
     final continueCourse = courses.continueCourse;
     final nextTopic = continueCourse?.nextTopic;
     final filtered = courses.filteredCourses;
-    final featured = courses.featuredCourses;
     final displayName = auth.user?.name.trim().isNotEmpty == true
         ? auth.user!.name.trim()
         : 'Student';
@@ -309,6 +301,22 @@ class HomeScreen extends StatelessWidget {
                     Row(
                       children: [
                         const Expanded(child: _SectionLabel('My courses')),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              AppMotion.fadeSlide(const AllCoursesScreen()),
+                            );
+                          },
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(
+                              color: AppColors.blue,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Text(
                           '${filtered.length}',
                           style: const TextStyle(
@@ -324,14 +332,13 @@ class HomeScreen extends StatelessWidget {
                       height: 36,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: categories.length,
+                        itemCount: courses.categoryNames.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (context, index) {
-                          final item = categories[index];
-                          final selected =
-                              courses.selectedCategory == item.$1;
+                          final name = courses.categoryNames[index];
+                          final selected = courses.selectedCategory == name;
                           return GestureDetector(
-                            onTap: () => courses.setCategory(item.$1),
+                            onTap: () => courses.setCategory(name),
                             child: AnimatedContainer(
                               duration: AppMotion.fast,
                               curve: AppMotion.curve,
@@ -339,9 +346,7 @@ class HomeScreen extends StatelessWidget {
                                 horizontal: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: selected
-                                    ? AppColors.blue
-                                    : Colors.white,
+                                color: selected ? AppColors.blue : Colors.white,
                                 borderRadius: BorderRadius.circular(100),
                                 border: Border.all(
                                   color: selected
@@ -349,28 +354,16 @@ class HomeScreen extends StatelessWidget {
                                       : AppColors.line,
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    item.$2,
-                                    size: 15,
-                                    color: selected
-                                        ? Colors.white
-                                        : AppColors.muted,
+                              child: Center(
+                                child: Text(
+                                  name,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color:
+                                        selected ? Colors.white : AppColors.ink,
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    item.$1,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: selected
-                                          ? Colors.white
-                                          : AppColors.ink,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           );
@@ -520,30 +513,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            // 8 — Browse / featured catalog
-            if (featured.isNotEmpty) ...[
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
-                sliver: const SliverToBoxAdapter(
-                  child: _SectionLabel('Browse'),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 210,
-                  child: ListView.separated(
-                    padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: featured.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      return _featuredTile(context, featured[index], courses);
-                    },
-                  ),
-                ),
-              ),
-            ],
-
             SliverToBoxAdapter(child: SizedBox(height: bottom + 8)),
           ],
         ),
@@ -625,56 +594,14 @@ class HomeScreen extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                    style:
+                        const TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             LiveCountdown(target: target),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _featuredTile(
-    BuildContext context,
-    Course course,
-    CourseProvider courses,
-  ) {
-    return PressableScale(
-      onTap: () {
-        courses.selectCourse(course);
-        Navigator.of(context).push(
-          AppMotion.fadeSlide(CourseDetailScreen(courseId: course.id)),
-        );
-      },
-      child: SizedBox(
-        width: 220,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CourseCover(
-              url: course.thumbnailUrl,
-              title: course.title,
-              height: 124,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              course.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Rs ${course.monthlyFee}/mo · ${course.durationMonths} mo',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
-            ),
           ],
         ),
       ),

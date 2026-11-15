@@ -3,10 +3,36 @@ import '../models/course.dart';
 import '../services/api_client.dart';
 import '../services/local_cache.dart';
 
+class CourseCategory {
+  final String id;
+  final String name;
+  final String? icon;
+  final int sortOrder;
+
+  CourseCategory({
+    required this.id,
+    required this.name,
+    this.icon,
+    this.sortOrder = 0,
+  });
+
+  factory CourseCategory.fromApi(Map<String, dynamic> json) {
+    return CourseCategory(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      icon: json['icon'] as String?,
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class CourseProvider extends ChangeNotifier {
   List<Course> _courses = [];
+  List<CourseCategory> _categories = [];
   bool _loading = false;
+  bool _categoriesLoading = false;
   String _selectedCategory = 'All';
+  String _searchQuery = '';
   Course? _activeCourse;
   final Map<String, String> _markedAttendance = {};
 
@@ -14,18 +40,44 @@ class CourseProvider extends ChangeNotifier {
       List.unmodifiable(_courses.where((c) => c.published));
   List<Course> get enrolledCourses =>
       courses.where((course) => course.enrolled).toList();
+  List<CourseCategory> get categories => List.unmodifiable(_categories);
   bool get loading => _loading;
+  bool get categoriesLoading => _categoriesLoading;
   String get selectedCategory => _selectedCategory;
+  String get searchQuery => _searchQuery;
   Course? get activeCourse => _activeCourse;
-  Map<String, String> get markedAttendance => Map.unmodifiable(_markedAttendance);
+  Map<String, String> get markedAttendance =>
+      Map.unmodifiable(_markedAttendance);
+
+  /// Category names for the chip row — always includes "All" at the start.
+  List<String> get categoryNames => [
+        'All',
+        ..._categories.map((c) => c.name),
+      ];
 
   List<Course> get filteredCourses {
-    if (_selectedCategory == 'All') return courses;
-    return courses.where((c) => c.category == _selectedCategory).toList();
+    var result = courses;
+    if (_selectedCategory != 'All') {
+      result = result.where((c) => c.category == _selectedCategory).toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      result = result
+          .where((c) =>
+              c.title.toLowerCase().contains(q) ||
+              c.category.toLowerCase().contains(q))
+          .toList();
+    }
+    return result;
   }
 
-  List<Course> get featuredCourses =>
-      courses.where((c) => !c.enrolled || c.progressPercent < 100).take(3).toList();
+  /// All published courses for the All Courses screen.
+  List<Course> get allCourses => List.unmodifiable(courses);
+
+  List<Course> get featuredCourses => courses
+      .where((c) => !c.enrolled || c.progressPercent < 100)
+      .take(3)
+      .toList();
 
   Course? get continueCourse {
     final enrolled = enrolledCourses;
@@ -58,7 +110,25 @@ class CourseProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Cache-first, then live API refresh for smooth dashboard.
+  /// Fetch dynamic categories from the backend.
+  Future<void> fetchCategories() async {
+    _categoriesLoading = true;
+    try {
+      final data = await ApiClient.instance.get('/courses/categories');
+      if (data is List) {
+        _categories = data
+            .whereType<Map>()
+            .map((e) => CourseCategory.fromApi(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('Categories fetch failed: $e');
+    }
+    _categoriesLoading = false;
+    notifyListeners();
+  }
+
+  /// Cache-first, then live API refresh.
   Future<void> fetchEnrolledCourses() async {
     _loading = true;
     notifyListeners();
@@ -86,16 +156,31 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Fetch both courses and categories in parallel.
+  Future<void> fetchAll() async {
+    await Future.wait([
+      fetchEnrolledCourses(),
+      fetchCategories(),
+    ]);
+  }
+
   void clearMemory() {
     _courses = [];
+    _categories = [];
     _activeCourse = null;
     _markedAttendance.clear();
     _selectedCategory = 'All';
+    _searchQuery = '';
     notifyListeners();
   }
 
   void setCategory(String category) {
     _selectedCategory = category;
+    notifyListeners();
+  }
+
+  void setSearchQuery(String query) {
+    _searchQuery = query;
     notifyListeners();
   }
 
@@ -111,8 +196,9 @@ class CourseProvider extends ChangeNotifier {
         if (topic.id == topicId) topic.completed = true;
       }
     }
-    course.progressPercent =
-        course.topicsTotal == 0 ? 0 : (course.topicsDone / course.topicsTotal) * 100;
+    course.progressPercent = course.topicsTotal == 0
+        ? 0
+        : (course.topicsDone / course.topicsTotal) * 100;
     notifyListeners();
     try {
       await ApiClient.instance.post('/courses/topics/$topicId/progress', body: {

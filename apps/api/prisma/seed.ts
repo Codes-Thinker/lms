@@ -790,16 +790,30 @@ async function main() {
     },
   });
 
-  // ── Office geofence configuration (singleton row) ──
+  // ── Office geofence (Port Singer) + role shift defaults ──
   await prisma.officeConfig.upsert({
     where: { id: 1 },
-    update: {},
+    update: {
+      radiusMeters: 50,
+      studentStartTime: "09:00",
+      studentEndTime: "14:00",
+      staffStartTime: "08:00",
+      staffEndTime: "17:00",
+      internStartTime: "10:00",
+      internEndTime: "18:00",
+    },
     create: {
       id: 1,
       latitude: 29.3931779,
       longitude: 71.6924333,
-      radiusMeters: 100,
+      radiusMeters: 50,
       timezone: "Asia/Karachi",
+      studentStartTime: "09:00",
+      studentEndTime: "14:00",
+      staffStartTime: "08:00",
+      staffEndTime: "17:00",
+      internStartTime: "10:00",
+      internEndTime: "18:00",
     },
   });
 

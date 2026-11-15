@@ -53,6 +53,18 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Code's Thinker uses your location to enable office attendance check-in within 50 meters.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Code's Thinker uses location in the background to remind you once per day to check in when you arrive at the office.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Code's Thinker uses location in the background to remind you once per day to check in when you arrive at the office.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Code's Thinker needs camera access to update your profile photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

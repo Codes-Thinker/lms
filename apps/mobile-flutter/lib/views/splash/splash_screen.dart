@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +14,7 @@ import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/ct_mark.dart';
@@ -75,13 +78,16 @@ class _SplashScreenState extends State<SplashScreen> {
       final attendance = context.read<AttendanceProvider>();
       final notes = context.read<NotificationProvider>();
       await Future.wait([
-        courses.fetchEnrolledCourses(),
+        courses.fetchAll(),
         tasks.load(),
         fees.load(),
         attendance.loadMine(),
         notes.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
+      OfficeLocationService.instance.bind(attendance);
+      // Fire-and-forget: geofence stream + once/day arrival reminder.
+      unawaited(OfficeLocationService.instance.start());
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         AppMotion.fadeSlide(const AppShell()),

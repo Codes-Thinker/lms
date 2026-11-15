@@ -7,15 +7,102 @@ import '../../core/responsive.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../services/office_location_service.dart';
 
-class AttendanceScreen extends StatelessWidget {
+class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
+
+  @override
+  State<AttendanceScreen> createState() => _AttendanceScreenState();
+}
+
+class _AttendanceScreenState extends State<AttendanceScreen>
+    with WidgetsBindingObserver {
+  bool _locBusy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootLocation());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      OfficeLocationService.instance.refreshNow();
+    }
+  }
+
+  Future<void> _bootLocation() async {
+    final att = context.read<AttendanceProvider>();
+    OfficeLocationService.instance.bind(att);
+    setState(() => _locBusy = true);
+    await OfficeLocationService.instance.start();
+    if (mounted) setState(() => _locBusy = false);
+  }
 
   String _fmt(DateTime dt) {
     final h = dt.hour.toString().padLeft(2, '0');
     final m = dt.minute.toString().padLeft(2, '0');
     final s = dt.second.toString().padLeft(2, '0');
     return '$h:$m:$s';
+  }
+
+  Future<void> _checkIn() async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.user;
+    if (user == null) return;
+    final ui = context.read<UiProvider>();
+    final att = context.read<AttendanceProvider>();
+
+    setState(() => _locBusy = true);
+    final pos = await OfficeLocationService.instance.currentPosition();
+    if (!mounted) return;
+    if (pos == null) {
+      setState(() => _locBusy = false);
+      ui.showSnack(
+        'Location permission / GPS required for check-in',
+        tone: AppSnackTone.error,
+      );
+      return;
+    }
+    await att.verifyLocation(pos.latitude, pos.longitude);
+    if (!mounted) return;
+    if (!att.insideGeofence) {
+      setState(() => _locBusy = false);
+      ui.showSnack(
+        'Office ke ${att.geofenceRadius}m ke andar aao (ab ${att.distanceFromOffice}m door)',
+        tone: AppSnackTone.warning,
+      );
+      return;
+    }
+
+    try {
+      final mark = await att.checkIn(
+        personId: user.id,
+        personName: user.name,
+        role: user.role,
+        lat: pos.latitude,
+        lng: pos.longitude,
+      );
+      if (!mounted) return;
+      ui.showSnack('Checked in ${mark.status} at ${_fmt(mark.checkInAt)}');
+    } catch (e) {
+      if (!mounted) return;
+      ui.showSnack(
+        e.toString().replaceFirst('Exception: ', ''),
+        tone: AppSnackTone.error,
+      );
+    } finally {
+      if (mounted) setState(() => _locBusy = false);
+    }
   }
 
   @override
@@ -25,13 +112,14 @@ class AttendanceScreen extends StatelessWidget {
     final now = DateTime.now();
     final user = auth.user;
     final mine = user == null ? null : attendance.todayFor(user.id);
-    final predicted = attendance.autoStatus(now);
     final pad = AppResponsive.pagePad(context);
 
     final pushed = ModalRoute.of(context)?.canPop ?? false;
     final bottom = pushed
         ? AppResponsive.pageBottom(context)
         : AppResponsive.shellBottom(context);
+
+    final canCheckIn = attendance.insideGeofence && !_locBusy && !attendance.loading;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -40,12 +128,25 @@ class AttendanceScreen extends StatelessWidget {
         backgroundColor: AppColors.bg,
         foregroundColor: AppColors.ink,
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Refresh location',
+            onPressed: _locBusy
+                ? null
+                : () async {
+                    setState(() => _locBusy = true);
+                    await OfficeLocationService.instance.refreshNow();
+                    if (mounted) setState(() => _locBusy = false);
+                  },
+            icon: const Icon(Icons.my_location_rounded, size: 20),
+          ),
+        ],
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom),
         children: [
           Text(
-            '${user?.roleLabel ?? 'User'} · office check-in',
+            '${user?.roleLabel ?? 'User'} · Port Singer geofence',
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -58,6 +159,57 @@ class AttendanceScreen extends StatelessWidget {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  attendance.insideGeofence
+                      ? Icons.location_on_rounded
+                      : Icons.location_off_rounded,
+                  color: attendance.insideGeofence
+                      ? const Color(0xFF059669)
+                      : AppColors.muted,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _locBusy || attendance.checkingLocation
+                            ? 'Checking location…'
+                            : attendance.insideGeofence
+                                ? 'Inside office zone'
+                                : 'Outside office zone',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        attendance.distanceFromOffice >= 0
+                            ? '${attendance.distanceFromOffice}m away · ${attendance.geofenceRadius}m radius'
+                            : 'Enable GPS to unlock check-in',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               const Text(
@@ -77,28 +229,18 @@ class AttendanceScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            'Check-in now → $predicted (late after 10:05 AM). Check-out jab office chhoren.',
-            style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
+          const Text(
+            'Check-in only inside 50m. Arrival reminder once per day. Check-out anytime — shift end pe auto checkout.',
+            style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 20),
           if (mine == null)
             AppBtn(
-              loading: attendance.loading || user == null,
-              label: 'Check in · mark attendance',
-              onPressed: user == null
-                  ? null
-                  : () async {
-                      final mark = await context.read<AttendanceProvider>().checkIn(
-                            personId: user.id,
-                            personName: user.name,
-                            role: user.role,
-                          );
-                      if (!context.mounted) return;
-                      context.read<UiProvider>().showSnack(
-                            'Checked in ${mark.status} at ${_fmt(mark.checkInAt)}',
-                          );
-                    },
+              loading: attendance.loading || _locBusy || user == null,
+              label: canCheckIn
+                  ? 'Check in · mark attendance'
+                  : 'Go inside office zone to check in',
+              onPressed: canCheckIn ? _checkIn : null,
             )
           else if (mine.isCheckedIn) ...[
             Text(
@@ -120,7 +262,8 @@ class AttendanceScreen extends StatelessWidget {
               label: 'Check out · leave office',
               tone: AppBtnTone.secondary,
               onPressed: () async {
-                final mark = await context.read<AttendanceProvider>().checkOut(user!.id);
+                final mark =
+                    await context.read<AttendanceProvider>().checkOut(user!.id);
                 if (!context.mounted || mark?.checkOutAt == null) return;
                 context.read<UiProvider>().showSnack(
                       'Checked out at ${_fmt(mark!.checkOutAt!)}',
@@ -144,7 +287,7 @@ class AttendanceScreen extends StatelessWidget {
           ],
           const SizedBox(height: 28),
           const Text(
-            'TODAY · WHO CAME / LEFT',
+            'TODAY',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 12,
@@ -157,7 +300,7 @@ class AttendanceScreen extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'No check-ins yet. Jab office aao, Check in dabao — dashboard pe time sync hoga.',
+                'Office zone mein aao — check-in enable hoga. Pehli entry pe din mein ek reminder milega.',
                 style: TextStyle(color: AppColors.muted, height: 1.4),
               ),
             )
@@ -185,7 +328,8 @@ class AttendanceScreen extends StatelessWidget {
                                 row.personName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -213,7 +357,8 @@ class AttendanceScreen extends StatelessWidget {
                     ),
                   ),
                   if (i < attendance.today.length - 1)
-                    const Divider(height: 1, thickness: 0.5, color: AppColors.line),
+                    const Divider(
+                        height: 1, thickness: 0.5, color: AppColors.line),
                 ],
               );
             }),

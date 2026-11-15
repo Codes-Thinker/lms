@@ -7,6 +7,8 @@ import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
 
@@ -114,6 +116,9 @@ export default function UserProfilePage() {
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [shiftStart, setShiftStart] = useState("09:00");
+  const [shiftEnd, setShiftEnd] = useState("17:00");
+  const [shiftSaving, setShiftSaving] = useState(false);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -124,7 +129,6 @@ export default function UserProfilePage() {
         if (!cancelled) setReport(data);
       } catch (reportErr) {
         try {
-          // Fallback: core user row (live API) if report endpoint is stale/down.
           const user = await api<RawUser>(`/users/${params.id}`);
           if (!cancelled) setReport(emptyReportFromUser(user));
         } catch {
@@ -136,6 +140,17 @@ export default function UserProfilePage() {
             );
           }
         }
+      }
+      try {
+        const sch = await api<{ startTime?: string; endTime?: string }>(
+          `/system/schedule/${params.id}`
+        );
+        if (!cancelled) {
+          if (sch.startTime) setShiftStart(sch.startTime);
+          if (sch.endTime) setShiftEnd(sch.endTime);
+        }
+      } catch {
+        /* role defaults apply */
       }
     })();
     return () => {
@@ -285,25 +300,77 @@ export default function UserProfilePage() {
           </dl>
         </div>
 
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-semibold">Recent attendance</h3>
-          <ul className="space-y-2 text-sm">
-            {report.recentAttendance.map((a, i) => (
-              <li
-                key={`${a.date}-${i}`}
-                className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+        <div className="glass-card space-y-4 p-5">
+          <div>
+            <h3 className="mb-1 font-semibold">Shift / auto checkout</h3>
+            <p className="mb-3 text-xs text-slate-500">
+              Overrides role default. After end time, attendance auto check-out
+              (even if still at office).
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Start</Label>
+                <Input
+                  type="time"
+                  className="w-[140px]"
+                  value={shiftStart}
+                  onChange={(e) => setShiftStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">End</Label>
+                <Input
+                  type="time"
+                  className="w-[140px]"
+                  value={shiftEnd}
+                  onChange={(e) => setShiftEnd(e.target.value)}
+                />
+              </div>
+              <Button
+                size="sm"
+                disabled={shiftSaving || !params?.id}
+                onClick={() => {
+                  if (!params?.id) return;
+                  setShiftSaving(true);
+                  api(`/system/schedule/${params.id}`, {
+                    method: "PUT",
+                    body: JSON.stringify({
+                      startTime: shiftStart,
+                      endTime: shiftEnd,
+                      active: true,
+                    }),
+                  })
+                    .then(() => show("Shift saved"))
+                    .catch((e) =>
+                      show(e instanceof Error ? e.message : "Failed", "error")
+                    )
+                    .finally(() => setShiftSaving(false));
+                }}
               >
-                <span>
-                  {a.date}
-                  {a.courseTitle ? ` · ${a.courseTitle}` : ""}
-                </span>
-                <span className="font-medium">{a.status}</span>
-              </li>
-            ))}
-            {report.recentAttendance.length === 0 ? (
-              <li className="text-slate-500">No attendance yet</li>
-            ) : null}
-          </ul>
+                {shiftSaving ? "Saving…" : "Save shift"}
+              </Button>
+            </div>
+          </div>
+          <div>
+            <h3 className="mb-3 font-semibold">Recent attendance</h3>
+            <ul className="space-y-2 text-sm">
+              {report.recentAttendance.map((a, i) => (
+                <li
+                  key={`${a.date}-${i}`}
+                  className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                >
+                  <span>
+                    {a.date}
+                    {a.courseTitle ? ` · ${a.courseTitle}` : ""}
+                  </span>
+                  <span className="font-medium">{a.status}</span>
+                </li>
+              ))}
+              {report.recentAttendance.length === 0 ? (
+                <li className="text-slate-500">No attendance yet</li>
+              ) : null}
+            </ul>
+          </div>
         </div>
       </div>
 

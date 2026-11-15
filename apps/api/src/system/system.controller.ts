@@ -91,6 +91,13 @@ export class SystemController {
     return this.system.getSchedule(user.sub);
   }
 
+  @Get("schedule/:userId")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "STAFF")
+  getUserSchedule(@Param("userId") userId: string) {
+    return this.system.getSchedule(userId);
+  }
+
   @Get("schedules")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("SUPER_ADMIN", "STAFF")

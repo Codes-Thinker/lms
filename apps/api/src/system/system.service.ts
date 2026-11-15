@@ -66,7 +66,7 @@ export class SystemService {
     });
   }
 
-  // ── Office geofence configuration ──
+  // ── Office geofence configuration (Port Singer / Gohe Tone) ──
   async getOfficeConfig() {
     let config = await this.prisma.officeConfig.findUnique({ where: { id: 1 } });
     if (!config) {
@@ -75,8 +75,14 @@ export class SystemService {
           id: 1,
           latitude: 29.3931779,
           longitude: 71.6924333,
-          radiusMeters: 100,
+          radiusMeters: 50,
           timezone: "Asia/Karachi",
+          studentStartTime: "09:00",
+          studentEndTime: "14:00",
+          staffStartTime: "08:00",
+          staffEndTime: "17:00",
+          internStartTime: "10:00",
+          internEndTime: "18:00",
         },
       });
     }
@@ -88,18 +94,64 @@ export class SystemService {
     longitude?: number;
     radiusMeters?: number;
     timezone?: string;
+    studentStartTime?: string;
+    studentEndTime?: string;
+    staffStartTime?: string;
+    staffEndTime?: string;
+    internStartTime?: string;
+    internEndTime?: string;
   }) {
     return this.prisma.officeConfig.upsert({
       where: { id: 1 },
-      update: data,
+      update: {
+        ...data,
+        // Keep pin static unless explicitly overridden; always clamp radius to 50 default intent
+        radiusMeters: data.radiusMeters ?? 50,
+      },
       create: {
         id: 1,
         latitude: data.latitude ?? 29.3931779,
         longitude: data.longitude ?? 71.6924333,
-        radiusMeters: data.radiusMeters ?? 100,
+        radiusMeters: data.radiusMeters ?? 50,
         timezone: data.timezone ?? "Asia/Karachi",
+        studentStartTime: data.studentStartTime ?? "09:00",
+        studentEndTime: data.studentEndTime ?? "14:00",
+        staffStartTime: data.staffStartTime ?? "08:00",
+        staffEndTime: data.staffEndTime ?? "17:00",
+        internStartTime: data.internStartTime ?? "10:00",
+        internEndTime: data.internEndTime ?? "18:00",
       },
     });
+  }
+
+  /** Per-user schedule override, else role defaults from office config. */
+  async resolveShiftTimes(userId: string): Promise<{
+    startTime: string;
+    endTime: string;
+  }> {
+    const personal = await this.prisma.staffSchedule.findUnique({
+      where: { userId },
+    });
+    if (personal?.active) {
+      return { startTime: personal.startTime, endTime: personal.endTime };
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { accountType: true },
+    });
+    const cfg = await this.getOfficeConfig();
+    switch (user?.accountType) {
+      case "STAFF":
+        return { startTime: cfg.staffStartTime, endTime: cfg.staffEndTime };
+      case "INTERN":
+        return { startTime: cfg.internStartTime, endTime: cfg.internEndTime };
+      case "STUDENT":
+      default:
+        return {
+          startTime: cfg.studentStartTime,
+          endTime: cfg.studentEndTime,
+        };
+    }
   }
 
   // ── Course categories (dynamic) ──
@@ -143,15 +195,26 @@ export class SystemService {
 
   // ── Staff work schedules ──
   async getSchedule(userId: string) {
-    let schedule = await this.prisma.staffSchedule.findUnique({
+    const personal = await this.prisma.staffSchedule.findUnique({
       where: { userId },
     });
-    if (!schedule) {
-      schedule = await this.prisma.staffSchedule.create({
-        data: { userId, startTime: "08:00", endTime: "17:00" },
-      });
+    const resolved = await this.resolveShiftTimes(userId);
+    if (personal) {
+      return {
+        ...personal,
+        startTime: personal.active ? personal.startTime : resolved.startTime,
+        endTime: personal.active ? personal.endTime : resolved.endTime,
+        resolvedFrom: personal.active ? "user" : "role",
+      };
     }
-    return schedule;
+    return {
+      id: null,
+      userId,
+      startTime: resolved.startTime,
+      endTime: resolved.endTime,
+      active: true,
+      resolvedFrom: "role",
+    };
   }
 
   async upsertSchedule(

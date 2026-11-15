@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 
@@ -13,25 +13,45 @@ type Row = {
   checkInAt?: string | null;
   checkOutAt?: string | null;
   courseTitle?: string | null;
+  autoCheckout?: boolean;
   source?: string;
 };
 
 export default function AttendancePage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [live, setLive] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const data = await api<Row[]>("/attendance");
+      setRows(data);
+      setError(null);
+      setLive(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed");
+    }
+  }, []);
 
   useEffect(() => {
-    api<Row[]>("/attendance")
-      .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
-  }, []);
+    void load();
+    const id = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(id);
+  }, [load]);
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5">
-        <h2 className="text-lg font-semibold">Attendance</h2>
-        <p className="text-sm text-slate-500">Live check-in / check-out from the Android app</p>
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      <div className="glass-card flex flex-wrap items-start justify-between gap-3 p-5">
+        <div>
+          <h2 className="text-lg font-semibold">Attendance</h2>
+          <p className="text-sm text-slate-500">
+            Geofence check-in (50m) · live every 5s · auto checkout at shift end
+          </p>
+          {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+        </div>
+        <Badge variant={live ? "success" : "secondary"}>
+          {live ? "Live" : "Connecting"}
+        </Badge>
       </div>
       <div className="glass-card table-scroll overflow-hidden">
         <table className="w-full text-left text-sm">
@@ -54,15 +74,32 @@ export default function AttendancePage() {
                 <td className="px-5 py-3.5">{r.date}</td>
                 <td className="px-5 py-3.5">{r.courseTitle || "—"}</td>
                 <td className="px-5 py-3.5">
-                  <Badge variant="secondary">{r.status}</Badge>
+                  <Badge variant="secondary">
+                    {r.status}
+                    {r.autoCheckout ? " · auto" : ""}
+                  </Badge>
                 </td>
                 <td className="px-5 py-3.5 text-xs text-slate-500">
-                  {r.checkInAt ? new Date(r.checkInAt).toLocaleTimeString() : "—"}
+                  {r.checkInAt
+                    ? new Date(r.checkInAt).toLocaleTimeString()
+                    : "—"}
                   {" / "}
-                  {r.checkOutAt ? new Date(r.checkOutAt).toLocaleTimeString() : "—"}
+                  {r.checkOutAt
+                    ? new Date(r.checkOutAt).toLocaleTimeString()
+                    : "—"}
                 </td>
               </tr>
             ))}
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="px-5 py-8 text-center text-slate-500"
+                >
+                  No attendance yet
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

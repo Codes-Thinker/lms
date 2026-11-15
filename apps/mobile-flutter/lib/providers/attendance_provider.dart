@@ -78,6 +78,21 @@ class AttendanceProvider extends ChangeNotifier {
   final List<AttendanceMark> _history = [];
   bool _loading = false;
 
+  // Geofence state
+  bool _insideGeofence = false;
+  int _distanceFromOffice = -1;
+  bool _checkingLocation = false;
+  double? _officeLat;
+  double? _officeLng;
+  int _geofenceRadius = 50;
+
+  bool get insideGeofence => _insideGeofence;
+  int get distanceFromOffice => _distanceFromOffice;
+  bool get checkingLocation => _checkingLocation;
+  int get geofenceRadius => _geofenceRadius;
+  double? get officeLat => _officeLat;
+  double? get officeLng => _officeLng;
+
   List<AttendanceMark> get today => List.unmodifiable(_today);
   List<AttendanceMark> get history => List.unmodifiable(_history);
   bool get loading => _loading;
@@ -132,7 +147,8 @@ class AttendanceProvider extends ChangeNotifier {
       _history
         ..clear()
         ..addAll(
-          histList.map((e) => AttendanceMark.fromApi(e as Map<String, dynamic>)),
+          histList
+              .map((e) => AttendanceMark.fromApi(e as Map<String, dynamic>)),
         );
       await LocalCache.setJson(LocalCache.attendanceMine, {
         'today': today is Map ? [today] : <dynamic>[],
@@ -153,12 +169,19 @@ class AttendanceProvider extends ChangeNotifier {
     required String personId,
     required String personName,
     required String role,
+    double? lat,
+    double? lng,
   }) async {
+    if (lat == null || lng == null) {
+      throw Exception('Location required for check-in');
+    }
     _loading = true;
     notifyListeners();
     try {
-      final data = await ApiClient.instance.post('/attendance/check-in')
-          as Map<String, dynamic>;
+      final data = await ApiClient.instance.post(
+        '/attendance/check-in',
+        body: {'lat': lat, 'lng': lng},
+      ) as Map<String, dynamic>;
       final mark = AttendanceMark.fromApi(data);
       _today
         ..removeWhere((m) => m.personId == personId)
@@ -166,22 +189,41 @@ class AttendanceProvider extends ChangeNotifier {
       _loading = false;
       notifyListeners();
       return mark;
-    } catch (_) {
-      final at = DateTime.now();
-      final status = autoStatus(at);
-      _today.removeWhere((m) => m.personId == personId);
-      final mark = AttendanceMark(
-        id: 'att-${at.millisecondsSinceEpoch}',
-        personId: personId,
-        personName: personName,
-        role: role,
-        status: status,
-        checkInAt: at,
-      );
-      _today.insert(0, mark);
+    } catch (e) {
       _loading = false;
       notifyListeners();
-      return mark;
+      rethrow;
+    }
+  }
+
+  /// Verify geofence location — calls backend to check distance.
+  Future<void> verifyLocation(double lat, double lng) async {
+    _checkingLocation = true;
+    notifyListeners();
+    try {
+      final data = await ApiClient.instance.post('/attendance/verify-location',
+          body: {'lat': lat, 'lng': lng}) as Map<String, dynamic>;
+      _insideGeofence = data['inside'] as bool? ?? false;
+      _distanceFromOffice = (data['distance'] as num?)?.toInt() ?? -1;
+      _officeLat = (data['officeLat'] as num?)?.toDouble();
+      _officeLng = (data['officeLng'] as num?)?.toDouble();
+      _geofenceRadius = (data['radius'] as num?)?.toInt() ?? 50;
+    } catch (e) {
+      debugPrint('Location verify failed: $e');
+      _insideGeofence = false;
+      _distanceFromOffice = -1;
+    }
+    _checkingLocation = false;
+    notifyListeners();
+  }
+
+  /// Process arrival reminder — sends at most one per day.
+  Future<void> processArrivalReminder(double lat, double lng) async {
+    try {
+      await ApiClient.instance
+          .post('/attendance/arrival-reminder', body: {'lat': lat, 'lng': lng});
+    } catch (e) {
+      debugPrint('Arrival reminder failed: $e');
     }
   }
 

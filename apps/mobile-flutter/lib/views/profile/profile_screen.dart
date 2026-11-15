@@ -14,6 +14,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/avatar_service.dart';
+import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
 import '../auth/login_screen.dart';
 import '../help/help_hub_screen.dart';
@@ -178,6 +179,7 @@ class ProfileScreen extends StatelessWidget {
     final ui = context.read<UiProvider>();
     ui.showLoading();
     await PushNotificationService.instance.unregisterFromBackend();
+    await OfficeLocationService.instance.stop();
     context.read<CourseProvider>().clearMemory();
     context.read<TaskProvider>().clearMemory();
     context.read<FeeProvider>().clearMemory();
@@ -411,6 +413,7 @@ class ProfileScreen extends StatelessWidget {
             child: ElevatedButton(
               onPressed: () async {
                 await PushNotificationService.instance.unregisterFromBackend();
+                await OfficeLocationService.instance.stop();
                 context.read<CourseProvider>().clearMemory();
                 context.read<TaskProvider>().clearMemory();
                 context.read<FeeProvider>().clearMemory();
