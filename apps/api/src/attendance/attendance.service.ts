@@ -48,9 +48,17 @@ export class AttendanceService implements OnModuleInit {
   }
 
   private todayDate(): Date {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+    // Office timezone (Asia/Karachi) — avoid UTC day-roll issues for Pakistan LMS.
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Karachi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const y = Number(parts.find((p) => p.type === "year")?.value);
+    const m = Number(parts.find((p) => p.type === "month")?.value);
+    const d = Number(parts.find((p) => p.type === "day")?.value);
+    return new Date(Date.UTC(y, m - 1, d));
   }
 
   private isLate(now: Date, shiftStart: string | null): boolean {
