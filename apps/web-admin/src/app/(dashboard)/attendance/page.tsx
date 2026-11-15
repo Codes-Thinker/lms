@@ -11,6 +11,7 @@ type CourseTab = {
   title: string;
   category: string;
   enrolledCount: number;
+  published?: boolean;
 };
 
 type Row = {
@@ -132,8 +133,14 @@ export default function AttendancePage() {
             >
               {t.title}
               {t.id !== "all" ? (
-                <span className={cn("ml-1.5 text-xs", active ? "text-blue-100" : "text-slate-400")}>
+                <span
+                  className={cn(
+                    "ml-1.5 text-xs",
+                    active ? "text-blue-100" : "text-slate-400"
+                  )}
+                >
                   {t.enrolledCount}
+                  {t.published === false ? " · draft" : ""}
                 </span>
               ) : null}
             </button>

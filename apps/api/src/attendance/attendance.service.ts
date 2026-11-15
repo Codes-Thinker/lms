@@ -152,24 +152,23 @@ export class AttendanceService implements OnModuleInit {
       : this.todayDate();
     const dateStr = day.toISOString().slice(0, 10);
 
+    // Every course added in admin becomes a tab (even with 0 enrollments).
     const courses = await this.prisma.course.findMany({
-      where: {
-        published: true,
-        enrollments: { some: {} },
-      },
       select: {
         id: true,
         title: true,
         category: true,
+        published: true,
         _count: { select: { enrollments: true } },
       },
-      orderBy: { title: "asc" },
+      orderBy: [{ published: "desc" }, { title: "asc" }],
     });
 
     const courseTabs = courses.map((c) => ({
       id: c.id,
       title: c.title,
       category: c.category,
+      published: c.published,
       enrolledCount: c._count.enrollments,
     }));
 
