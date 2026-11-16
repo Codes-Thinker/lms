@@ -23,6 +23,7 @@ import 'views/teacher/assignment_chat_screen.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/force_update_sheet.dart';
+import 'widgets/realtime_bootstrap.dart';
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -137,11 +138,13 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => VersionProvider()),
       ],
-      child: MaterialApp(
-        navigatorKey: appNavigatorKey,
-        title: "Code's Thinker LMS",
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
+      child: RealtimeBootstrap(
+        onOpen: (type, {taskId}) => _openFromNotification(type),
+        child: MaterialApp(
+          navigatorKey: appNavigatorKey,
+          title: "Code's Thinker LMS",
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
           brightness: Brightness.light,
           scaffoldBackgroundColor: AppColors.bg,
           fontFamily: null,
@@ -235,6 +238,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
           );
         },
         home: const SplashScreen(),
+      ),
       ),
     );
   }
