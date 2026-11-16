@@ -13,6 +13,7 @@ import { HealthController } from "./health.controller";
 import { MailModule } from "./mail/mail.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { RealtimeModule } from "./realtime/realtime.module";
 import { ReportsModule } from "./reports/reports.module";
 import { SupportModule } from "./support/support.module";
 import { SystemModule } from "./system/system.module";
@@ -26,6 +27,7 @@ import { UsersModule } from "./users/users.module";
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     PrismaModule,
     MailModule,
+    RealtimeModule,
     AuthModule,
     UsersModule,
     CoursesModule,

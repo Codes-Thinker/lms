@@ -1,8 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import '../models/fee_payment.dart';
 import '../services/api_client.dart';
+import '../services/image_compress_service.dart';
 import '../services/local_cache.dart';
 
 class FeeProvider extends ChangeNotifier {
@@ -160,14 +159,17 @@ class FeeProvider extends ChangeNotifier {
     _loading = true;
     notifyListeners();
     try {
-      final dataUrl =
-          'data:image/jpeg;base64,${base64Encode(imageBytes)}';
+      final dataUrl = await ImageCompressService.toDataUrl(
+        imageBytes,
+        maxSide: 1280,
+      );
       final data = await ApiClient.instance.post(
         '/fees/$caseId/submit-payment',
         body: {
           'amount': fee.amount,
           'screenshotData': dataUrl,
-          'screenshotName': fileName,
+          'screenshotName':
+              '${fileName.replaceAll(RegExp(r'\.\w+$'), '')}.png',
         },
       ) as Map<String, dynamic>;
       _applyCaseResponse(caseId, data);

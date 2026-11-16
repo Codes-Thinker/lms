@@ -310,7 +310,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No batches synced yet',
+                          'No batches yet',
                           style: TextStyle(color: AppColors.muted),
                         ),
                       )

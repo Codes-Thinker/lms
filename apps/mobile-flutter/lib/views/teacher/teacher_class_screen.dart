@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
+import 'assignment_chat_screen.dart';
 
 /// Teacher: course filter tabs + Students / Assignments + assign sheet.
 class TeacherClassScreen extends StatefulWidget {
@@ -153,14 +154,10 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
   }
 
   Future<void> _openAssignmentChat(AssignedStudentTask task) async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AssignmentChatScreen(taskId: task.id),
       ),
-      builder: (ctx) => _AssignmentChatSheet(taskId: task.id),
     );
     if (!mounted) return;
     await context.read<TeachingProvider>().load(silent: true);
@@ -966,186 +963,3 @@ class _EditAssignmentSheetState extends State<_EditAssignmentSheet> {
   }
 }
 
-/// Live assignment thread — student ↔ this teacher.
-class _AssignmentChatSheet extends StatefulWidget {
-  final String taskId;
-
-  const _AssignmentChatSheet({required this.taskId});
-
-  @override
-  State<_AssignmentChatSheet> createState() => _AssignmentChatSheetState();
-}
-
-class _AssignmentChatSheetState extends State<_AssignmentChatSheet> {
-  final _controller = TextEditingController();
-  bool _sending = false;
-  Timer? _poll;
-
-  @override
-  void initState() {
-    super.initState();
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted) return;
-      context.read<TeachingProvider>().load(silent: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _poll?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _sending) return;
-    setState(() => _sending = true);
-    _controller.clear();
-    try {
-      await context.read<TeachingProvider>().sendAssignmentMessage(
-            taskId: widget.taskId,
-            text: text,
-            senderName: 'You',
-          );
-    } catch (e) {
-      if (mounted) {
-        _controller.text = text;
-        context.read<UiProvider>().showSnack(
-              ApiErrors.friendly(e),
-              tone: AppSnackTone.error,
-            );
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    AssignedStudentTask? task;
-    try {
-      task = context
-          .watch<TeachingProvider>()
-          .assigned
-          .firstWhere((t) => t.id == widget.taskId);
-    } catch (_) {
-      task = null;
-    }
-
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        12,
-        16,
-        16 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.7,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.line,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            Text(
-              task?.title ?? 'Assignment chat',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-            ),
-            Text(
-              '${task?.assignedToName ?? 'Student'} · ${task?.spentMinutes ?? 0}m worked',
-              style: const TextStyle(color: AppColors.muted, fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            Expanded(
-              child: ListView(
-                children: [
-                  if (task == null || task.chat.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Text(
-                        'No messages yet. Student updates show here in realtime.',
-                        style: TextStyle(color: AppColors.muted),
-                      ),
-                    ),
-                  ...?(task?.chat.map((msg) {
-                    final mine = msg.senderRole == 'ADMIN';
-                    return Align(
-                      alignment: mine
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        constraints: const BoxConstraints(maxWidth: 280),
-                        decoration: BoxDecoration(
-                          color: mine ? AppColors.blue : AppColors.bg,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${msg.senderName} · ${msg.sentAt}',
-                              style: TextStyle(
-                                color:
-                                    mine ? Colors.white70 : AppColors.muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              msg.text,
-                              style: TextStyle(
-                                color: mine ? Colors.white : AppColors.ink,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  })),
-                ],
-              ),
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _send(),
-                    decoration: InputDecoration(
-                      hintText: 'Reply to student…',
-                      filled: true,
-                      fillColor: AppColors.bg,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _sending ? null : _send,
-                  style:
-                      IconButton.styleFrom(backgroundColor: AppColors.blue),
-                  icon: const Icon(Icons.send_rounded, color: Colors.white),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

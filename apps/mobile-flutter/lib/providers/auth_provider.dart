@@ -8,6 +8,7 @@ import '../core/api_errors.dart';
 import '../models/user.dart';
 import '../services/api_client.dart';
 import '../services/avatar_service.dart';
+import '../services/image_compress_service.dart';
 import '../services/local_cache.dart';
 
 enum LoginRole { student, intern, staff }
@@ -228,10 +229,10 @@ class AuthProvider extends ChangeNotifier {
     _avatarPath = path;
     notifyListeners();
 
-    // Sync to server so admin dashboard shows the same photo.
+    // Upload compressed photo so admin dashboard shows the same image.
     try {
-      final bytes = await File(path).readAsBytes();
-      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final raw = await File(path).readAsBytes();
+      final dataUrl = await ImageCompressService.toDataUrl(raw, maxSide: 800);
       final data = await ApiClient.instance.patch(
         '/users/me',
         body: {'profileImage': dataUrl},

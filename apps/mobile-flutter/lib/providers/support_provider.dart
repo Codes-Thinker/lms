@@ -1,7 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
+import '../services/image_compress_service.dart';
 
 class SupportTicket {
   final String id;
@@ -307,13 +306,19 @@ class SupportProvider extends ChangeNotifier {
     required List<int> bytes,
     String fileName = 'chat.jpg',
     String caption = '',
-  }) {
-    final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+  }) async {
+    final dataUrl = await ImageCompressService.toDataUrl(
+      Uint8List.fromList(bytes),
+      maxSide: 1280,
+    );
+    final name = fileName.toLowerCase().endsWith('.png')
+        ? fileName
+        : '${fileName.replaceAll(RegExp(r'\.\w+$'), '')}.png';
     return sendChat(
       senderName: senderName,
       text: caption,
       imageData: dataUrl,
-      imageName: fileName,
+      imageName: name,
     );
   }
 

@@ -89,8 +89,11 @@ export function hrefForNotification(n: AppNotification): string {
     case "survey":
     case "general":
       return "/feedback";
-    case "task":
-      return "/tasks";
+    case "task": {
+      const taskId = d.taskId || "";
+      if (taskId) return `/staff?taskChat=${encodeURIComponent(taskId)}`;
+      return "/staff";
+    }
     case "project":
       return "/interns";
     case "system":
@@ -115,10 +118,8 @@ export function NotificationsProvider({
     try {
       const rows = await api<ApiNote[]>("/notifications/me");
       const mapped = rows.map(mapNote);
-      // Chat tone is handled by ChatInboxProvider — beep here for fees/tickets/surveys.
-      const alertUnread = mapped.filter(
-        (n) => !n.read && n.type !== "chat"
-      ).length;
+      // Beep for any new unread (chat, fees, tasks, …).
+      const alertUnread = mapped.filter((n) => !n.read).length;
       if (primed.current && alertUnread > prevUnread.current) {
         playNotifyTone(740);
       }
@@ -132,7 +133,8 @@ export function NotificationsProvider({
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 30000);
+    // Fallback poll when Socket.IO is unavailable.
+    const id = window.setInterval(() => void refresh(), 12000);
     return () => window.clearInterval(id);
   }, [refresh]);
 

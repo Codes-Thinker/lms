@@ -19,7 +19,7 @@ import 'views/help/admin_chat_screen.dart';
 import 'views/shell/app_shell.dart';
 import 'views/splash/splash_screen.dart';
 import 'views/tasks/task_detail_screen.dart';
-import 'views/teacher/teacher_class_screen.dart';
+import 'views/teacher/assignment_chat_screen.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/force_update_sheet.dart';
@@ -104,7 +104,9 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
         if (n == null) return;
         if (_auth.isStaff) {
           n.push(
-            MaterialPageRoute(builder: (_) => const TeacherClassScreen()),
+            MaterialPageRoute(
+              builder: (_) => AssignmentChatScreen(taskId: taskId),
+            ),
           );
         } else {
           n.push(

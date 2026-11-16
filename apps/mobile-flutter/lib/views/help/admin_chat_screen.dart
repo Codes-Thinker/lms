@@ -139,7 +139,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             Text(
-              'Support chat · live sync',
+              'Support chat',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.muted,

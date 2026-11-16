@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useChatInbox } from "@/components/ui/chat-inbox-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { compressImageFile } from "@/lib/compress-image";
 import { cn } from "@/lib/utils";
 
 type Message = {
@@ -32,14 +33,6 @@ const EMOJIS = [
   "🔥", "🎉", "✅", "📌", "📷", "🙏", "💯", "😎",
 ];
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Could not read image"));
-    reader.readAsDataURL(file);
-  });
-}
 
 function messagesFingerprint(msgs?: Message[]) {
   return (msgs || [])
@@ -220,11 +213,11 @@ export default function InboxPage() {
       return;
     }
     try {
-      const imageData = await fileToDataUrl(file);
+      const { dataUrl, name } = await compressImageFile(file);
       await sendPayload({
         text: text.trim() || undefined,
-        imageData,
-        imageName: file.name,
+        imageData: dataUrl,
+        imageName: name,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed");
@@ -242,7 +235,7 @@ export default function InboxPage() {
           <div className="shrink-0 border-b border-slate-100 px-4 py-3">
             <h2 className="text-base font-semibold">Chat inbox</h2>
             <p className="text-xs text-slate-500">
-              Live sync · tap a chat · photos open full size
+              Tap a chat · photos open full size
             </p>
             {error ? (
               <p className="mt-2 text-xs text-red-600">{error}</p>

@@ -12,7 +12,7 @@ import '../fees/fees_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../attendance/attendance_screen.dart';
-import '../teacher/teacher_class_screen.dart';
+import '../teacher/assignment_chat_screen.dart';
 import '../../providers/auth_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -61,7 +61,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
     final type = n.type.toUpperCase();
     final taskId = n.data?['taskId']?.toString();
-    final event = n.data?['event']?.toString();
     final isStaff = context.read<AuthProvider>().isStaff;
 
     if (type == 'CHAT') {
@@ -81,10 +80,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         );
         return;
       }
-      if (isStaff && event == 'chat') {
-        // Teacher: open My classes so they can reply on the assignment thread.
+      if (isStaff && taskId != null && taskId.isNotEmpty) {
         Navigator.of(context).push(
-          AppMotion.fadeSlide(const TeacherClassScreen()),
+          AppMotion.fadeSlide(AssignmentChatScreen(taskId: taskId)),
         );
         return;
       }

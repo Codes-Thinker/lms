@@ -218,7 +218,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Messages go to your teacher (and admin Teachers page). Live sync every few seconds.',
+                  'Messages go to your teacher (and admin Teachers page).',
                   style: TextStyle(color: AppColors.muted, fontSize: 12),
                 ),
                 const SizedBox(height: 8),

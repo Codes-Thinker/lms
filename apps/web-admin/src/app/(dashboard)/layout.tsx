@@ -28,6 +28,7 @@ import { isNavItemActive } from "@/lib/nav-active";
 import { clearSession, getAdminUser, getToken } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { PageEnter } from "@/components/ui/page-enter";
+import { RealtimeBridge } from "@/components/ui/realtime-bridge";
 import { SnackbarProvider } from "@/components/ui/snackbar";
 import { NotificationsProvider } from "@/components/ui/notifications-provider";
 import { NotificationsBell } from "@/components/ui/notifications-bell";
@@ -321,6 +322,7 @@ export default function DashboardLayout({
     <SnackbarProvider>
       <NotificationsProvider>
         <AdminActivityProvider>
+          <RealtimeBridge />
           <div className="dashboard-shell flex min-h-screen bg-[#F8FAFC]">
             {/* Desktop sidebar */}
             <aside

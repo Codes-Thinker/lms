@@ -1,13 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import { NotificationType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { PushService } from "./push.service";
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly push: PushService
+    private readonly push: PushService,
+    private readonly realtime: RealtimeGateway
   ) {}
 
   async list(userId?: string) {
@@ -63,6 +65,16 @@ export class NotificationsService {
       type,
       notificationId: row.id,
       data: input.data,
+    });
+
+    // Live dashboard/app update (Socket.IO) — complements FCM.
+    this.realtime.emitToUser(input.userId, "notification", {
+      id: row.id,
+      title: input.title,
+      body: input.body,
+      type,
+      data: input.data ?? {},
+      createdAt: row.createdAt.toISOString(),
     });
 
     return row;

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { readListCache, writeListCache } from "@/lib/list-cache";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
 const CACHE_KEY = "lms_cache_staff_v1";
 
@@ -93,8 +95,10 @@ function mapStaff(u: Record<string, unknown>): StaffRow {
   };
 }
 
-export default function StaffPage() {
+function StaffPageInner() {
   const { show } = useSnackbar();
+  const searchParams = useSearchParams();
+  const taskChatId = (searchParams.get("taskChat") || "").trim();
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +166,16 @@ export default function StaffPage() {
     }, 15000);
     return () => window.clearInterval(id);
   }, [refresh, show]);
+
+  // Deep-link from notification: /staff?taskChat=<id>
+  useEffect(() => {
+    if (!taskChatId || tasks.length === 0) return;
+    const match = tasks.find((t) => t.id === taskChatId);
+    if (match) {
+      setChatTask(match);
+      setChatText("");
+    }
+  }, [taskChatId, tasks]);
 
   async function saveEdit() {
     if (!editTask || !editTitle.trim()) return;
@@ -524,5 +538,13 @@ export default function StaffPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function StaffPage() {
+  return (
+    <SearchParamsBoundary>
+      <StaffPageInner />
+    </SearchParamsBoundary>
   );
 }
