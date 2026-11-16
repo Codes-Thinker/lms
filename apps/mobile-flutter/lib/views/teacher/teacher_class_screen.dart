@@ -89,7 +89,7 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
       floatingActionButton: selected == null
           ? null
           : FloatingActionButton.extended(
-              onPressed: () => _openAssign(context, selected),
+              onPressed: () => _openAssign(selected),
               backgroundColor: AppColors.blue,
               icon: const Icon(Icons.edit_note_rounded),
               label: const Text('New assignment'),
@@ -124,11 +124,8 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
                             students: teaching.filteredStudents,
                             course: selected!,
                             onSearch: teaching.setStudentQuery,
-                            onAssignOne: (id) => _openAssign(
-                              context,
-                              selected,
-                              preselect: [id],
-                            ),
+                            onAssignOne: (id) =>
+                                _openAssign(selected, preselect: [id]),
                           ),
                           _AssignmentsTab(
                             searchController: _assignmentSearch,
@@ -144,210 +141,97 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
   }
 
   Future<void> _openAssign(
-    BuildContext context,
     TeachingCourse course, {
     List<String>? preselect,
   }) async {
-    final titleCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-    final selectedIds = <String>{...(preselect ?? const [])};
-    var assignAll = preselect == null || preselect.isEmpty;
-    var studentFilter = '';
-
-    final ok = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<_AssignSheetResult>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setModal) {
-            final visible = course.students.where((s) {
-              final q = studentFilter.trim().toLowerCase();
-              if (q.isEmpty) return true;
-              return s.name.toLowerCase().contains(q) ||
-                  (s.batch ?? '').toLowerCase().contains(q);
-            }).toList();
-
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                12,
-                20,
-                20 + MediaQuery.viewInsetsOf(ctx).bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 14),
-                        decoration: BoxDecoration(
-                          color: AppColors.line,
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                    Text(
-                      'Write & assign',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      course.batch?.isNotEmpty == true
-                          ? '${course.title} · ${course.batch}'
-                          : course.title,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: titleCtrl,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: _fieldDec('Assignment title *'),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: descCtrl,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: _fieldDec(
-                        'Instructions — what should they do?',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.softBlue,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                          'Entire batch',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Text(
-                          assignAll
-                              ? 'All ${course.students.length} students'
-                              : 'Pick individuals below',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        value: assignAll,
-                        activeThumbColor: AppColors.blue,
-                        onChanged: (v) => setModal(() {
-                          assignAll = v;
-                          if (v) selectedIds.clear();
-                        }),
-                      ),
-                    ),
-                    if (!assignAll) ...[
-                      const SizedBox(height: 10),
-                      TextField(
-                        onChanged: (v) => setModal(() => studentFilter = v),
-                        decoration: _fieldDec('Filter students…'),
-                      ),
-                      const SizedBox(height: 6),
-                      ...visible.map(
-                        (s) => CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          value: selectedIds.contains(s.id),
-                          title: Text(s.name,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                            [s.batch, s.accountType]
-                                .whereType<String>()
-                                .where((e) => e.isNotEmpty)
-                                .join(' · '),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          onChanged: (v) => setModal(() {
-                            if (v == true) {
-                              selectedIds.add(s.id);
-                            } else {
-                              selectedIds.remove(s.id);
-                            }
-                          }),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (titleCtrl.text.trim().isEmpty) return;
-                          if (!assignAll && selectedIds.isEmpty) return;
-                          Navigator.pop(ctx, true);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.blue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          assignAll
-                              ? 'Assign to whole batch'
-                              : 'Assign to ${selectedIds.length} student${selectedIds.length == 1 ? '' : 's'}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (ctx) => _AssignTaskSheet(
+        course: course,
+        preselect: preselect,
+      ),
     );
 
-    final title = titleCtrl.text;
-    final desc = descCtrl.text;
-    final ids = selectedIds.toList();
-    final whole = assignAll;
-    titleCtrl.dispose();
-    descCtrl.dispose();
-
-    if (ok != true || !context.mounted) return;
+    if (result == null || !mounted) return;
 
     final ui = context.read<UiProvider>();
+    final teaching = context.read<TeachingProvider>();
     try {
-      final count = await context.read<TeachingProvider>().assignTask(
-            courseId: course.id,
-            title: title,
-            description: desc,
-            assigneeIds: whole ? null : ids,
-          );
-      if (!context.mounted) return;
-      context.read<TeachingProvider>().setTabIndex(1);
-      _tabs.animateTo(1);
+      final count = await teaching.assignTask(
+        courseId: course.id,
+        title: result.title,
+        description: result.description,
+        assigneeIds: result.assigneeIds,
+      );
+      if (!mounted) return;
+      teaching.setTabIndex(1);
+      if (_tabs.index != 1) _tabs.animateTo(1);
       ui.showSnack(
         'Assigned to $count student${count == 1 ? '' : 's'}',
         tone: AppSnackTone.success,
       );
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       ui.showSnack(ApiErrors.friendly(e), tone: AppSnackTone.error);
     }
+  }
+}
+
+class _AssignSheetResult {
+  final String title;
+  final String description;
+  /// null = whole batch
+  final List<String>? assigneeIds;
+
+  const _AssignSheetResult({
+    required this.title,
+    required this.description,
+    required this.assigneeIds,
+  });
+}
+
+/// Owns its Text controllers so they are never used after dispose.
+class _AssignTaskSheet extends StatefulWidget {
+  final TeachingCourse course;
+  final List<String>? preselect;
+
+  const _AssignTaskSheet({
+    required this.course,
+    this.preselect,
+  });
+
+  @override
+  State<_AssignTaskSheet> createState() => _AssignTaskSheetState();
+}
+
+class _AssignTaskSheetState extends State<_AssignTaskSheet> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+  late final TextEditingController _filterCtrl;
+  late final Set<String> _selectedIds;
+  late bool _assignAll;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController();
+    _descCtrl = TextEditingController();
+    _filterCtrl = TextEditingController();
+    _selectedIds = {...?(widget.preselect)};
+    _assignAll = widget.preselect == null || widget.preselect!.isEmpty;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _filterCtrl.dispose();
+    super.dispose();
   }
 
   InputDecoration _fieldDec(String hint) => InputDecoration(
@@ -361,6 +245,163 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
           borderSide: BorderSide.none,
         ),
       );
+
+  void _submit() {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    if (!_assignAll && _selectedIds.isEmpty) return;
+    Navigator.pop(
+      context,
+      _AssignSheetResult(
+        title: title,
+        description: _descCtrl.text.trim(),
+        assigneeIds: _assignAll ? null : _selectedIds.toList(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final course = widget.course;
+    final q = _filterCtrl.text.trim().toLowerCase();
+    final visible = course.students.where((s) {
+      if (q.isEmpty) return true;
+      return s.name.toLowerCase().contains(q) ||
+          (s.batch ?? '').toLowerCase().contains(q);
+    }).toList();
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.line,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            const Text(
+              'Write & assign',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              course.batch?.isNotEmpty == true
+                  ? '${course.title} · ${course.batch}'
+                  : course.title,
+              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _titleCtrl,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _fieldDec('Assignment title *'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _descCtrl,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: _fieldDec('Instructions — what should they do?'),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.softBlue,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text(
+                  'Entire batch',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  _assignAll
+                      ? 'All ${course.students.length} students'
+                      : 'Pick individuals below',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                value: _assignAll,
+                activeThumbColor: AppColors.blue,
+                onChanged: (v) => setState(() {
+                  _assignAll = v;
+                  if (v) _selectedIds.clear();
+                }),
+              ),
+            ),
+            if (!_assignAll) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _filterCtrl,
+                onChanged: (_) => setState(() {}),
+                decoration: _fieldDec('Filter students…'),
+              ),
+              const SizedBox(height: 6),
+              ...visible.map(
+                (s) => CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: _selectedIds.contains(s.id),
+                  title: Text(s.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    [s.batch, s.accountType]
+                        .whereType<String>()
+                        .where((e) => e.isNotEmpty)
+                        .join(' · '),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onChanged: (v) => setState(() {
+                    if (v == true) {
+                      _selectedIds.add(s.id);
+                    } else {
+                      _selectedIds.remove(s.id);
+                    }
+                  }),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _submit,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.blue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  _assignAll
+                      ? 'Assign to whole batch'
+                      : 'Assign to ${_selectedIds.length} student${_selectedIds.length == 1 ? '' : 's'}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CourseFilterBar extends StatelessWidget {
