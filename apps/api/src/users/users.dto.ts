@@ -10,7 +10,7 @@ import {
   MinLength,
 } from "class-validator";
 import { Type } from "class-transformer";
-import { AccountStatus, AccountType } from "@prisma/client";
+import { AccountStatus, AccountType, PaymentPlanType } from "@prisma/client";
 
 export class CreateUserDto {
   @IsString()
@@ -52,6 +52,50 @@ export class CreateUserDto {
   @IsOptional()
   @IsBoolean()
   sendInvitation?: boolean;
+
+  /** Student: enroll into these courses on create. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  courseIds?: string[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  monthlyFee?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  totalCourseFee?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  courseDurationMonths?: number;
+
+  @IsOptional()
+  @IsEnum(PaymentPlanType)
+  paymentType?: PaymentPlanType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  installment1Amount?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  installment2Amount?: number;
+
+  @IsOptional()
+  @IsString()
+  feeStartDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  feeDueDay?: number;
 }
 
 export class UpdateUserDto {
@@ -122,6 +166,26 @@ export class UpdateUserDto {
   @IsString()
   internshipEnd?: string | null;
 
+  @IsOptional()
+  @IsEnum(PaymentPlanType)
+  paymentType?: PaymentPlanType | null;
+
+  @IsOptional()
+  @IsInt()
+  installment1Amount?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  installment2Amount?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  courseDurationMonths?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  totalCourseFee?: number | null;
+
   /** Replace student enrollments with these course IDs. */
   @IsOptional()
   @IsArray()
@@ -142,15 +206,18 @@ export class ListUsersQueryDto {
   @IsEnum(AccountStatus)
   status?: AccountStatus;
 
+  /** Filter students enrolled in this course. */
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number = 1;
+  @IsString()
+  courseId?: string;
 
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  pageSize?: number = 20;
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  pageSize?: number;
 }

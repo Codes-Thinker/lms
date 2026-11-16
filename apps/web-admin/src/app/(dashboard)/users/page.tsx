@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,14 @@ type UserRow = {
 
 const ACCOUNT_TYPES = ["STUDENT", "INTERN", "STAFF"] as const;
 
+const PAYMENT_TYPES = ["MONTHLY", "TWO_INSTALLMENTS", "CUSTOM"] as const;
+
+type CourseOption = {
+  id: string;
+  title: string;
+  category?: string;
+};
+
 const emptyForm = {
   fullName: "",
   email: "",
@@ -48,6 +57,18 @@ const emptyForm = {
   accountType: "STUDENT" as (typeof ACCOUNT_TYPES)[number],
   track: "",
   phone: "",
+};
+
+const emptyStudentFee = {
+  courseIds: [] as string[],
+  courseDurationMonths: "",
+  totalCourseFee: "",
+  monthlyFee: "",
+  paymentType: "MONTHLY" as (typeof PAYMENT_TYPES)[number],
+  installment1Amount: "",
+  installment2Amount: "",
+  feeStartDate: "",
+  feeDueDay: "5",
 };
 
 function assignedCourseLabel(u: UserRow): string {
@@ -58,18 +79,26 @@ function assignedCourseLabel(u: UserRow): string {
 
 export default function UsersPage() {
   const { show } = useSnackbar();
+  const searchParams = useSearchParams();
+  const qFromUrl = (searchParams.get("q") || "").trim();
   const [items, setItems] = useState<UserRow[]>(() => cacheGetSync<UserRow[]>(USERS_CACHE_KEY) ?? []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [studentFee, setStudentFee] = useState(emptyStudentFee);
+  const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [q, setQ] = useState(qFromUrl);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (searchQ?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const r = await api<{ items: UserRow[] }>("/users?pageSize=100");
+      const params = new URLSearchParams({ pageSize: "200" });
+      const term = (searchQ ?? q).trim();
+      if (term) params.set("q", term);
+      const r = await api<{ items: UserRow[] }>(`/users?${params.toString()}`);
       setItems(r.items);
       await cacheSet(USERS_CACHE_KEY, r.items);
     } catch (e) {
@@ -78,14 +107,41 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [q]);
+
+  useEffect(() => {
+    setQ(qFromUrl);
+  }, [qFromUrl]);
 
   useEffect(() => {
     void cacheGet<UserRow[]>(USERS_CACHE_KEY).then((cached) => {
       if (cached?.data?.length) setItems(cached.data);
     });
-    void load();
-  }, [load]);
+    void load(qFromUrl);
+    api<CourseOption[]>("/courses?all=1")
+      .then(setCourseOptions)
+      .catch(() => setCourseOptions([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qFromUrl]);
+
+  useEffect(() => {
+    if (form.accountType !== "STUDENT") return;
+    const monthly = Number(studentFee.monthlyFee);
+    const months = Number(studentFee.courseDurationMonths);
+    if (monthly > 0 && months > 0) {
+      setStudentFee((prev) => ({
+        ...prev,
+        totalCourseFee: String(Math.round(monthly * months)),
+      }));
+    }
+  }, [form.accountType, studentFee.monthlyFee, studentFee.courseDurationMonths]);
+
+  const suggestedTotal = useMemo(() => {
+    const monthly = Number(studentFee.monthlyFee);
+    const months = Number(studentFee.courseDurationMonths);
+    if (monthly > 0 && months > 0) return monthly * months;
+    return null;
+  }, [studentFee.monthlyFee, studentFee.courseDurationMonths]);
 
   function setField<K extends keyof typeof emptyForm>(
     key: K,
@@ -96,24 +152,66 @@ export default function UsersPage() {
 
   function resetForm() {
     setForm(emptyForm);
+    setStudentFee(emptyStudentFee);
     setShowPassword(false);
+  }
+
+  function toggleCourseId(id: string) {
+    setStudentFee((prev) => {
+      const has = prev.courseIds.includes(id);
+      return {
+        ...prev,
+        courseIds: has
+          ? prev.courseIds.filter((x) => x !== id)
+          : [...prev.courseIds, id],
+      };
+    });
+  }
+
+  function numOrUndefined(v: string): number | undefined {
+    const n = Number(v);
+    return v.trim() !== "" && !Number.isNaN(n) ? n : undefined;
   }
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
+      const body: Record<string, unknown> = {
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        accountType: form.accountType,
+        track: form.track.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        password: form.password.trim() || undefined,
+        sendInvitation: !form.password.trim(),
+      };
+      if (form.accountType === "STUDENT") {
+        if (studentFee.courseIds.length) body.courseIds = studentFee.courseIds;
+        const monthlyFee = numOrUndefined(studentFee.monthlyFee);
+        const totalCourseFee = numOrUndefined(studentFee.totalCourseFee);
+        const courseDurationMonths = numOrUndefined(studentFee.courseDurationMonths);
+        const installment1Amount = numOrUndefined(studentFee.installment1Amount);
+        const installment2Amount = numOrUndefined(studentFee.installment2Amount);
+        const feeDueDay = numOrUndefined(studentFee.feeDueDay);
+        if (monthlyFee !== undefined) body.monthlyFee = monthlyFee;
+        if (totalCourseFee !== undefined) body.totalCourseFee = totalCourseFee;
+        if (courseDurationMonths !== undefined)
+          body.courseDurationMonths = courseDurationMonths;
+        body.paymentType = studentFee.paymentType;
+        if (studentFee.paymentType === "TWO_INSTALLMENTS") {
+          if (installment1Amount !== undefined)
+            body.installment1Amount = installment1Amount;
+          if (installment2Amount !== undefined)
+            body.installment2Amount = installment2Amount;
+        }
+        if (studentFee.feeStartDate.trim())
+          body.feeStartDate = studentFee.feeStartDate.trim();
+        if (feeDueDay !== undefined) body.feeDueDay = feeDueDay;
+      }
       await api("/users", {
         method: "POST",
-        body: JSON.stringify({
-          fullName: form.fullName.trim(),
-          email: form.email.trim(),
-          accountType: form.accountType,
-          track: form.track.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          password: form.password.trim() || undefined,
-          sendInvitation: !form.password.trim(),
-        }),
+        body: JSON.stringify(body),
       });
       resetForm();
       show("User created");
@@ -128,11 +226,32 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5">
-        <h2 className="text-lg font-semibold">Users</h2>
-        <p className="text-sm text-slate-500">
-          Add Student · Intern · Teacher — tap a name for full profile
-        </p>
+      <div className="glass-card space-y-3 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Users</h2>
+            <p className="text-sm text-slate-500">
+              Add Student · Intern · Teacher — tap a name for full profile
+            </p>
+          </div>
+          <form
+            className="flex w-full max-w-md gap-2 sm:w-auto"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void load(q);
+            }}
+          >
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name, email, phone…"
+              className="h-10"
+            />
+            <Button type="submit" variant="secondary">
+              Search
+            </Button>
+          </form>
+        </div>
         {error ? (
           <p className="mt-2 text-sm text-red-600">
             {error}
@@ -294,6 +413,168 @@ export default function UsersPage() {
             />
           </div>
         </div>
+
+        {form.accountType === "STUDENT" ? (
+          <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="space-y-1">
+              <h4 className="font-semibold text-slate-800">Enrollment &amp; fees</h4>
+              <p className="text-xs text-slate-500">
+                Optional — configure course access and payment plan at signup
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Courses</Label>
+              {courseOptions.length === 0 ? (
+                <p className="text-xs text-slate-500">No courses loaded</p>
+              ) : (
+                <div className="flex max-h-40 flex-col gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3">
+                  {courseOptions.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={studentFee.courseIds.includes(c.id)}
+                        onChange={() => toggleCourseId(c.id)}
+                        className="rounded border-slate-300"
+                      />
+                      <span>{c.title || c.category}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="student-duration">Duration (months)</Label>
+                <Input
+                  id="student-duration"
+                  type="number"
+                  min={1}
+                  value={studentFee.courseDurationMonths}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({
+                      ...p,
+                      courseDurationMonths: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="student-monthly">Monthly fee (Rs)</Label>
+                <Input
+                  id="student-monthly"
+                  type="number"
+                  min={0}
+                  value={studentFee.monthlyFee}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({ ...p, monthlyFee: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="student-total">Total course fee (Rs)</Label>
+                <Input
+                  id="student-total"
+                  type="number"
+                  min={0}
+                  value={studentFee.totalCourseFee}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({
+                      ...p,
+                      totalCourseFee: e.target.value,
+                    }))
+                  }
+                />
+                {suggestedTotal != null ? (
+                  <p className="text-xs text-slate-500">
+                    Suggested: Rs {suggestedTotal.toLocaleString()} (monthly ×
+                    duration)
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="student-payment-type">Payment type</Label>
+                <select
+                  id="student-payment-type"
+                  className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  value={studentFee.paymentType}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({
+                      ...p,
+                      paymentType: e.target.value as (typeof PAYMENT_TYPES)[number],
+                    }))
+                  }
+                >
+                  {PAYMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t.replace(/_/g, " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="student-fee-start">Fee start date</Label>
+                <Input
+                  id="student-fee-start"
+                  type="date"
+                  value={studentFee.feeStartDate}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({ ...p, feeStartDate: e.target.value }))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="student-fee-due">Fee due day of month</Label>
+                <Input
+                  id="student-fee-due"
+                  type="number"
+                  min={1}
+                  max={28}
+                  value={studentFee.feeDueDay}
+                  onChange={(e) =>
+                    setStudentFee((p) => ({ ...p, feeDueDay: e.target.value }))
+                  }
+                />
+              </div>
+              {studentFee.paymentType === "TWO_INSTALLMENTS" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="student-inst1">Installment 1 (Rs)</Label>
+                    <Input
+                      id="student-inst1"
+                      type="number"
+                      min={0}
+                      value={studentFee.installment1Amount}
+                      onChange={(e) =>
+                        setStudentFee((p) => ({
+                          ...p,
+                          installment1Amount: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="student-inst2">Installment 2 (Rs)</Label>
+                    <Input
+                      id="student-inst2"
+                      type="number"
+                      min={0}
+                      value={studentFee.installment2Amount}
+                      onChange={(e) =>
+                        setStudentFee((p) => ({
+                          ...p,
+                          installment2Amount: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <Button type="submit" disabled={saving}>

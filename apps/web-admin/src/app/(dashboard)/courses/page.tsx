@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CourseDocCover } from "@/components/courses/course-doc-cover";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { cn } from "@/lib/utils";
 
 type Course = {
   id: string;
@@ -32,6 +33,19 @@ export default function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [categoryTab, setCategoryTab] = useState("All");
+
+  const categories = useMemo(() => {
+    const set = new Set(
+      courses.map((c) => c.category?.trim()).filter((x): x is string => Boolean(x))
+    );
+    return ["All", ...Array.from(set).sort((a, b) => a.localeCompare(b))];
+  }, [courses]);
+
+  const visibleCourses = useMemo(() => {
+    if (categoryTab === "All") return courses;
+    return courses.filter((c) => c.category === categoryTab);
+  }, [courses, categoryTab]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -90,8 +104,47 @@ export default function CoursesPage() {
           No courses yet. Add your first tile to publish to students.
         </div>
       ) : (
+        <>
+          {categories.length > 1 ? (
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => {
+                const active = categoryTab === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryTab(cat)}
+                    className={cn(
+                      "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+                      active
+                        ? "bg-[#2563EB] text-white"
+                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    )}
+                  >
+                    {cat}
+                    {cat !== "All" ? (
+                      <span
+                        className={cn(
+                          "ml-1.5 text-xs",
+                          active ? "text-blue-100" : "text-slate-400"
+                        )}
+                      >
+                        {courses.filter((c) => c.category === cat).length}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {visibleCourses.length === 0 ? (
+            <div className="glass-card p-8 text-center text-sm text-slate-500">
+              No courses in this category.
+            </div>
+          ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {courses.map((c) => {
+          {visibleCourses.map((c) => {
             const lectures =
               c.outline?.reduce((n, s) => n + (s.topics?.length ?? 0), 0) ?? 0;
             const installments = c.installmentCount ?? 2;
@@ -175,6 +228,8 @@ export default function CoursesPage() {
             );
           })}
         </div>
+          )}
+        </>
       )}
     </div>
   );

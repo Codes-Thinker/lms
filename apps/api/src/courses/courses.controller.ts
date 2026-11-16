@@ -46,6 +46,12 @@ export class CoursesController {
     return this.courses.listEnrollmentRequests(courseId, status);
   }
 
+  @Get(":id/students")
+  @Roles("SUPER_ADMIN", "STAFF")
+  enrolledStudents(@Param("id") id: string) {
+    return this.courses.listEnrolledStudents(id);
+  }
+
   @Get(":id")
   get(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.courses.get(id, user.sub);

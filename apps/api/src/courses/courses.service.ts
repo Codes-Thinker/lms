@@ -777,4 +777,66 @@ export class CoursesService {
     ]);
     return { ok: true };
   }
+
+  /** Admin: enrolled students for a course with fee + attendance summary. */
+  async listEnrolledStudents(courseId: string) {
+    await this.prisma.course.findUniqueOrThrow({ where: { id: courseId } });
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { courseId },
+      include: {
+        user: {
+          include: {
+            batch: true,
+            feeCases: {
+              where: { courseId },
+              orderBy: { dueDate: "desc" },
+              take: 1,
+            },
+            attendanceRecords: {
+              where: { courseId },
+              take: 90,
+              orderBy: { date: "desc" },
+            },
+          },
+        },
+      },
+      orderBy: { enrolledAt: "desc" },
+    });
+
+    const pending = await this.prisma.enrollmentRequest.count({
+      where: { courseId, status: "PENDING" },
+    });
+
+    const students = enrollments.map((e) => {
+      const att = e.user.attendanceRecords;
+      const presentish = att.filter((a) =>
+        ["PRESENT", "LATE", "CHECKED_OUT"].includes(a.status)
+      ).length;
+      const attendancePercent =
+        att.length === 0 ? 0 : Math.round((presentish / att.length) * 100);
+      const latestFee = e.user.feeCases[0];
+      return {
+        id: e.user.id,
+        name: e.user.fullName,
+        email: e.user.email,
+        phone: e.user.phone,
+        batch: e.user.batch?.code ?? null,
+        enrolledAt: e.enrolledAt.toISOString().slice(0, 10),
+        enrollmentStatus: "ENROLLED",
+        accountStatus: e.user.status,
+        feeStatus: latestFee?.status ?? e.feeStatus,
+        paidAmount: e.paidAmount,
+        attendancePercent,
+      };
+    });
+
+    return {
+      courseId,
+      pendingEnrollmentRequests: pending,
+      totalEnrolled: students.length,
+      activeStudents: students.filter((s) => s.accountStatus === "ACTIVE")
+        .length,
+      students,
+    };
+  }
 }

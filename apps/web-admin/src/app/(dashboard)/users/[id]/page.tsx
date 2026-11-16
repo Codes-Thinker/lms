@@ -63,6 +63,7 @@ type Report = {
     status: string;
     audience?: string;
     dueAt?: string | null;
+    assignedBy?: string | null;
   }>;
   projects?: Array<{
     id: string;
@@ -792,9 +793,25 @@ export default function UserProfilePage() {
               {(report.tasks || []).map((t) => (
                 <li
                   key={t.id}
-                  className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                  className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
                 >
-                  <span>{t.title}</span>
+                  <span>
+                    <span className="font-medium text-slate-900">{t.title}</span>
+                    {t.audience ? (
+                      <span className="text-slate-500"> · {t.audience}</span>
+                    ) : null}
+                    {t.dueAt ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        · due {t.dueAt.slice(0, 10)}
+                      </span>
+                    ) : null}
+                    <span className="mt-0.5 block text-xs text-slate-500">
+                      {t.assignedBy?.trim()
+                        ? `Assigned by ${t.assignedBy}`
+                        : "Source: Task module (admin/teacher assigned)"}
+                    </span>
+                  </span>
                   <span className="font-medium">{t.status}</span>
                 </li>
               ))}

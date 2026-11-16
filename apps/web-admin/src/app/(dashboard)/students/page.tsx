@@ -1,19 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { readListCache, writeListCache } from "@/lib/list-cache";
-import type { AdminPaymentInfo, FeeRecord } from "@/types";
+import { FeeStatusBadge } from "@/lib/fee-display";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useSnackbar } from "@/components/ui/snackbar";
-import { useNotifications } from "@/components/ui/notifications-provider";
 import { UserAvatar } from "@/components/ui/user-avatar";
 
-const CACHE_KEY = "lms_cache_students_v1";
+const CACHE_KEY = "lms_cache_students_v2";
+const PAGE_SIZE = 25;
+
+type CourseTab = {
+  id: string;
+  title: string;
+  category?: string;
+};
 
 type CourseEnr = {
   id: string;
@@ -21,6 +28,7 @@ type CourseEnr = {
   batch?: string | null;
   enrolledAt?: string;
   progressPercent?: number;
+  feeStatus?: string | null;
 };
 
 type StudentRow = {
@@ -37,17 +45,9 @@ type StudentRow = {
 };
 
 type StudentsCache = {
+  courses: CourseTab[];
   list: StudentRow[];
-  fees: FeeRecord[];
-  payment: AdminPaymentInfo;
 };
-
-function feeBadge(status: string) {
-  if (status === "PAID") return <Badge variant="success">Paid / Done</Badge>;
-  if (status === "SENT") return <Badge variant="warning">Screenshot sent</Badge>;
-  if (status === "PARTIAL") return <Badge variant="warning">Partial</Badge>;
-  return <Badge variant="danger">Due</Badge>;
-}
 
 function accountStatusBadge(status: string) {
   const s = status.toUpperCase();
@@ -61,6 +61,10 @@ function shortId(id: string) {
   return id.length > 10 ? `${id.slice(0, 8)}…` : id;
 }
 
+function tabLabel(c: CourseTab) {
+  return c.title?.trim() || c.category?.trim() || "Course";
+}
+
 function mapStudent(u: Record<string, unknown>): StudentRow {
   const courses = ((u.courses as CourseEnr[] | undefined) ?? []).map((c) => ({
     id: String(c.id),
@@ -68,6 +72,7 @@ function mapStudent(u: Record<string, unknown>): StudentRow {
     batch: c.batch ?? null,
     enrolledAt: c.enrolledAt,
     progressPercent: c.progressPercent ?? 0,
+    feeStatus: c.feeStatus ?? null,
   }));
   return {
     id: String(u.id),
@@ -86,99 +91,135 @@ function mapStudent(u: Record<string, unknown>): StudentRow {
   };
 }
 
-const defaultPayment: AdminPaymentInfo = {
-  adminName: "",
-  phone: "",
-  jazzCash: "",
-  easyPaisa: "",
-  bankTitle: "",
-  bankAccount: "",
-};
-
 export default function StudentsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { show } = useSnackbar();
+
+  const courseParam = searchParams.get("course") ?? "all";
+  const qFromUrl = searchParams.get("q") ?? "";
+
+  const [courses, setCourses] = useState<CourseTab[]>([]);
   const [list, setList] = useState<StudentRow[]>([]);
-  const [fees, setFees] = useState<FeeRecord[]>([]);
-  const [payment, setPayment] = useState<AdminPaymentInfo>(defaultPayment);
-  const [selectedId, setSelectedId] = useState("");
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState(qFromUrl);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { show } = useSnackbar();
-  const { push } = useNotifications();
-  const selected = fees.find((f) => f.id === selectedId) ?? fees[0];
 
-  const applyCache = useCallback((data: StudentsCache) => {
-    setList(data.list);
-    setFees(data.fees);
-    setPayment(data.payment);
-    setSelectedId((prev) => prev || data.fees[0]?.id || "");
-  }, []);
+  const replaceQuery = useCallback(
+    (next: { course?: string; q?: string }) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (next.course !== undefined) {
+        if (next.course === "all") params.delete("course");
+        else params.set("course", next.course);
+      }
+      if (next.q !== undefined) {
+        if (!next.q.trim()) params.delete("q");
+        else params.set("q", next.q.trim());
+      }
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
+
+  useEffect(() => {
+    setSearchInput(qFromUrl);
+  }, [qFromUrl]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      if (searchInput.trim() !== qFromUrl.trim()) {
+        setPage(1);
+        replaceQuery({ q: searchInput });
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [searchInput, qFromUrl, replaceQuery]);
+
+  const fetchStudents = useCallback(async () => {
+    setError(null);
+    const courseId = courseParam === "all" ? "" : courseParam;
+    const q = qFromUrl.trim();
+    const params = new URLSearchParams({
+      accountType: "STUDENT",
+      pageSize: String(PAGE_SIZE),
+      page: String(page),
+    });
+    if (q) params.set("q", q);
+    if (courseId) params.set("courseId", courseId);
+
+    const [courseList, users] = await Promise.all([
+      api<CourseTab[]>("/courses?all=1"),
+      api<{ items: Array<Record<string, unknown>>; total?: number }>(
+        `/users?${params.toString()}`
+      ),
+    ]);
+    const students = users.items.map(mapStudent);
+    setCourses(courseList);
+    setList(students);
+    setTotal(users.total ?? students.length);
+    writeListCache<StudentsCache>(CACHE_KEY, {
+      courses: courseList,
+      list: students,
+    });
+  }, [courseParam, page, qFromUrl]);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
-      const [users, feeList, pay] = await Promise.all([
-        api<{ items: Array<Record<string, unknown>> }>(
-          "/users?accountType=STUDENT&pageSize=100"
-        ),
-        api<FeeRecord[]>("/fees"),
-        api<AdminPaymentInfo | null>("/system/payment-info"),
-      ]);
-      const students = users.items.map(mapStudent);
-      const payInfo = pay ?? defaultPayment;
-      setList(students);
-      setFees(feeList);
-      setPayment(payInfo);
-      setSelectedId((prev) => prev || feeList[0]?.id || "");
-      writeListCache<StudentsCache>(CACHE_KEY, {
-        list: students,
-        fees: feeList,
-        payment: payInfo,
-      });
+      await fetchStudents();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Load failed");
+      const msg = e instanceof Error ? e.message : "Load failed";
+      setError(msg);
+      show(msg);
       throw e;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchStudents, show]);
 
   useEffect(() => {
     const cached = readListCache<StudentsCache>(CACHE_KEY);
     if (cached) {
-      applyCache(cached);
+      setCourses(cached.courses);
+      setList(cached.list);
       setLoading(false);
     }
-    refresh().catch((e) => show(e instanceof Error ? e.message : "Load failed"));
-  }, [applyCache, refresh, show]);
+  }, []);
 
-  async function sendFeeReminder(fee: FeeRecord) {
-    await api(`/fees/${fee.id}/remind`, { method: "POST", body: "{}" });
-    push({
-      title: "Fee reminder sent",
-      body: `${fee.studentName} · Rs ${fee.amount.toLocaleString()} · ${fee.month}`,
-      type: "fee",
-    });
-    show(`Fee reminder sent to ${fee.studentName}`);
-    await refresh();
+  const filterRef = useRef({ course: courseParam, q: qFromUrl });
+
+  useEffect(() => {
+    const filterChanged =
+      filterRef.current.course !== courseParam ||
+      filterRef.current.q !== qFromUrl;
+    filterRef.current = { course: courseParam, q: qFromUrl };
+    if (filterChanged && page !== 1) {
+      setPage(1);
+      return;
+    }
+    void refresh();
+  }, [courseParam, page, qFromUrl, refresh]);
+
+  const tabs = useMemo(
+    () => [{ id: "all", title: "All Students", category: "" }, ...courses],
+    [courses]
+  );
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  function selectCourse(id: string) {
+    setPage(1);
+    replaceQuery({ course: id });
   }
 
-  async function approvePayment(id: string) {
-    await api(`/fees/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: "PAID" }),
-    });
-    show("Payment approved · Done");
-    await refresh();
-  }
-
-  async function savePaymentInfo() {
-    await api("/system/payment-info", {
-      method: "PUT",
-      body: JSON.stringify(payment),
-    });
-    show("Admin payment numbers saved · visible in student app");
-  }
+  const feesHref =
+    courseParam === "all" ? "/fees" : `/fees?course=${encodeURIComponent(courseParam)}`;
 
   return (
     <div className="space-y-6">
@@ -186,19 +227,23 @@ export default function StudentsPage() {
         <div>
           <h2 className="text-lg font-semibold">Students</h2>
           <p className="text-sm text-slate-500">
-            Live roster · fee chat · full profile at{" "}
-            <span className="font-medium text-slate-700">/users/:id</span>{" "}
-            (attendance, fees, tasks)
+            Roster by course · profiles at{" "}
+            <span className="font-medium text-slate-700">/users/:id</span>
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={loading}
-          onClick={() => refresh().catch((e) => show(String(e)))}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="secondary" asChild>
+            <Link href={feesHref}>Open fees</Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={loading}
+            onClick={() => refresh().catch((e) => show(String(e)))}
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -207,38 +252,41 @@ export default function StudentsPage() {
         </div>
       ) : null}
 
-      <div className="glass-card space-y-3 p-5">
-        <h3 className="font-semibold">Admin payment numbers (shown in app)</h3>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {(
-            [
-              ["adminName", "Admin name"],
-              ["phone", "Phone"],
-              ["jazzCash", "JazzCash"],
-              ["easyPaisa", "EasyPaisa"],
-              ["bankTitle", "Bank title"],
-              ["bankAccount", "Bank account"],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="space-y-1.5">
-              <Label>{label}</Label>
-              <Input
-                value={payment[key] ?? ""}
-                onChange={(e) => setPayment({ ...payment, [key]: e.target.value })}
-              />
-            </div>
-          ))}
+      <div className="glass-card space-y-4 p-5">
+        <Input
+          placeholder="Search name, email, or phone…"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          className="max-w-md"
+        />
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((t) => {
+            const active = courseParam === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => selectCourse(t.id)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+                  active
+                    ? "bg-[#2563EB] text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                {t.id === "all" ? t.title : tabLabel(t)}
+              </button>
+            );
+          })}
         </div>
-        <Button onClick={() => savePaymentInfo().catch((e) => show(String(e)))}>
-          Save payment details
-        </Button>
       </div>
 
       <div className="glass-card table-scroll overflow-hidden">
         <div className="border-b border-slate-100 px-5 py-4">
           <h3 className="font-semibold">Student roster</h3>
           <p className="text-xs text-slate-500">
-            Click a row for course summary · progress from enrollments (no per-student report calls)
+            {loading ? "Loading…" : `${total} student${total === 1 ? "" : "s"}`}
+            {qFromUrl ? ` · matching “${qFromUrl}”` : null}
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -256,10 +304,17 @@ export default function StudentsPage() {
               </tr>
             </thead>
             <tbody>
-              {list.length === 0 && !loading ? (
+              {loading && list.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-5 py-10 text-center text-slate-500">
-                    No students yet
+                    Loading students…
+                  </td>
+                </tr>
+              ) : null}
+              {!loading && list.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-slate-500">
+                    No students match this filter
                   </td>
                 </tr>
               ) : null}
@@ -268,7 +323,7 @@ export default function StudentsPage() {
                   s.courses.map((c) => c.title).join(", ") || "—";
                 const batchLabel =
                   [s.batch, s.batchName].filter(Boolean).join(" · ") || "—";
-                const enrolled = s.courses[0]?.enrolledAt ?? "—";
+                const enrolled = s.courses.length > 0;
                 const open = expandedId === s.id;
                 return (
                   <Fragment key={s.id}>
@@ -298,7 +353,10 @@ export default function StudentsPage() {
                       <td className="px-5 py-3.5 font-mono text-xs text-slate-600">
                         {shortId(s.id)}
                       </td>
-                      <td className="max-w-[200px] truncate px-5 py-3.5" title={courseTitles}>
+                      <td
+                        className="max-w-[200px] truncate px-5 py-3.5"
+                        title={courseTitles}
+                      >
                         {courseTitles}
                       </td>
                       <td className="px-5 py-3.5">
@@ -307,8 +365,16 @@ export default function StudentsPage() {
                           <p className="text-xs text-slate-500">{s.track}</p>
                         ) : null}
                       </td>
-                      <td className="px-5 py-3.5">{enrolled}</td>
-                      <td className="px-5 py-3.5 font-medium">{s.progressPercent}%</td>
+                      <td className="px-5 py-3.5">
+                        {enrolled ? (
+                          <Badge variant="success">Enrolled</Badge>
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5 font-medium">
+                        {s.progressPercent}%
+                      </td>
                       <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
                     </tr>
                     {open ? (
@@ -316,16 +382,29 @@ export default function StudentsPage() {
                         <td colSpan={8} className="px-5 py-4">
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div className="space-y-2 text-sm">
-                              <p className="font-medium text-slate-700">Enrolled courses</p>
+                              <p className="font-medium text-slate-700">
+                                Course breakdown
+                              </p>
                               {s.courses.length === 0 ? (
                                 <p className="text-slate-500">No enrollments</p>
                               ) : (
-                                <ul className="space-y-1">
+                                <ul className="space-y-2">
                                   {s.courses.map((c) => (
-                                    <li key={c.id} className="text-slate-600">
-                                      {c.title}
-                                      {c.batch ? ` · ${c.batch}` : ""} — {c.progressPercent ?? 0}%
-                                      {c.enrolledAt ? ` · from ${c.enrolledAt}` : ""}
+                                    <li
+                                      key={c.id}
+                                      className="flex flex-wrap items-center gap-2 text-slate-600"
+                                    >
+                                      <span>
+                                        {c.title}
+                                        {c.batch ? ` · ${c.batch}` : ""} —{" "}
+                                        {c.progressPercent ?? 0}%
+                                        {c.enrolledAt
+                                          ? ` · from ${c.enrolledAt}`
+                                          : ""}
+                                      </span>
+                                      {c.feeStatus ? (
+                                        <FeeStatusBadge status={c.feeStatus} />
+                                      ) : null}
                                     </li>
                                   ))}
                                 </ul>
@@ -344,110 +423,31 @@ export default function StudentsPage() {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="glass-card table-scroll overflow-hidden">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h3 className="font-semibold">Fee cases</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50/80 text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Student</th>
-                  <th className="px-5 py-3 font-medium">Course</th>
-                  <th className="px-5 py-3 font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {fees.map((fee) => (
-                  <tr
-                    key={fee.id}
-                    className={`border-t border-slate-100 ${
-                      selectedId === fee.id ? "bg-blue-50/40" : ""
-                    }`}
-                  >
-                    <td className="px-5 py-3.5 font-semibold">{fee.studentName}</td>
-                    <td className="px-5 py-3.5">{fee.courseTitle}</td>
-                    <td className="px-5 py-3.5">Rs {fee.amount.toLocaleString()}</td>
-                    <td className="px-5 py-3.5">{feeBadge(fee.status)}</td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => setSelectedId(fee.id)}>
-                          Open chat
-                        </Button>
-                        {fee.status !== "PAID" ? (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() =>
-                                sendFeeReminder(fee).catch((e) => show(String(e)))
-                              }
-                            >
-                              Remind
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                approvePayment(fee.id).catch((e) => show(String(e)))
-                              }
-                            >
-                              Approve / Done
-                            </Button>
-                          </>
-                        ) : (
-                          <span className="text-xs text-slate-400">Cleared</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="glass-card flex flex-col overflow-hidden">
-          <div className="border-b border-slate-100 px-5 py-4">
-            <h3 className="font-semibold">Payment chat</h3>
-            <p className="text-sm text-slate-500">
-              {selected
-                ? `${selected.studentName} · ${selected.courseTitle}`
-                : "Select a fee case"}
+        {pageCount > 1 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
+            <p className="text-xs text-slate-500">
+              Page {page} of {pageCount}
             </p>
-          </div>
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
-            {selected?.chat?.map((m) => (
-              <div
-                key={m.id}
-                className={`rounded-2xl px-3 py-2 text-sm ${
-                  m.senderRole === "ADMIN"
-                    ? "bg-slate-100 text-slate-800"
-                    : "ml-6 bg-blue-600 text-white"
-                }`}
-              >
-                <p className="text-[11px] opacity-70">
-                  {m.senderName} · {m.sentAt}
-                </p>
-                <p className="mt-0.5">{m.text}</p>
-              </div>
-            ))}
-          </div>
-          {selected && selected.status !== "PAID" ? (
-            <div className="border-t border-slate-100 p-4">
+            <div className="flex gap-2">
               <Button
-                className="w-full"
-                onClick={() => approvePayment(selected.id).catch((e) => show(String(e)))}
+                size="sm"
+                variant="secondary"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                Approve screenshot · mark Done
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={page >= pageCount || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
               </Button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

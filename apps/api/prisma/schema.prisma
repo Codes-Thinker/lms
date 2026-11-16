@@ -25,6 +25,7 @@ enum AttendanceStatus {
   LATE
   ABSENT
   CHECKED_OUT
+  LEAVE
 }
 
 enum FeeStatus {
@@ -34,6 +35,13 @@ enum FeeStatus {
   PARTIAL
   OVERDUE
   REJECTED
+  WAIVED
+}
+
+enum PaymentPlanType {
+  MONTHLY
+  TWO_INSTALLMENTS
+  CUSTOM
 }
 
 enum TaskStatus {
@@ -164,6 +172,12 @@ model User {
   monthlyFee      Int?
   feeStartDate    DateTime?  @db.Date
   feeDueDay       Int        @default(15)
+  /** Student payment plan (optional). */
+  paymentType           PaymentPlanType?
+  installment1Amount    Int?
+  installment2Amount    Int?
+  courseDurationMonths  Int?
+  totalCourseFee        Int?
   /** Intern program window (optional). */
   internshipStart DateTime?  @db.Date
   internshipEnd   DateTime?  @db.Date
@@ -344,6 +358,7 @@ model FeeCase {
   monthlyFee       Int?
   billingStart     DateTime?  @db.Date
   dueDay           Int        @default(15)
+  amountPaid       Int        @default(0)
   paymentScreenshotData String?
   paymentSubmittedAt     DateTime?
   rejectionReason        String?
@@ -351,6 +366,19 @@ model FeeCase {
   updatedAt  DateTime     @updatedAt
   messages   FeeMessage[]
   submissions PaymentSubmission[]
+  reminderLogs FeeReminderLog[]
+}
+
+/** Tracks fee reminder sends so cron never duplicates FIRST/FINAL per case. */
+model FeeReminderLog {
+  id        String   @id @default(cuid())
+  feeCaseId String
+  feeCase   FeeCase  @relation(fields: [feeCaseId], references: [id], onDelete: Cascade)
+  kind      String
+  sentAt    DateTime @default(now())
+
+  @@unique([feeCaseId, kind])
+  @@index([sentAt])
 }
 
 model FeeMessage {

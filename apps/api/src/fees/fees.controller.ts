@@ -32,8 +32,21 @@ export class FeesController {
 
   @Get()
   @Roles("SUPER_ADMIN", "STAFF")
-  list() {
-    return this.fees.list();
+  list(@Query("courseId") courseId?: string, @Query("studentId") studentId?: string) {
+    return this.fees.list(studentId, courseId);
+  }
+
+  /** Trigger / inspect monthly fee reminder cron (admin). */
+  @Post("run-reminders")
+  @Roles("SUPER_ADMIN", "STAFF")
+  runReminders() {
+    return this.fees.runScheduledFeeReminders();
+  }
+
+  @Post("ensure-monthly")
+  @Roles("SUPER_ADMIN", "STAFF")
+  ensureMonthly() {
+    return this.fees.ensureMonthlyFeeCases();
   }
 
   /** Admin: list pending payment submissions. */
@@ -52,6 +65,11 @@ export class FeesController {
     feeStartDate?: string;
     feeDueDay?: number;
     courseId?: string;
+    paymentType?: "MONTHLY" | "TWO_INSTALLMENTS" | "CUSTOM";
+    installment1Amount?: number;
+    installment2Amount?: number;
+    courseDurationMonths?: number;
+    totalCourseFee?: number;
   }) {
     return this.fees.configureStudentFee(body.studentId, body);
   }

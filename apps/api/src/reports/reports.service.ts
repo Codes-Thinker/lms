@@ -104,6 +104,11 @@ export class ReportsService {
         where: {
           OR: [{ assigneeId: userId }, { createdById: userId }],
         },
+        include: {
+          createdBy: { select: { fullName: true } },
+          assignee: { select: { fullName: true } },
+          course: { select: { title: true, batchLabel: true } },
+        },
         orderBy: { updatedAt: "desc" },
         take: 20,
       }),
@@ -174,6 +179,13 @@ export class ReportsService {
         status: t.status,
         audience: t.audience,
         dueAt: t.dueAt?.toISOString() ?? null,
+        assignedBy: t.createdBy?.fullName ?? null,
+        assignedToName: t.assignee?.fullName ?? null,
+        courseTitle: t.course?.title ?? null,
+        batch: t.course?.batchLabel ?? null,
+        source: t.createdBy?.fullName
+          ? `Assigned by ${t.createdBy.fullName}`
+          : "Task module (admin/teacher)",
       })),
       projects: projects.map((p) => ({
         id: p.id,

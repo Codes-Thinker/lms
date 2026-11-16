@@ -80,15 +80,20 @@ export class UsersService {
 
   async list(query: ListUsersQueryDto) {
     const page = query.page ?? 1;
-    const pageSize = Math.min(query.pageSize ?? 20, 100);
+    const pageSize = Math.min(query.pageSize ?? 20, 200);
     const where: Prisma.UserWhereInput = {};
     if (query.accountType) where.accountType = query.accountType;
     if (query.status) where.status = query.status;
+    if (query.courseId?.trim()) {
+      where.enrollments = { some: { courseId: query.courseId.trim() } };
+    }
     if (query.q?.trim()) {
       const q = query.q.trim();
       where.OR = [
         { fullName: { contains: q, mode: "insensitive" } },
         { email: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q, mode: "insensitive" } },
+        { track: { contains: q, mode: "insensitive" } },
       ];
     }
 
@@ -201,6 +206,9 @@ export class UsersService {
           monthlyFee: u.monthlyFee,
           feeStartDate: u.feeStartDate,
           feeDueDay: u.feeDueDay,
+          totalCourseFee: u.totalCourseFee,
+          courseDurationMonths: u.courseDurationMonths,
+          paymentType: u.paymentType,
           department: u.department?.name ?? null,
           departmentId: u.departmentId,
           batch: u.batch?.code ?? null,
@@ -519,12 +527,78 @@ export class UsersService {
         track: dto.track,
         departmentId: dto.departmentId,
         batchId: dto.batchId,
+        monthlyFee: dto.monthlyFee,
+        totalCourseFee: dto.totalCourseFee,
+        courseDurationMonths: dto.courseDurationMonths,
+        paymentType: dto.paymentType,
+        installment1Amount: dto.installment1Amount,
+        installment2Amount: dto.installment2Amount,
+        feeStartDate: dto.feeStartDate ? new Date(dto.feeStartDate) : null,
+        feeDueDay: dto.feeDueDay ?? 5,
         createdById,
         invitedAt: hasPassword ? null : new Date(),
         activatedAt: hasPassword ? new Date() : null,
         roles: { create: { roleId: role.id } },
       },
     });
+
+    const courseIds = Array.from(
+      new Set((dto.courseIds ?? []).filter((x) => typeof x === "string" && x.trim()))
+    );
+    for (const courseId of courseIds) {
+      const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+      if (!course) continue;
+      await this.prisma.enrollment.create({
+        data: { userId: user.id, courseId },
+      });
+      await this.prisma.enrollmentRequest.upsert({
+        where: { userId_courseId: { userId: user.id, courseId } },
+        update: {
+          status: "APPROVED",
+          reviewedAt: new Date(),
+          adminNote: "Assigned on user create",
+        },
+        create: {
+          userId: user.id,
+          courseId,
+          status: "APPROVED",
+          reviewedAt: new Date(),
+          adminNote: "Assigned on user create",
+        },
+      });
+    }
+
+    // Seed first fee case for primary course when student fee is configured.
+    if (
+      dto.accountType === AccountType.STUDENT &&
+      dto.monthlyFee &&
+      courseIds[0]
+    ) {
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseIds[0] },
+      });
+      const now = new Date();
+      const monthLabel = now.toLocaleString("en-US", {
+        month: "short",
+        year: "numeric",
+      });
+      const dueDay = dto.feeDueDay ?? 5;
+      const dueDate = new Date(now.getFullYear(), now.getMonth(), dueDay);
+      await this.prisma.feeCase.create({
+        data: {
+          studentId: user.id,
+          courseId: courseIds[0],
+          courseTitle: course?.title ?? "Course",
+          month: monthLabel,
+          amount: dto.monthlyFee,
+          status: "DUE",
+          dueDate,
+          monthlyFee: dto.monthlyFee,
+          dueDay,
+          billingStart: dto.feeStartDate ? new Date(dto.feeStartDate) : now,
+        },
+      });
+    }
 
     const send = !hasPassword && dto.sendInvitation !== false;
     let invitationMeta: { expiresAt: Date } | null = null;

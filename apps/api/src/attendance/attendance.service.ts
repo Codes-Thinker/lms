@@ -176,7 +176,7 @@ export class AttendanceService implements OnModuleInit {
       const enrollments = await this.prisma.enrollment.findMany({
         where: { courseId: filters.courseId },
         include: {
-          user: true,
+          user: { include: { batch: true } },
           course: { select: { id: true, title: true, category: true } },
         },
         orderBy: { user: { fullName: "asc" } },
@@ -188,6 +188,7 @@ export class AttendanceService implements OnModuleInit {
           course: true,
           user: {
             include: {
+              batch: true,
               enrollments: {
                 include: {
                   course: { select: { id: true, title: true, category: true } },
@@ -209,6 +210,7 @@ export class AttendanceService implements OnModuleInit {
           date: day,
           courseId: courseMeta?.id ?? enr.courseId,
           courseTitle: courseMeta?.title ?? null,
+          batch: enr.user.batch?.code ?? null,
           courses: [
             {
               id: enr.course.id,
@@ -228,6 +230,7 @@ export class AttendanceService implements OnModuleInit {
         course: true,
         user: {
           include: {
+            batch: true,
             enrollments: {
               include: {
                 course: { select: { id: true, title: true, category: true } },
@@ -567,6 +570,7 @@ export class AttendanceService implements OnModuleInit {
     date: Date;
     courseId?: string | null;
     courseTitle?: string | null;
+    batch?: string | null;
     courses?: { id: string; title: string; category: string }[];
   }) {
     return {
@@ -588,6 +592,7 @@ export class AttendanceService implements OnModuleInit {
       checkInDistance: null,
       courseId: input.courseId ?? null,
       courseTitle: input.courseTitle ?? null,
+      batch: input.batch ?? null,
       courses: input.courses ?? [],
       durationMinutes: null,
       durationLabel: null,
@@ -615,6 +620,7 @@ export class AttendanceService implements OnModuleInit {
     user: {
       fullName: string;
       accountType: string;
+      batch?: { code: string } | null;
       enrollments?: {
         course: { id: string; title: string; category: string };
       }[];
@@ -659,6 +665,7 @@ export class AttendanceService implements OnModuleInit {
       courseTitle:
         r.course?.title ??
         (enrolled.length === 1 ? enrolled[0].title : null),
+      batch: r.user.batch?.code ?? null,
       courses: enrolled,
       durationMinutes: mins,
       durationLabel: this.formatDuration(mins),

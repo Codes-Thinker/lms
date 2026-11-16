@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type CourseTab = {
@@ -26,6 +28,8 @@ type Row = {
   courseId?: string | null;
   courseTitle?: string | null;
   courses?: { id: string; title: string; category: string }[];
+  batch?: string | null;
+  attendancePercent?: number | null;
   durationMinutes?: number | null;
   durationLabel?: string | null;
   note?: string | null;
@@ -52,17 +56,43 @@ function statusVariant(status: string) {
   const s = status.toUpperCase();
   if (s === "LATE") return "warning" as const;
   if (s === "ABSENT") return "danger" as const;
+  if (s === "LEAVE") return "info" as const;
   if (s === "CHECKED_OUT") return "secondary" as const;
   if (s === "PRESENT") return "success" as const;
   return "secondary" as const;
 }
 
 export default function AttendancePage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const initialDate =
+    searchParams.get("date") ?? new Date().toISOString().slice(0, 10);
+  const initialCourse = searchParams.get("course") ?? "all";
+  const initialQ = searchParams.get("q") ?? "";
+
   const [board, setBoard] = useState<Board | null>(null);
-  const [courseId, setCourseId] = useState<string>("all");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [courseId, setCourseId] = useState<string>(initialCourse);
+  const [date, setDate] = useState(initialDate);
+  const [nameQuery, setNameQuery] = useState(initialQ);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+
+  const syncUrl = useCallback(
+    (next: { course?: string; date?: string; q?: string }) => {
+      const params = new URLSearchParams();
+      const c = next.course ?? courseId;
+      const d = next.date ?? date;
+      const q = next.q ?? nameQuery;
+      if (c !== "all") params.set("course", c);
+      if (d) params.set("date", d);
+      if (q.trim()) params.set("q", q.trim());
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [courseId, date, nameQuery, pathname, router]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -88,7 +118,14 @@ export default function AttendancePage() {
     return [{ id: "all", title: "All", category: "", enrolledCount: 0 }, ...list];
   }, [board?.courses]);
 
-  const rows = board?.rows ?? [];
+  const allRows = board?.rows ?? [];
+
+  const rows = useMemo(() => {
+    const needle = nameQuery.trim().toLowerCase();
+    if (!needle) return allRows;
+    return allRows.filter((r) => r.personName.toLowerCase().includes(needle));
+  }, [allRows, nameQuery]);
+
   const present = rows.filter((r) => r.status !== "ABSENT").length;
   const absent = rows.filter((r) => r.status === "ABSENT").length;
   const late = rows.filter((r) => r.status === "LATE").length;
@@ -104,10 +141,24 @@ export default function AttendancePage() {
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={nameQuery}
+            onChange={(e) => {
+              const v = e.target.value;
+              setNameQuery(v);
+              syncUrl({ q: v });
+            }}
+            placeholder="Search by name…"
+            className="h-9 w-[min(100%,220px)] rounded-lg"
+          />
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDate(v);
+              syncUrl({ date: v });
+            }}
             className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm"
           />
           <Badge variant={live ? "success" : "secondary"}>
@@ -123,7 +174,10 @@ export default function AttendancePage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => setCourseId(t.id)}
+              onClick={() => {
+                setCourseId(t.id);
+                syncUrl({ course: t.id });
+              }}
               className={cn(
                 "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
                 active
@@ -170,6 +224,7 @@ export default function AttendancePage() {
               <th className="px-4 py-3 font-medium">Person</th>
               <th className="px-4 py-3 font-medium">Date</th>
               <th className="px-4 py-3 font-medium">Course</th>
+              <th className="px-4 py-3 font-medium">Batch</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Check in</th>
               <th className="px-4 py-3 font-medium">Check out</th>
@@ -183,6 +238,10 @@ export default function AttendancePage() {
                 r.courseTitle ||
                 r.courses?.map((c) => c.title).join(", ") ||
                 "—";
+              const pct =
+                r.attendancePercent != null && !Number.isNaN(r.attendancePercent)
+                  ? r.attendancePercent
+                  : null;
               return (
                 <tr key={r.id} className="border-t border-slate-100">
                   <td className="px-4 py-3.5">
@@ -193,6 +252,11 @@ export default function AttendancePage() {
                       {r.personName}
                     </Link>
                     <p className="text-xs text-slate-500">{r.role}</p>
+                    {pct != null ? (
+                      <p className="text-[11px] text-slate-400">
+                        Roll {pct}%
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3.5 whitespace-nowrap">{r.date}</td>
                   <td className="px-4 py-3.5">
@@ -204,6 +268,9 @@ export default function AttendancePage() {
                         {r.courses.length} enrollments
                       </p>
                     ) : null}
+                  </td>
+                  <td className="px-4 py-3.5 text-slate-600">
+                    {r.batch?.trim() ? r.batch : "—"}
                   </td>
                   <td className="px-4 py-3.5">
                     <Badge variant={statusVariant(r.status)}>
@@ -238,12 +305,14 @@ export default function AttendancePage() {
             {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className="px-4 py-10 text-center text-slate-500"
                 >
-                  {courseId === "all"
-                    ? "No attendance marks for this date yet"
-                    : "No students enrolled in this course"}
+                  {nameQuery.trim()
+                    ? "No people match this search"
+                    : courseId === "all"
+                      ? "No attendance marks for this date yet"
+                      : "No students enrolled in this course"}
                 </td>
               </tr>
             ) : null}

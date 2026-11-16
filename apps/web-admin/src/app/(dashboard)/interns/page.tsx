@@ -52,10 +52,21 @@ type TaskRow = {
   title: string;
   assignedToId?: string | null;
   assignedToName?: string | null;
+  assignedBy?: string | null;
+  courseTitle?: string | null;
   audience?: string | null;
   status: string;
   dueAt?: string | null;
 };
+
+function taskDetailLine(t: TaskRow) {
+  const parts: string[] = [];
+  if (t.assignedBy?.trim()) parts.push(`from ${t.assignedBy}`);
+  if (t.assignedToName?.trim()) parts.push(`→ ${t.assignedToName}`);
+  if (t.courseTitle?.trim()) parts.push(`· ${t.courseTitle}`);
+  if (t.dueAt) parts.push(`· due ${t.dueAt.slice(0, 10)}`);
+  return parts.join(" ");
+}
 
 type InternsCache = {
   interns: InternRow[];
@@ -440,10 +451,9 @@ export default function InternsPage() {
               className="flex justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
             >
               <span>
-                {t.title}
-                {t.assignedToName ? ` · ${t.assignedToName}` : ""}
-                {t.dueAt ? (
-                  <span className="text-slate-500"> · due {t.dueAt.slice(0, 10)}</span>
+                <span className="font-medium text-slate-900">{t.title}</span>
+                {taskDetailLine(t) ? (
+                  <span className="text-slate-500"> {taskDetailLine(t)}</span>
                 ) : null}
               </span>
               <Badge variant="secondary">{t.status}</Badge>
