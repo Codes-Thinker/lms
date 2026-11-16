@@ -43,6 +43,7 @@ const nav = [
   { href: "/fees", label: "Student fees", icon: Wallet },
   { href: "/attendance", label: "Attendance", icon: CalendarCheck },
   { href: "/courses", label: "Courses", icon: BookOpen },
+  { href: "/courses/requests", label: "Enrollments", icon: UsersRound },
   { href: "/inbox", label: "Chat inbox", icon: MessageSquare },
   { href: "/feedback", label: "Feedback", icon: ClipboardList },
   { href: "/system", label: "System", icon: Settings2 },

@@ -38,12 +38,16 @@ class Course {
   final int installmentCount;
   final String description;
   final bool published;
+  final bool allowEnrollmentRequests;
   int paidAmount;
   String feeStatus;
   double attendancePercent;
   double progressPercent;
   final double rating;
   final bool enrolled;
+
+  /// NOT_ENROLLED | REQUEST_PENDING | APPROVED | REJECTED | ENROLLED
+  final String enrollmentStatus;
   final List<OutlineSection> outline;
   final DateTime? nextClassAt;
   final DateTime? feeDueAt;
@@ -67,8 +71,10 @@ class Course {
     this.installmentCount = 2,
     this.description = '',
     this.published = true,
+    this.allowEnrollmentRequests = false,
     this.rating = 4.5,
     this.enrolled = false,
+    this.enrollmentStatus = 'NOT_ENROLLED',
     this.nextClassAt,
     this.feeDueAt,
   });
@@ -86,6 +92,9 @@ class Course {
   int get totalHours =>
       outline.expand((s) => s.topics).fold(0, (s, t) => s + t.minutes) ~/ 60;
 
+  bool get requestPending => enrollmentStatus == 'REQUEST_PENDING';
+  bool get requestRejected => enrollmentStatus == 'REJECTED';
+
   Topic? get nextTopic {
     for (final section in outline) {
       for (final topic in section.topics) {
@@ -97,6 +106,9 @@ class Course {
 
   factory Course.fromApi(Map<String, dynamic> json) {
     final outlineRaw = (json['outline'] as List?) ?? const [];
+    final enrolled = json['enrolled'] as bool? ?? false;
+    final status = (json['enrollmentStatus'] as String?) ??
+        (enrolled ? 'ENROLLED' : 'NOT_ENROLLED');
     return Course(
       id: json['id'] as String,
       title: json['title'] as String? ?? '',
@@ -111,12 +123,14 @@ class Course {
       installmentCount: (json['installmentCount'] as num?)?.toInt() ?? 2,
       description: json['description'] as String? ?? '',
       published: json['published'] as bool? ?? true,
+      allowEnrollmentRequests: json['allowEnrollmentRequests'] as bool? ?? false,
       paidAmount: (json['paidAmount'] as num?)?.toInt() ?? 0,
       feeStatus: json['feeStatus'] as String? ?? 'DUE',
       attendancePercent: (json['attendancePercent'] as num?)?.toDouble() ?? 0,
       progressPercent: (json['progressPercent'] as num?)?.toDouble() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
-      enrolled: json['enrolled'] as bool? ?? false,
+      enrolled: enrolled,
+      enrollmentStatus: status,
       outline: outlineRaw.map((s) {
         final section = s as Map<String, dynamic>;
         final topics = (section['topics'] as List?) ?? const [];

@@ -10,6 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { cacheGet, cacheGetSync, cacheSet } from "@/lib/local-db";
+
+const USERS_CACHE_KEY = "lms_cache_users_v1";
+
+type UserCourse = {
+  id: string;
+  title: string;
+  batch?: string | null;
+  progressPercent?: number;
+  enrollmentStatus?: string;
+};
 
 type UserRow = {
   id: string;
@@ -20,6 +31,12 @@ type UserRow = {
   status: string;
   track?: string | null;
   phone?: string | null;
+  courses?: UserCourse[];
+  assignedCourses?: string[];
+  progressPercent?: number;
+  batch?: string | null;
+  batchName?: string | null;
+  pendingEnrollmentRequests?: number;
 };
 
 const ACCOUNT_TYPES = ["STUDENT", "INTERN", "STAFF"] as const;
@@ -33,9 +50,15 @@ const emptyForm = {
   phone: "",
 };
 
+function assignedCourseLabel(u: UserRow): string {
+  if (u.assignedCourses?.length) return u.assignedCourses.join(", ");
+  if (u.courses?.length) return u.courses.map((c) => c.title).join(", ");
+  return "—";
+}
+
 export default function UsersPage() {
   const { show } = useSnackbar();
-  const [items, setItems] = useState<UserRow[]>([]);
+  const [items, setItems] = useState<UserRow[]>(() => cacheGetSync<UserRow[]>(USERS_CACHE_KEY) ?? []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -48,6 +71,7 @@ export default function UsersPage() {
     try {
       const r = await api<{ items: UserRow[] }>("/users?pageSize=100");
       setItems(r.items);
+      await cacheSet(USERS_CACHE_KEY, r.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load users");
       setItems([]);
@@ -57,6 +81,9 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
+    void cacheGet<UserRow[]>(USERS_CACHE_KEY).then((cached) => {
+      if (cached?.data?.length) setItems(cached.data);
+    });
     void load();
   }, [load]);
 
@@ -301,15 +328,24 @@ export default function UsersPage() {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50/80 text-slate-500">
               <tr>
-                <th className="px-5 py-3 font-medium">Name</th>
-                <th className="px-5 py-3 font-medium">Type</th>
-                <th className="px-5 py-3 font-medium">Track</th>
-                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Full name</th>
+                <th className="px-5 py-3 font-medium">Email</th>
+                <th className="px-5 py-3 font-medium">Role</th>
+                <th className="px-5 py-3 font-medium">Assigned course(s)</th>
+                <th className="px-5 py-3 font-medium">Batch</th>
+                <th className="px-5 py-3 font-medium">Progress</th>
+                <th className="px-5 py-3 font-medium">Enrollment</th>
+                <th className="px-5 py-3 font-medium">Account status</th>
               </tr>
             </thead>
             <tbody>
               {items.map((u) => {
                 const display = u.name || u.fullName || u.email;
+                const batch = u.batch || u.batchName || "—";
+                const progress =
+                  u.progressPercent !== undefined
+                    ? `${u.progressPercent}%`
+                    : "—";
                 return (
                   <tr key={u.id} className="border-t border-slate-100">
                     <td className="px-5 py-3.5">
@@ -323,20 +359,31 @@ export default function UsersPage() {
                           accountType={u.accountType}
                           size="sm"
                         />
-                        <span>
-                          <span className="block font-semibold">{display}</span>
-                          <span className="block text-xs text-slate-500">
-                            {u.email}
-                          </span>
-                        </span>
+                        <span className="font-semibold">{display}</span>
                       </Link>
                     </td>
+                    <td className="px-5 py-3.5 text-slate-600">{u.email}</td>
                     <td className="px-5 py-3.5">
                       <Badge variant="secondary">
                         {roleLabel(u.accountType)}
                       </Badge>
                     </td>
-                    <td className="px-5 py-3.5">{u.track || "—"}</td>
+                    <td className="max-w-[200px] truncate px-5 py-3.5" title={assignedCourseLabel(u)}>
+                      {assignedCourseLabel(u)}
+                    </td>
+                    <td className="px-5 py-3.5">{batch}</td>
+                    <td className="px-5 py-3.5">{progress}</td>
+                    <td className="px-5 py-3.5">
+                      {u.courses?.length ? (
+                        <Badge variant="success">Enrolled</Badge>
+                      ) : (u.pendingEnrollmentRequests ?? 0) > 0 ? (
+                        <Badge variant="warning">
+                          {u.pendingEnrollmentRequests} pending
+                        </Badge>
+                      ) : (
+                        <span className="text-slate-500">None</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5">
                       <Badge variant="outline">{u.status}</Badge>
                     </td>
@@ -346,7 +393,7 @@ export default function UsersPage() {
               {!loading && items.length === 0 && !error ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={8}
                     className="px-5 py-8 text-center text-slate-500"
                   >
                     No users yet

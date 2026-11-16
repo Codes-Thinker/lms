@@ -36,6 +36,16 @@ export class CoursesController {
     return this.courses.categories();
   }
 
+  /** Admin: list enrollment requests (optional courseId / status filters). */
+  @Get("enrollment-requests")
+  @Roles("SUPER_ADMIN", "STAFF")
+  listEnrollmentRequests(
+    @Query("courseId") courseId?: string,
+    @Query("status") status?: string
+  ) {
+    return this.courses.listEnrollmentRequests(courseId, status);
+  }
+
   @Get(":id")
   get(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.courses.get(id, user.sub);
@@ -56,9 +66,56 @@ export class CoursesController {
     return this.courses.checkEnrollment(user.sub, id);
   }
 
+  /**
+   * Submit enrollment REQUEST (does not auto-enroll).
+   * Blocked when course.allowEnrollmentRequests is false.
+   */
   @Post(":id/enroll")
-  enroll(@Param("id") id: string, @CurrentUser() user: AuthUser) {
-    return this.courses.enroll(user.sub, id);
+  enroll(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body?: { note?: string }
+  ) {
+    return this.courses.enroll(user.sub, id, body?.note);
+  }
+
+  @Post(":id/enrollment-requests")
+  requestEnrollment(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body?: { note?: string }
+  ) {
+    return this.courses.requestEnrollment(user.sub, id, body?.note);
+  }
+
+  @Post("enrollment-requests/:requestId/approve")
+  @Roles("SUPER_ADMIN", "STAFF")
+  approveRequest(
+    @Param("requestId") requestId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body?: { adminNote?: string }
+  ) {
+    return this.courses.reviewEnrollmentRequest(
+      requestId,
+      user.sub,
+      "APPROVE",
+      body?.adminNote
+    );
+  }
+
+  @Post("enrollment-requests/:requestId/reject")
+  @Roles("SUPER_ADMIN", "STAFF")
+  rejectRequest(
+    @Param("requestId") requestId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body?: { adminNote?: string }
+  ) {
+    return this.courses.reviewEnrollmentRequest(
+      requestId,
+      user.sub,
+      "REJECT",
+      body?.adminNote
+    );
   }
 
   @Post("topics/:topicId/progress")

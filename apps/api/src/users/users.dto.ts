@@ -114,6 +114,14 @@ export class UpdateUserDto {
   @IsInt()
   feeDueDay?: number;
 
+  @IsOptional()
+  @IsString()
+  internshipStart?: string | null;
+
+  @IsOptional()
+  @IsString()
+  internshipEnd?: string | null;
+
   /** Replace student enrollments with these course IDs. */
   @IsOptional()
   @IsArray()

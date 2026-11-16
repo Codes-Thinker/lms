@@ -29,6 +29,8 @@ type Report = {
     phone?: string | null;
     lastLoginAt?: string | null;
     createdAt?: string;
+    internshipStart?: string | null;
+    internshipEnd?: string | null;
   };
   attendancePercent: number;
   feesPending: number;
@@ -61,6 +63,20 @@ type Report = {
     status: string;
     audience?: string;
     dueAt?: string | null;
+  }>;
+  projects?: Array<{
+    id: string;
+    title: string;
+    techStack?: string | null;
+    status: string;
+    progressPercent: number;
+    deadline?: string | null;
+  }>;
+  taughtCourses?: Array<{
+    id: string;
+    title: string;
+    batch?: string | null;
+    enrolledCount: number;
   }>;
 };
 
@@ -564,6 +580,16 @@ export default function UserProfilePage() {
             <Row label="Designation" value={u.designation || "—"} />
             <Row label="Department" value={u.department || "—"} />
             <Row label="Batch" value={u.batch || "—"} />
+            {isIntern ? (
+              <Row
+                label="Internship"
+                value={
+                  u.internshipStart || u.internshipEnd
+                    ? `${u.internshipStart || "?"} → ${u.internshipEnd || "?"}`
+                    : "—"
+                }
+              />
+            ) : null}
             <Row
               label="Last login"
               value={
@@ -707,24 +733,92 @@ export default function UserProfilePage() {
           </div>
         </>
       ) : (
-        <div className="glass-card p-5">
-          <h3 className="mb-3 font-semibold">
-            {isIntern ? "Projects / tasks" : "Assigned tasks"}
-          </h3>
-          <ul className="space-y-2 text-sm">
-            {(report.tasks || []).map((t) => (
-              <li
-                key={t.id}
-                className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
-              >
-                <span>{t.title}</span>
-                <span className="font-medium">{t.status}</span>
-              </li>
-            ))}
-            {(report.tasks || []).length === 0 ? (
-              <li className="text-slate-500">No tasks yet</li>
-            ) : null}
-          </ul>
+        <div className="space-y-4">
+          {isTeacher ? (
+            <div className="glass-card p-5">
+              <h3 className="mb-3 font-semibold">Taught courses</h3>
+              <ul className="space-y-2 text-sm">
+                {(report.taughtCourses || []).map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                  >
+                    <span>
+                      {c.title}
+                      {c.batch ? ` · ${c.batch}` : ""}
+                    </span>
+                    <span className="font-medium">
+                      {c.enrolledCount} students
+                    </span>
+                  </li>
+                ))}
+                {(report.taughtCourses || []).length === 0 ? (
+                  <li className="text-slate-500">
+                    No courses assigned — set Instructor on a course
+                  </li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+          {isIntern ? (
+            <div className="glass-card p-5">
+              <h3 className="mb-3 font-semibold">Projects</h3>
+              <ul className="space-y-2 text-sm">
+                {(report.projects || []).map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                  >
+                    <span>
+                      {p.title}
+                      {p.techStack ? ` · ${p.techStack}` : ""}
+                    </span>
+                    <span className="font-medium">
+                      {p.progressPercent}% · {p.status}
+                    </span>
+                  </li>
+                ))}
+                {(report.projects || []).length === 0 ? (
+                  <li className="text-slate-500">No projects yet</li>
+                ) : null}
+              </ul>
+            </div>
+          ) : null}
+          <div className="glass-card p-5">
+            <h3 className="mb-3 font-semibold">
+              {isIntern ? "Assigned tasks" : "Tasks"}
+            </h3>
+            <ul className="space-y-2 text-sm">
+              {(report.tasks || []).map((t) => (
+                <li
+                  key={t.id}
+                  className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                >
+                  <span>{t.title}</span>
+                  <span className="font-medium">{t.status}</span>
+                </li>
+              ))}
+              {(report.tasks || []).length === 0 ? (
+                <li className="text-slate-500">No tasks yet</li>
+              ) : null}
+            </ul>
+          </div>
+          {isIntern && report.courses.length > 0 ? (
+            <div className="glass-card p-5">
+              <h3 className="mb-3 font-semibold">Enrolled courses</h3>
+              <ul className="space-y-2 text-sm">
+                {report.courses.map((c) => (
+                  <li
+                    key={c.id}
+                    className="flex justify-between border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+                  >
+                    <span>{c.title}</span>
+                    <span className="font-medium">{c.progressPercent}%</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

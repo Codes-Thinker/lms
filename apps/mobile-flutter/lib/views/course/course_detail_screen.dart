@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_motion.dart';
-import '../../providers/auth_provider.dart';
+import '../../core/api_errors.dart' show ApiErrors;
+import '../../models/course.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/api_client.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/course_cover.dart';
 import '../../widgets/live_countdown.dart';
+import '../help/admin_chat_screen.dart';
 
 class CourseDetailScreen extends StatelessWidget {
   final String courseId;
@@ -40,7 +41,7 @@ class CourseDetailScreen extends StatelessWidget {
 
 /// Full content for enrolled students — roadmap, lessons, progress, mark done.
 class _EnrolledContent extends StatelessWidget {
-  final dynamic course;
+  final Course course;
   final CourseProvider courses;
 
   const _EnrolledContent({required this.course, required this.courses});
@@ -173,9 +174,9 @@ class _EnrolledContent extends StatelessWidget {
   }
 }
 
-/// Limited public info for non-enrolled students — no roadmap, locked content.
+/// Limited public info — enrollment requires admin approval.
 class _NonEnrolledContent extends StatefulWidget {
-  final dynamic course;
+  final Course course;
 
   const _NonEnrolledContent({required this.course});
 
@@ -184,28 +185,63 @@ class _NonEnrolledContent extends StatefulWidget {
 }
 
 class _NonEnrolledContentState extends State<_NonEnrolledContent> {
-  bool _enrolling = false;
+  bool _busy = false;
 
-  Future<void> _enroll() async {
-    setState(() => _enrolling = true);
+  Future<void> _requestEnrollment() async {
+    setState(() => _busy = true);
     try {
-      await ApiClient.instance.post('/courses/${widget.course.id}/enroll');
+      await ApiClient.instance.post(
+        '/courses/${widget.course.id}/enroll',
+        body: {
+          'note': 'Please enroll me in ${widget.course.title}',
+        },
+      );
       if (!mounted) return;
-      context
-          .read<UiProvider>()
-          .showSnack('Enrolled! Tap again to view full content.');
-      context.read<CourseProvider>().fetchEnrolledCourses();
+      context.read<UiProvider>().showSnack(
+            'Request sent. Waiting for admin approval.',
+          );
+      await context.read<CourseProvider>().fetchEnrolledCourses();
     } catch (e) {
       if (!mounted) return;
-      context.read<UiProvider>().showSnack('Enrollment failed. Try again.');
+      context.read<UiProvider>().showSnack(ApiErrors.friendly(e));
     }
-    setState(() => _enrolling = false);
+    if (mounted) setState(() => _busy = false);
+  }
+
+  void _openAdminChat() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AdminChatScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final c = widget.course;
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final pending = c.requestPending;
+    final rejected = c.requestRejected;
+    final canRequest = c.allowEnrollmentRequests && !pending;
+
+    String lockTitle;
+    String lockBody;
+    if (pending) {
+      lockTitle = 'Request pending';
+      lockBody =
+          'Your enrollment request is with the admin. You will get access once it is approved.';
+    } else if (rejected) {
+      lockTitle = 'Request rejected';
+      lockBody =
+          'Your last enrollment request was rejected. Contact the admin via chat for help.';
+    } else if (!c.allowEnrollmentRequests) {
+      lockTitle = 'Direct enrollment unavailable';
+      lockBody =
+          'This course does not accept self-enrollment. Please contact the admin through in-app chat to request enrollment.';
+    } else {
+      lockTitle = 'Admin approval required';
+      lockBody =
+          'Submit an enrollment request. An admin must Accept it before you can access lessons.';
+    }
+
     return ListView(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottom),
       children: [
@@ -217,17 +253,37 @@ class _NonEnrolledContentState extends State<_NonEnrolledContent> {
                 fontWeight: FontWeight.w800,
                 color: AppColors.ink)),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.bg,
-            borderRadius: BorderRadius.circular(100),
-          ),
-          child: Text(c.category,
-              style: const TextStyle(
-                  color: AppColors.muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.bg,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(c.category,
+                  style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.softBlue,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                c.enrollmentStatus.replaceAll('_', ' '),
+                style: const TextStyle(
+                    color: AppColors.blue,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         if (c.description.isNotEmpty)
@@ -251,7 +307,6 @@ class _NonEnrolledContentState extends State<_NonEnrolledContent> {
           ],
         ),
         const SizedBox(height: 28),
-        // Locked content indicator
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -260,43 +315,65 @@ class _NonEnrolledContentState extends State<_NonEnrolledContent> {
           ),
           child: Column(
             children: [
-              const Icon(Icons.lock_outline_rounded,
-                  size: 36, color: AppColors.blue),
+              Icon(
+                pending
+                    ? Icons.hourglass_top_rounded
+                    : rejected
+                        ? Icons.block_rounded
+                        : Icons.lock_outline_rounded,
+                size: 36,
+                color: AppColors.blue,
+              ),
               const SizedBox(height: 8),
-              const Text(
-                'Course content is locked',
-                style: TextStyle(
+              Text(
+                lockTitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                     color: AppColors.ink),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Enroll in this course to access the full roadmap, lessons, assignments, and learning materials.',
+              Text(
+                lockBody,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                     color: AppColors.muted, fontSize: 13, height: 1.4),
               ),
             ],
           ),
         ),
         const SizedBox(height: 20),
+        if (canRequest)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _busy ? null : _requestEnrollment,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: _busy
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Text('Request enrollment',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        if (canRequest) const SizedBox(height: 10),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _enrolling ? null : _enroll,
-            style: ElevatedButton.styleFrom(
+          child: OutlinedButton.icon(
+            onPressed: _openAdminChat,
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            label: const Text('Contact admin via chat',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
-            child: _enrolling
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Text('Enroll Now',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           ),
         ),
       ],

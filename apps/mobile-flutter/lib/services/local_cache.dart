@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Session-scoped JSON cache in SharedPreferences.
-/// Shows last good API data instantly, then refresh in background.
-/// Cleared on logout so the next user never sees stale data.
+import 'local_db.dart';
+
+/// Session-scoped JSON cache.
+/// Prefers SQLite ([LocalDb]) for larger payloads; mirrors to SharedPreferences
+/// as a fallback. Cleared on logout so the next user never sees stale data.
+/// Backend remains the source of truth — cache is for faster UX only.
 class LocalCache {
   LocalCache._();
 
@@ -19,6 +22,7 @@ class LocalCache {
   static const notifications = 'notifications';
   static const reportMe = 'report_me';
   static const chatThread = 'chat_thread';
+  static const usersRoster = 'users_roster';
 
   static Future<SharedPreferences?> _prefs() async {
     try {
@@ -32,6 +36,7 @@ class LocalCache {
   static String _key(String name) => '$_prefix$name';
 
   static Future<void> setJson(String name, Object? value) async {
+    await LocalDb.setJson(_key(name), value);
     final prefs = await _prefs();
     if (prefs == null) return;
     if (value == null) {
@@ -46,12 +51,18 @@ class LocalCache {
   }
 
   static Future<dynamic> getJson(String name) async {
+    final fromDb = await LocalDb.getJson(_key(name));
+    if (fromDb != null) return fromDb;
+
     final prefs = await _prefs();
     if (prefs == null) return null;
     final raw = prefs.getString(_key(name));
     if (raw == null || raw.isEmpty) return null;
     try {
-      return jsonDecode(raw);
+      final decoded = jsonDecode(raw);
+      // Backfill SQLite from prefs for next read.
+      await LocalDb.setJson(_key(name), decoded);
+      return decoded;
     } catch (e) {
       debugPrint('LocalCache get $name: $e');
       return null;
@@ -73,6 +84,7 @@ class LocalCache {
 
   /// Wipe all LMS cache keys (call on logout / session end).
   static Future<void> clearSession() async {
+    await LocalDb.clearAll();
     final prefs = await _prefs();
     if (prefs == null) return;
     final keys = prefs.getKeys().where((k) => k.startsWith(_prefix)).toList();

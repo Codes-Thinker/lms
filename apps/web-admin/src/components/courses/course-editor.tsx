@@ -36,6 +36,8 @@ export type CourseEditorValue = {
   installmentCount: number;
   totalFee: number;
   published: boolean;
+  allowEnrollmentRequests: boolean;
+  instructorId: string;
   outline: EditorSection[];
 };
 
@@ -56,6 +58,8 @@ export function emptyCourseValue(): CourseEditorValue {
     installmentCount: 2,
     totalFee: 0,
     published: true,
+    allowEnrollmentRequests: false,
+    instructorId: "",
     outline: [
       {
         key: uid("sec"),
@@ -81,6 +85,8 @@ export function courseToEditorValue(course: {
   installmentCount?: number;
   totalFee: number;
   published: boolean;
+  allowEnrollmentRequests?: boolean;
+  instructorId?: string | null;
   outline?: {
     id: string;
     title: string;
@@ -99,6 +105,8 @@ export function courseToEditorValue(course: {
     installmentCount: course.installmentCount ?? 2,
     totalFee: course.totalFee,
     published: course.published,
+    allowEnrollmentRequests: course.allowEnrollmentRequests ?? false,
+    instructorId: course.instructorId ?? "",
     outline:
       course.outline?.map((s) => ({
         key: s.id,
@@ -127,6 +135,8 @@ export function editorValueToPayload(value: CourseEditorValue) {
     installmentCount: Math.max(1, Number(value.installmentCount) || 2),
     totalFee: Number(value.totalFee) || 0,
     published: value.published,
+    allowEnrollmentRequests: value.allowEnrollmentRequests,
+    instructorId: value.instructorId.trim() || null,
     outline: value.outline.map((s, si) => ({
       id: s.id,
       title: s.title.trim(),
@@ -177,6 +187,17 @@ export function CourseEditor({
   const [coverBusy, setCoverBusy] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [instructors, setInstructors] = useState<
+    { id: string; fullName?: string; name?: string; email: string }[]
+  >([]);
+
+  useEffect(() => {
+    api<{ items: { id: string; fullName?: string; name?: string; email: string }[] }>(
+      "/users?accountType=STAFF&pageSize=100"
+    )
+      .then((r) => setInstructors(r.items))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     api<Array<{ name: string }>>("/system/categories")
@@ -347,6 +368,35 @@ export function CourseEditor({
             checked={value.published}
             onCheckedChange={(checked) => set("published", checked)}
           />
+        </div>
+        <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 md:col-span-2">
+          <div>
+            <p className="text-sm font-medium">Allow enrollment requests</p>
+            <p className="text-xs text-slate-500">
+              Students submit a request; admin approves before access
+            </p>
+          </div>
+          <Switch
+            checked={value.allowEnrollmentRequests}
+            onCheckedChange={(checked) =>
+              set("allowEnrollmentRequests", checked)
+            }
+          />
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label>Course instructor</Label>
+          <select
+            className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+            value={value.instructorId}
+            onChange={(e) => set("instructorId", e.target.value)}
+          >
+            <option value="">— No instructor assigned —</option>
+            {instructors.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.fullName || u.name || u.email}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

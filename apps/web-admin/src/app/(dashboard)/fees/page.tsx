@@ -40,7 +40,7 @@ export default function FeesPage() {
     load().catch((e) => show(String(e)));
     const id = window.setInterval(() => {
       load().catch(() => {});
-    }, 5000);
+    }, 15000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -27,6 +27,8 @@ type CourseDto = {
   installmentCount?: number;
   totalFee: number;
   published: boolean;
+  allowEnrollmentRequests?: boolean;
+  instructorId?: string | null;
   outline?: {
     id: string;
     title: string;

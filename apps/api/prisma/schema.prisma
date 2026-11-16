@@ -45,6 +45,12 @@ enum TaskStatus {
   BLOCKED
 }
 
+enum EnrollmentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum TicketKind {
   REPORT
   COMPLAIN
@@ -150,11 +156,17 @@ model User {
   paymentSubmissions PaymentSubmission[]  @relation("PaymentSubStudent")
   reviewedPayments   PaymentSubmission[]  @relation("PaymentReviewer")
   attendanceReminders AttendanceReminder[]
+  enrollmentRequests  EnrollmentRequest[] @relation("EnrollmentRequester")
+  reviewedEnrollments EnrollmentRequest[] @relation("EnrollmentReviewer")
+  instructedCourses   Course[]            @relation("CourseInstructor")
 
   profileImage    String?
   monthlyFee      Int?
   feeStartDate    DateTime?  @db.Date
   feeDueDay       Int        @default(15)
+  /** Intern program window (optional). */
+  internshipStart DateTime?  @db.Date
+  internshipEnd   DateTime?  @db.Date
 }
 
 model FcmDevice {
@@ -209,6 +221,8 @@ model Course {
   installmentFee   Int            @default(0)
   installmentCount Int            @default(2)
   published        Boolean        @default(false)
+  /** When true, students may submit enrollment requests (admin must approve). */
+  allowEnrollmentRequests Boolean  @default(false)
   startMonth       String?
   rating           Float          @default(4.5)
   batchId          String?
@@ -216,13 +230,36 @@ model Course {
   batchLabel       String?
   categoryId       String?
   categoryRef      CourseCategory? @relation(fields: [categoryId], references: [id])
+  instructorId     String?
+  instructor       User?          @relation("CourseInstructor", fields: [instructorId], references: [id])
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   sections         CourseSection[]
   enrollments      Enrollment[]
+  enrollmentRequests EnrollmentRequest[]
   feeCases         FeeCase[]
   attendance       AttendanceRecord[]
   tasks            Task[]
+}
+
+model EnrollmentRequest {
+  id           String                  @id @default(cuid())
+  userId       String
+  courseId     String
+  status       EnrollmentRequestStatus @default(PENDING)
+  note         String?
+  adminNote    String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  user         User                    @relation("EnrollmentRequester", fields: [userId], references: [id], onDelete: Cascade)
+  course       Course                  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  reviewedBy   User?                   @relation("EnrollmentReviewer", fields: [reviewedById], references: [id])
+
+  @@unique([userId, courseId])
+  @@index([status])
+  @@index([courseId])
 }
 
 model CourseSection {

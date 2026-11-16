@@ -127,7 +127,7 @@ export default function DashboardPage() {
     })();
     const id = window.setInterval(() => {
       loadCore().catch(() => {});
-    }, 5000);
+    }, 15000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

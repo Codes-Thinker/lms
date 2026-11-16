@@ -178,11 +178,19 @@ async function main() {
     fullName: "Usman Tariq",
     accountType: AccountType.INTERN,
     passwordHash: hash,
+    designation: "Flutter Intern",
     phone: "+92 301 2222001",
     track: "Flutter Internship",
     departmentId: dept["Mobile Interns"],
     batchId: batch["CT-INTERN-A"],
     roleId: roleByCode.INTERN,
+  });
+  await prisma.user.update({
+    where: { id: usman.id },
+    data: {
+      internshipStart: new Date("2026-08-01"),
+      internshipEnd: new Date("2027-01-31"),
+    },
   });
 
   const ayesha = await upsertUser({
@@ -190,11 +198,40 @@ async function main() {
     fullName: "Ayesha Siddiqui",
     accountType: AccountType.INTERN,
     passwordHash: hash,
+    designation: "Backend Intern",
     phone: "+92 301 2222002",
     track: "MERN Internship",
     departmentId: dept["Backend Interns"],
     batchId: batch["CT-INTERN-B"],
     roleId: roleByCode.INTERN,
+  });
+  await prisma.user.update({
+    where: { id: ayesha.id },
+    data: {
+      internshipStart: new Date("2026-09-01"),
+      internshipEnd: new Date("2027-02-28"),
+    },
+  });
+
+  /** Sample intern demonstrating full workflow (role, project, tasks). */
+  const hamza = await upsertUser({
+    email: "hamza@codesthinker.com",
+    fullName: "Hamza Ali",
+    accountType: AccountType.INTERN,
+    passwordHash: hash,
+    designation: "Mobile App Intern",
+    phone: "+92 301 2222003",
+    track: "Flutter + Firebase",
+    departmentId: dept["Mobile Interns"],
+    batchId: batch["CT-INTERN-A"],
+    roleId: roleByCode.INTERN,
+  });
+  await prisma.user.update({
+    where: { id: hamza.id },
+    data: {
+      internshipStart: new Date("2026-10-01"),
+      internshipEnd: new Date("2027-03-31"),
+    },
   });
 
   const ali = await upsertUser({
@@ -235,6 +272,7 @@ async function main() {
 
   // Clear domain data for idempotent reseed of LMS content
   await prisma.topicProgress.deleteMany();
+  await prisma.enrollmentRequest.deleteMany();
   await prisma.enrollment.deleteMany();
   await prisma.courseTopic.deleteMany();
   await prisma.courseSection.deleteMany();
@@ -263,6 +301,8 @@ async function main() {
       totalFee: 48000,
       installmentFee: 6000,
       published: true,
+      allowEnrollmentRequests: true,
+      instructorId: hassan.id,
       startMonth: "2026-08",
       rating: 4.8,
       batchId: batch["CT-FLUTTER-NOV-26"],
@@ -320,6 +360,8 @@ async function main() {
       totalFee: 45000,
       installmentFee: 7500,
       published: true,
+      allowEnrollmentRequests: false,
+      instructorId: hassan.id,
       startMonth: "2026-09",
       rating: 4.6,
       batchId: batch["CT-MERN-OCT-26"],
@@ -375,6 +417,16 @@ async function main() {
     },
   });
 
+  // Demo pending enrollment request (Fatima → Flutter) for admin Enrollments page.
+  await prisma.enrollmentRequest.create({
+    data: {
+      userId: fatima.id,
+      courseId: flutter.id,
+      status: "PENDING",
+      note: "I want to join the Flutter track as a second course.",
+    },
+  });
+
   await prisma.enrollment.createMany({
     data: [
       {
@@ -391,6 +443,12 @@ async function main() {
       },
       {
         userId: usman.id,
+        courseId: flutter.id,
+        paidAmount: 0,
+        feeStatus: FeeStatus.DUE,
+      },
+      {
+        userId: hamza.id,
         courseId: flutter.id,
         paidAmount: 0,
         feeStatus: FeeStatus.DUE,
@@ -622,7 +680,46 @@ async function main() {
         techStack: "NestJS + Prisma",
         progressPercent: 10,
       },
+      {
+        title: "Push notification reliability kit",
+        description:
+          "Sample intern workflow: FCM foreground/background handling, deep links to chat, and QA checklist for Android/iOS.",
+        internId: hamza.id,
+        createdById: admin.id,
+        status: TaskStatus.IN_PROGRESS,
+        deadline: new Date("2026-12-15"),
+        techStack: "Flutter + Firebase Messaging",
+        repoUrl: "https://github.com/codesthinker/lms-mobile",
+        progressPercent: 35,
+      },
     ],
+  });
+
+  await prisma.task.create({
+    data: {
+      title: "Document FCM test matrix",
+      description:
+        "Write a short checklist covering killed/background/foreground notification cases for Android and iOS.",
+      audience: AccountType.INTERN,
+      status: TaskStatus.ASSIGNED,
+      assigneeId: hamza.id,
+      createdById: hassan.id,
+      dueAt: new Date("2026-11-25"),
+      courseId: flutter.id,
+    },
+  });
+  await prisma.task.create({
+    data: {
+      title: "Fix notification tap → Admin chat",
+      description:
+        "Ensure CHAT notifications open AdminChatScreen and mark the thread read.",
+      audience: AccountType.INTERN,
+      status: TaskStatus.IN_PROGRESS,
+      assigneeId: hamza.id,
+      createdById: hassan.id,
+      dueAt: new Date("2026-11-28"),
+      courseId: flutter.id,
+    },
   });
 
   await prisma.supportTicket.createMany({

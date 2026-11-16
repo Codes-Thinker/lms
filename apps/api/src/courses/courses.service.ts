@@ -31,10 +31,19 @@ type CourseWriteInput = {
   installmentFee?: number;
   installmentCount?: number;
   published?: boolean;
+  allowEnrollmentRequests?: boolean;
+  instructorId?: string | null;
   batchLabel?: string | null;
   startMonth?: string | null;
   outline?: OutlineSectionInput[];
 };
+
+export type EnrollmentStatusLabel =
+  | "NOT_ENROLLED"
+  | "REQUEST_PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "ENROLLED";
 
 @Injectable()
 export class CoursesService {
@@ -66,6 +75,8 @@ export class CoursesService {
       installmentFee: number;
       installmentCount: number;
       published: boolean;
+      allowEnrollmentRequests?: boolean;
+      instructorId?: string | null;
       startMonth: string | null;
       rating: number;
       batchLabel: string | null;
@@ -81,13 +92,22 @@ export class CoursesService {
         }[];
       }[];
       enrollments?: { paidAmount: number; feeStatus: string }[] | false;
+      enrollmentRequests?: { status: string }[] | false;
+      instructor?: { id: string; fullName: string } | null;
       _count: { enrollments: number };
     },
     completedIds: Set<string>
   ) {
     const topics = c.sections.flatMap((s) => s.topics);
     const enrollment = Array.isArray(c.enrollments) ? c.enrollments[0] : null;
+    const request = Array.isArray(c.enrollmentRequests)
+      ? c.enrollmentRequests[0]
+      : null;
     const progress = this.progressFor(topics, completedIds);
+    const enrollmentStatus = this.resolveEnrollmentStatus(
+      Boolean(enrollment),
+      request?.status
+    );
     return {
       id: c.id,
       title: c.title,
@@ -100,11 +120,16 @@ export class CoursesService {
       installmentFee: c.installmentFee,
       installmentCount: c.installmentCount,
       published: c.published,
+      allowEnrollmentRequests: Boolean(c.allowEnrollmentRequests),
+      instructorId: c.instructorId ?? null,
+      instructorName: c.instructor?.fullName ?? null,
       startMonth: c.startMonth,
       rating: c.rating,
       batch: c.batchLabel,
       enrolledCount: c._count.enrollments,
       enrolled: Boolean(enrollment),
+      enrollmentStatus,
+      requestStatus: request?.status ?? null,
       paidAmount: enrollment?.paidAmount ?? 0,
       feeStatus: enrollment?.feeStatus ?? null,
       progressPercent: progress.percent,
@@ -125,6 +150,17 @@ export class CoursesService {
     };
   }
 
+  private resolveEnrollmentStatus(
+    enrolled: boolean,
+    requestStatus?: string | null
+  ): EnrollmentStatusLabel {
+    if (enrolled) return "ENROLLED";
+    if (requestStatus === "PENDING") return "REQUEST_PENDING";
+    if (requestStatus === "APPROVED") return "APPROVED";
+    if (requestStatus === "REJECTED") return "REJECTED";
+    return "NOT_ENROLLED";
+  }
+
   async list(userId?: string, publishedOnly = true) {
     const courses = await this.prisma.course.findMany({
       where: publishedOnly ? { published: true } : undefined,
@@ -134,6 +170,8 @@ export class CoursesService {
           orderBy: { sortOrder: "asc" },
         },
         enrollments: userId ? { where: { userId } } : false,
+        enrollmentRequests: userId ? { where: { userId } } : false,
+        instructor: { select: { id: true, fullName: true } },
         _count: { select: { enrollments: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -158,13 +196,191 @@ export class CoursesService {
     return course;
   }
 
-  async enroll(userId: string, courseId: string) {
-    await this.prisma.course.findUniqueOrThrow({ where: { id: courseId } });
-    return this.prisma.enrollment.upsert({
-      where: { userId_courseId: { userId, courseId } },
-      update: {},
-      create: { userId, courseId },
+  /**
+   * Student self-service: submit an enrollment REQUEST (never auto-enrolls).
+   * Backend enforces allowEnrollmentRequests; direct Enrollment rows are
+   * created only by admin approve or admin user courseIds sync.
+   */
+  async enroll(userId: string, courseId: string, note?: string) {
+    return this.requestEnrollment(userId, courseId, note);
+  }
+
+  async requestEnrollment(userId: string, courseId: string, note?: string) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
     });
+    if (!course || !course.published) {
+      throw new NotFoundException("Course not found");
+    }
+
+    const existingEnrollment = await this.prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+    if (existingEnrollment) {
+      return {
+        status: "ENROLLED" as EnrollmentStatusLabel,
+        message: "Already enrolled in this course.",
+        enrollment: existingEnrollment,
+      };
+    }
+
+    if (!course.allowEnrollmentRequests) {
+      throw new ForbiddenException(
+        "Direct enrollment is unavailable for this course. Please contact the admin via chat to request enrollment."
+      );
+    }
+
+    const existing = await this.prisma.enrollmentRequest.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+    if (existing?.status === "PENDING") {
+      return {
+        status: "REQUEST_PENDING" as EnrollmentStatusLabel,
+        message: "Your enrollment request is already pending admin review.",
+        request: existing,
+      };
+    }
+
+    const request = await this.prisma.enrollmentRequest.upsert({
+      where: { userId_courseId: { userId, courseId } },
+      update: {
+        status: "PENDING",
+        note: note?.trim() || null,
+        adminNote: null,
+        reviewedById: null,
+        reviewedAt: null,
+      },
+      create: {
+        userId,
+        courseId,
+        status: "PENDING",
+        note: note?.trim() || null,
+      },
+    });
+
+    return {
+      status: "REQUEST_PENDING" as EnrollmentStatusLabel,
+      message: "Enrollment request submitted. Waiting for admin approval.",
+      request,
+    };
+  }
+
+  async listEnrollmentRequests(courseId?: string, status?: string) {
+    const where: Record<string, unknown> = {};
+    if (courseId) where.courseId = courseId;
+    if (status) where.status = status;
+    const rows = await this.prisma.enrollmentRequest.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            track: true,
+            accountType: true,
+            status: true,
+            batch: { select: { code: true, name: true } },
+          },
+        },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            batchLabel: true,
+            allowEnrollmentRequests: true,
+          },
+        },
+        reviewedBy: { select: { id: true, fullName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      note: r.note,
+      adminNote: r.adminNote,
+      createdAt: r.createdAt.toISOString(),
+      reviewedAt: r.reviewedAt?.toISOString() ?? null,
+      student: {
+        id: r.user.id,
+        name: r.user.fullName,
+        email: r.user.email,
+        phone: r.user.phone,
+        track: r.user.track,
+        accountType: r.user.accountType,
+        accountStatus: r.user.status,
+        batch: r.user.batch?.code ?? null,
+      },
+      course: r.course,
+      reviewedBy: r.reviewedBy
+        ? { id: r.reviewedBy.id, name: r.reviewedBy.fullName }
+        : null,
+    }));
+  }
+
+  async reviewEnrollmentRequest(
+    requestId: string,
+    reviewerId: string,
+    action: "APPROVE" | "REJECT",
+    adminNote?: string
+  ) {
+    const request = await this.prisma.enrollmentRequest.findUnique({
+      where: { id: requestId },
+      include: { course: true },
+    });
+    if (!request) throw new NotFoundException("Enrollment request not found");
+    if (request.status !== "PENDING") {
+      throw new BadRequestException(
+        `Request is already ${request.status.toLowerCase()}`
+      );
+    }
+
+    if (action === "REJECT") {
+      const updated = await this.prisma.enrollmentRequest.update({
+        where: { id: requestId },
+        data: {
+          status: "REJECTED",
+          adminNote: adminNote?.trim() || null,
+          reviewedById: reviewerId,
+          reviewedAt: new Date(),
+        },
+      });
+      return {
+        status: "REJECTED" as EnrollmentStatusLabel,
+        request: updated,
+      };
+    }
+
+    const [enrollment, updated] = await this.prisma.$transaction([
+      this.prisma.enrollment.upsert({
+        where: {
+          userId_courseId: {
+            userId: request.userId,
+            courseId: request.courseId,
+          },
+        },
+        update: {},
+        create: { userId: request.userId, courseId: request.courseId },
+      }),
+      this.prisma.enrollmentRequest.update({
+        where: { id: requestId },
+        data: {
+          status: "APPROVED",
+          adminNote: adminNote?.trim() || null,
+          reviewedById: reviewerId,
+          reviewedAt: new Date(),
+        },
+      }),
+    ]);
+
+    return {
+      status: "ENROLLED" as EnrollmentStatusLabel,
+      enrollment,
+      request: updated,
+    };
   }
 
   async toggleTopic(userId: string, topicId: string, completed: boolean) {
@@ -250,11 +466,20 @@ export class CoursesService {
     const enrollment = course.enrollments[0] ?? null;
     const isEnrolled = Boolean(enrollment);
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { accountType: true },
-    });
+    const [user, request] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { accountType: true },
+      }),
+      this.prisma.enrollmentRequest.findUnique({
+        where: { userId_courseId: { userId, courseId: id } },
+      }),
+    ]);
     const isStaff = user?.accountType === "SUPER_ADMIN" || user?.accountType === "STAFF";
+    const enrollmentStatus = this.resolveEnrollmentStatus(
+      isEnrolled,
+      request?.status
+    );
 
     // Public fields always returned
     const publicInfo = {
@@ -269,24 +494,34 @@ export class CoursesService {
       installmentFee: course.installmentFee,
       installmentCount: course.installmentCount,
       published: course.published,
+      allowEnrollmentRequests: course.allowEnrollmentRequests,
       startMonth: course.startMonth,
       rating: course.rating,
       batch: course.batchLabel,
       enrolledCount: course._count.enrollments,
       enrolled: isEnrolled,
+      enrollmentStatus,
+      requestStatus: request?.status ?? null,
       paidAmount: enrollment?.paidAmount ?? 0,
       feeStatus: enrollment?.feeStatus ?? null,
     };
 
     // Non-enrolled (non-staff) users get ONLY public info — no outline
     if (!isEnrolled && !isStaff) {
+      const lockedMessage =
+        enrollmentStatus === "REQUEST_PENDING"
+          ? "Your enrollment request is pending admin approval."
+          : enrollmentStatus === "REJECTED"
+            ? "Your enrollment request was rejected. Contact admin via chat for help."
+            : course.allowEnrollmentRequests
+              ? "Request enrollment to access the full content. An admin must approve your request."
+              : "Direct enrollment is unavailable. Contact the admin via chat to request enrollment.";
       return {
         ...publicInfo,
         progressPercent: 0,
         outline: [],
         locked: true,
-        message:
-          "You are not enrolled in this course. Enroll to access the full content.",
+        message: lockedMessage,
       };
     }
 
@@ -322,12 +557,36 @@ export class CoursesService {
     };
   }
 
-  /** Check if a user is enrolled in a course. */
+  /** Check enrollment + request status for a user/course pair. */
   async checkEnrollment(userId: string, courseId: string) {
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-    });
-    return { enrolled: Boolean(enrollment), enrollment };
+    const [enrollment, request, course] = await Promise.all([
+      this.prisma.enrollment.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+      }),
+      this.prisma.enrollmentRequest.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+      }),
+      this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { allowEnrollmentRequests: true },
+      }),
+    ]);
+    const enrolled = Boolean(enrollment);
+    return {
+      enrolled,
+      enrollmentStatus: this.resolveEnrollmentStatus(enrolled, request?.status),
+      allowEnrollmentRequests: Boolean(course?.allowEnrollmentRequests),
+      request: request
+        ? {
+            id: request.id,
+            status: request.status,
+            note: request.note,
+            adminNote: request.adminNote,
+            createdAt: request.createdAt.toISOString(),
+          }
+        : null,
+      enrollment,
+    };
   }
 
   private async replaceOutline(courseId: string, outline: OutlineSectionInput[]) {
@@ -449,6 +708,8 @@ export class CoursesService {
         installmentFee: data.installmentFee ?? 0,
         installmentCount: data.installmentCount ?? 2,
         published: data.published ?? false,
+        allowEnrollmentRequests: data.allowEnrollmentRequests ?? false,
+        instructorId: data.instructorId ?? null,
         batchLabel: data.batchLabel ?? null,
         startMonth: data.startMonth ?? null,
       },
@@ -482,6 +743,10 @@ export class CoursesService {
     if (data.installmentCount !== undefined)
       patch.installmentCount = data.installmentCount;
     if (data.published !== undefined) patch.published = data.published;
+    if (data.allowEnrollmentRequests !== undefined) {
+      patch.allowEnrollmentRequests = data.allowEnrollmentRequests;
+    }
+    if (data.instructorId !== undefined) patch.instructorId = data.instructorId;
     if (data.batchLabel !== undefined) patch.batchLabel = data.batchLabel;
     if (data.startMonth !== undefined) patch.startMonth = data.startMonth;
 

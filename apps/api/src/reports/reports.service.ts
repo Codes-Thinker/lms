@@ -99,13 +99,28 @@ export class ReportsService {
       .filter((f) => f.status !== FeeStatus.PAID)
       .reduce((s, f) => s + f.amount, 0);
 
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        OR: [{ assigneeId: userId }, { createdById: userId }],
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 20,
-    });
+    const [tasks, projects, taughtCourses] = await Promise.all([
+      this.prisma.task.findMany({
+        where: {
+          OR: [{ assigneeId: userId }, { createdById: userId }],
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 20,
+      }),
+      this.prisma.project.findMany({
+        where: { internId: userId },
+        orderBy: { updatedAt: "desc" },
+      }),
+      this.prisma.course.findMany({
+        where: { instructorId: userId },
+        select: {
+          id: true,
+          title: true,
+          batchLabel: true,
+          _count: { select: { enrollments: true } },
+        },
+      }),
+    ]);
 
     return {
       user: {
@@ -121,6 +136,8 @@ export class ReportsService {
         phone: user.phone,
         lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
         createdAt: user.createdAt.toISOString(),
+        internshipStart: user.internshipStart?.toISOString().slice(0, 10) ?? null,
+        internshipEnd: user.internshipEnd?.toISOString().slice(0, 10) ?? null,
       },
       attendancePercent,
       feesPending,
@@ -157,6 +174,21 @@ export class ReportsService {
         status: t.status,
         audience: t.audience,
         dueAt: t.dueAt?.toISOString() ?? null,
+      })),
+      projects: projects.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        techStack: p.techStack,
+        status: p.status,
+        progressPercent: p.progressPercent,
+        deadline: p.deadline?.toISOString().slice(0, 10) ?? null,
+      })),
+      taughtCourses: taughtCourses.map((c) => ({
+        id: c.id,
+        title: c.title,
+        batch: c.batchLabel,
+        enrolledCount: c._count.enrollments,
       })),
     };
   }

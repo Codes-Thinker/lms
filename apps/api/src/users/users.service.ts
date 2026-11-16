@@ -107,48 +107,133 @@ export class UsersService {
             orderBy: { createdAt: "desc" },
             take: 1,
           },
+          enrollments: {
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  title: true,
+                  batchLabel: true,
+                  sections: { select: { topics: { select: { id: true } } } },
+                },
+              },
+            },
+          },
+          enrollmentRequests: {
+            where: { status: "PENDING" },
+            select: { id: true, courseId: true, status: true },
+          },
+          instructedCourses: {
+            select: { id: true, title: true, batchLabel: true },
+          },
+          projects: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              progressPercent: true,
+            },
+            take: 5,
+            orderBy: { updatedAt: "desc" },
+          },
         },
       }),
     ]);
+
+    const userIds = items.map((u) => u.id);
+    const completedByUser = new Map<string, Set<string>>();
+    if (userIds.length) {
+      const progressRows = await this.prisma.topicProgress.findMany({
+        where: { userId: { in: userIds }, completed: true },
+        select: { userId: true, topicId: true },
+      });
+      for (const row of progressRows) {
+        let set = completedByUser.get(row.userId);
+        if (!set) {
+          set = new Set();
+          completedByUser.set(row.userId, set);
+        }
+        set.add(row.topicId);
+      }
+    }
 
     return {
       total,
       page,
       pageSize,
-      items: items.map((u) => ({
-        id: u.id,
-        name: u.fullName,
-        fullName: u.fullName,
-        email: u.email,
-        role: u.accountType,
-        accountType: u.accountType,
-        status: u.status,
-        designation: u.designation,
-        phone: u.phone,
-        track: u.track,
-        profileImage: u.profileImage,
-        monthlyFee: u.monthlyFee,
-        feeStartDate: u.feeStartDate,
-        feeDueDay: u.feeDueDay,
-        department: u.department?.name ?? u.department,
-        departmentId: u.departmentId,
-        batch: u.batch?.code ?? u.batch,
-        batchId: u.batchId,
-        roles: u.roles.map((r) => r.role.code),
-        invitedAt: u.invitedAt,
-        activatedAt: u.activatedAt,
-        lastLoginAt: u.lastLoginAt,
-        latestInvitation: u.invitations[0]
-          ? {
-              id: u.invitations[0].id,
-              expiresAt: u.invitations[0].expiresAt,
-              usedAt: u.invitations[0].usedAt,
-              revokedAt: u.invitations[0].revokedAt,
-              sentAt: u.invitations[0].sentAt,
-            }
-          : null,
-        createdAt: u.createdAt,
-      })),
+      items: items.map((u) => {
+        const completedIds = completedByUser.get(u.id) ?? new Set<string>();
+        const courses = u.enrollments.map((enr) => {
+          const topics = enr.course.sections.flatMap((s) => s.topics);
+          const done = topics.filter((t) => completedIds.has(t.id)).length;
+          const progressPercent =
+            topics.length === 0 ? 0 : Math.round((done / topics.length) * 100);
+          return {
+            id: enr.course.id,
+            title: enr.course.title,
+            batch: enr.course.batchLabel,
+            enrolledAt: enr.enrolledAt.toISOString().slice(0, 10),
+            feeStatus: enr.feeStatus,
+            progressPercent,
+            enrollmentStatus: "ENROLLED" as const,
+          };
+        });
+        const progressPercent =
+          courses.length === 0
+            ? 0
+            : Math.round(
+                courses.reduce((s, c) => s + c.progressPercent, 0) /
+                  courses.length
+              );
+
+        return {
+          id: u.id,
+          name: u.fullName,
+          fullName: u.fullName,
+          email: u.email,
+          role: u.accountType,
+          accountType: u.accountType,
+          status: u.status,
+          designation: u.designation,
+          phone: u.phone,
+          track: u.track,
+          profileImage: u.profileImage,
+          monthlyFee: u.monthlyFee,
+          feeStartDate: u.feeStartDate,
+          feeDueDay: u.feeDueDay,
+          department: u.department?.name ?? null,
+          departmentId: u.departmentId,
+          batch: u.batch?.code ?? null,
+          batchName: u.batch?.name ?? null,
+          batchId: u.batchId,
+          internshipStart: u.internshipStart?.toISOString().slice(0, 10) ?? null,
+          internshipEnd: u.internshipEnd?.toISOString().slice(0, 10) ?? null,
+          roles: u.roles.map((r) => r.role.code),
+          courses,
+          assignedCourses: courses.map((c) => c.title),
+          progressPercent,
+          pendingEnrollmentRequests: u.enrollmentRequests.length,
+          taughtCourses: u.instructedCourses.map((c) => ({
+            id: c.id,
+            title: c.title,
+            batch: c.batchLabel,
+          })),
+          projects: u.projects,
+          invitedAt: u.invitedAt,
+          activatedAt: u.activatedAt,
+          lastLoginAt: u.lastLoginAt,
+          latestInvitation: u.invitations[0]
+            ? {
+                id: u.invitations[0].id,
+                expiresAt: u.invitations[0].expiresAt,
+                usedAt: u.invitations[0].usedAt,
+                revokedAt: u.invitations[0].revokedAt,
+                sentAt: u.invitations[0].sentAt,
+              }
+            : null,
+          createdAt: u.createdAt,
+        };
+      }),
     };
   }
 
@@ -223,6 +308,17 @@ export class UsersService {
         feeCases: {
           include: { messages: { orderBy: { createdAt: "asc" } } },
           orderBy: { dueDate: "desc" },
+        },
+        projects: {
+          orderBy: { updatedAt: "desc" },
+        },
+        instructedCourses: {
+          select: {
+            id: true,
+            title: true,
+            batchLabel: true,
+            _count: { select: { enrollments: true } },
+          },
         },
         staffSchedule: true,
       },
@@ -353,12 +449,31 @@ export class UsersService {
         batch: u.batch?.code ?? null,
         profileImage: u.profileImage,
         createdAt: u.createdAt.toISOString().slice(0, 10),
+        internshipStart: u.internshipStart?.toISOString().slice(0, 10) ?? null,
+        internshipEnd: u.internshipEnd?.toISOString().slice(0, 10) ?? null,
       },
+      internshipStart: u.internshipStart?.toISOString().slice(0, 10) ?? null,
+      internshipEnd: u.internshipEnd?.toISOString().slice(0, 10) ?? null,
       enrolledCourses,
       attendanceHistory: attendance,
       assignments: tasks,
       feeHistory: fees,
       outstandingAmount,
+      projects: u.projects.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        techStack: p.techStack,
+        status: p.status,
+        progressPercent: p.progressPercent,
+        deadline: p.deadline?.toISOString().slice(0, 10) ?? null,
+      })),
+      taughtCourses: u.instructedCourses.map((c) => ({
+        id: c.id,
+        title: c.title,
+        batch: c.batchLabel,
+        enrolledCount: c._count.enrollments,
+      })),
       todayAttendance: todayRecord
         ? {
             checkInAt: todayRecord.checkInAt?.toISOString() ?? null,
@@ -452,6 +567,16 @@ export class UsersService {
     if (dto.track !== undefined) data.track = dto.track?.trim() || null;
     if (dto.profileImage !== undefined) data.profileImage = dto.profileImage;
     if (dto.monthlyFee !== undefined) data.monthlyFee = dto.monthlyFee;
+    if (dto.internshipStart !== undefined) {
+      data.internshipStart = dto.internshipStart
+        ? new Date(dto.internshipStart)
+        : null;
+    }
+    if (dto.internshipEnd !== undefined) {
+      data.internshipEnd = dto.internshipEnd
+        ? new Date(dto.internshipEnd)
+        : null;
+    }
     if (dto.feeStartDate !== undefined) {
       data.feeStartDate = dto.feeStartDate ? new Date(dto.feeStartDate) : null;
     }
@@ -515,6 +640,21 @@ export class UsersService {
         if (!course) continue;
         await this.prisma.enrollment.create({
           data: { userId: id, courseId },
+        });
+        await this.prisma.enrollmentRequest.upsert({
+          where: { userId_courseId: { userId: id, courseId } },
+          update: {
+            status: "APPROVED",
+            reviewedAt: new Date(),
+            adminNote: "Assigned by admin",
+          },
+          create: {
+            userId: id,
+            courseId,
+            status: "APPROVED",
+            reviewedAt: new Date(),
+            adminNote: "Assigned by admin",
+          },
         });
       }
     }

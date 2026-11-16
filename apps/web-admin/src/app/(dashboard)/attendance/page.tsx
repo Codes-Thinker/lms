@@ -79,7 +79,7 @@ export default function AttendancePage() {
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load(), 5000);
+    const id = window.setInterval(() => void load(), 15000);
     return () => window.clearInterval(id);
   }, [load]);
 

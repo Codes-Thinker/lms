@@ -62,7 +62,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     void loadList();
-    const id = window.setInterval(() => void loadList(), 5000);
+    const id = window.setInterval(() => void loadList(), 8000);
     return () => window.clearInterval(id);
   }, [loadList]);
 

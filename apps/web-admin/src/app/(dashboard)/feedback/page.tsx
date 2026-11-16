@@ -49,7 +49,7 @@ export default function FeedbackPage() {
     load().catch((e) => show(e instanceof Error ? e.message : "Failed"));
     const id = window.setInterval(() => {
       load().catch(() => {});
-    }, 5000);
+    }, 15000);
     return () => window.clearInterval(id);
   }, [load, show]);
 
