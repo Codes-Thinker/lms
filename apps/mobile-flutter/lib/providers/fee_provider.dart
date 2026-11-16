@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../models/fee_payment.dart';
 import '../services/api_client.dart';
@@ -33,28 +35,33 @@ class FeeProvider extends ChangeNotifier {
     return s ?? 'DUE';
   }
 
+  List<FeeChatMessage> _mapChat(List? raw) {
+    return (raw ?? const []).map((m) {
+      final msg = Map<String, dynamic>.from(m as Map);
+      return FeeChatMessage(
+        id: msg['id'] as String? ?? '',
+        senderName: msg['senderName'] as String? ?? '',
+        senderRole: msg['senderRole'] as String? ?? 'ADMIN',
+        text: msg['text'] as String? ?? '',
+        sentAt: msg['sentAt'] as String? ?? '',
+        hasScreenshot: msg['hasScreenshot'] as bool? ?? false,
+        screenshotData: msg['screenshotData'] as String?,
+      );
+    }).toList();
+  }
+
   List<FeePaymentCase> _mapCases(List<dynamic> data) {
     return data.map((e) {
       final j = Map<String, dynamic>.from(e as Map);
-      final chat = ((j['chat'] as List?) ?? const []).map((m) {
-        final msg = Map<String, dynamic>.from(m as Map);
-        return FeeChatMessage(
-          id: msg['id'] as String? ?? '',
-          senderName: msg['senderName'] as String? ?? '',
-          senderRole: msg['senderRole'] as String? ?? 'ADMIN',
-          text: msg['text'] as String? ?? '',
-          sentAt: msg['sentAt'] as String? ?? '',
-          hasScreenshot: msg['hasScreenshot'] as bool? ?? false,
-        );
-      }).toList();
       return FeePaymentCase(
         id: j['id'] as String,
-        courseId: '',
+        courseId: j['courseId'] as String? ?? '',
         courseTitle: j['courseTitle'] as String? ?? '',
         month: j['month'] as String? ?? '',
         amount: (j['amount'] as num?)?.toInt() ?? 0,
         status: _mapStatus(j['status'] as String?),
-        chat: chat,
+        chat: _mapChat(j['chat'] as List?),
+        paymentScreenshotData: j['paymentScreenshotData'] as String?,
       );
     }).toList();
   }
@@ -66,6 +73,19 @@ class FeeProvider extends ChangeNotifier {
     easyPaisa = pay['easyPaisa'] as String? ?? easyPaisa;
     bankTitle = pay['bankTitle'] as String? ?? bankTitle;
     bankAccount = pay['bankAccount'] as String? ?? bankAccount;
+  }
+
+  void _applyCaseResponse(String caseId, Map<String, dynamic> data) {
+    final chat = _mapChat(data['chat'] as List?);
+    _cases = _cases.map((c) {
+      if (c.id != caseId) return c;
+      return c.copyWith(
+        status: _mapStatus(data['status'] as String?),
+        chat: chat,
+        paymentScreenshotData:
+            data['paymentScreenshotData'] as String? ?? c.paymentScreenshotData,
+      );
+    }).toList();
   }
 
   Future<void> load() async {
@@ -109,104 +129,56 @@ class FeeProvider extends ChangeNotifier {
     required String caseId,
     required String senderName,
     required String text,
-    bool withScreenshot = false,
   }) async {
-    if (text.trim().isEmpty && !withScreenshot) return;
+    if (text.trim().isEmpty) return;
     _loading = true;
     notifyListeners();
     try {
       final data = await ApiClient.instance.post(
         '/fees/$caseId/messages',
-        body: {
-          'text': text.trim().isEmpty
-              ? 'Payment screenshot attached'
-              : text.trim(),
-          'hasScreenshot': withScreenshot,
-        },
+        body: {'text': text.trim(), 'hasScreenshot': false},
       ) as Map<String, dynamic>;
-      final chat = ((data['chat'] as List?) ?? const []).map((m) {
-        final msg = m as Map<String, dynamic>;
-        return FeeChatMessage(
-          id: msg['id'] as String? ?? '',
-          senderName: msg['senderName'] as String? ?? '',
-          senderRole: msg['senderRole'] as String? ?? 'STUDENT',
-          text: msg['text'] as String? ?? '',
-          sentAt: msg['sentAt'] as String? ?? '',
-          hasScreenshot: msg['hasScreenshot'] as bool? ?? false,
-        );
-      }).toList();
-      _cases = _cases.map((c) {
-        if (c.id != caseId) return c;
-        return c.copyWith(
-          status: _mapStatus(data['status'] as String?),
-          chat: chat,
-        );
-      }).toList();
-    } catch (_) {
-      final now = DateTime.now();
-      final stamp =
-          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      _cases = _cases.map((c) {
-        if (c.id != caseId) return c;
-        final msg = FeeChatMessage(
-          id: 'fm-${now.millisecondsSinceEpoch}',
-          senderName: senderName,
-          senderRole: 'STUDENT',
-          text: text.trim().isEmpty
-              ? 'Payment screenshot attached'
-              : text.trim(),
-          sentAt: stamp,
-          hasScreenshot: withScreenshot,
-          screenshotLabel: withScreenshot ? 'payment_screenshot.jpg' : null,
-        );
-        return c.copyWith(
-          status: withScreenshot ? 'SENT' : c.status,
-          chat: [...c.chat, msg],
-        );
-      }).toList();
+      _applyCaseResponse(caseId, data);
+    } catch (e) {
+      debugPrint('Fee message failed: $e');
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
-    _loading = false;
-    notifyListeners();
   }
 
-  Future<void> approve(String caseId) async {
+  /// Upload a real payment screenshot (JPEG bytes) for admin review.
+  Future<void> submitPaymentScreenshot({
+    required String caseId,
+    required Uint8List imageBytes,
+    String fileName = 'payment_screenshot.jpg',
+  }) async {
+    final fee = byId(caseId);
+    if (fee == null) throw StateError('Fee case not found');
+
     _loading = true;
     notifyListeners();
     try {
-      final data = await ApiClient.instance.patch(
-        '/fees/$caseId/status',
-        body: {'status': 'PAID'},
+      final dataUrl =
+          'data:image/jpeg;base64,${base64Encode(imageBytes)}';
+      final data = await ApiClient.instance.post(
+        '/fees/$caseId/submit-payment',
+        body: {
+          'amount': fee.amount,
+          'screenshotData': dataUrl,
+          'screenshotName': fileName,
+        },
       ) as Map<String, dynamic>;
-      _cases = _cases.map((c) {
-        if (c.id != caseId) return c;
-        return c.copyWith(status: 'APPROVED');
-      }).toList();
-      // keep chat from response if present
-      if (data['chat'] is List) {
-        final chat = (data['chat'] as List).map((m) {
-          final msg = m as Map<String, dynamic>;
-          return FeeChatMessage(
-            id: msg['id'] as String? ?? '',
-            senderName: msg['senderName'] as String? ?? '',
-            senderRole: msg['senderRole'] as String? ?? 'ADMIN',
-            text: msg['text'] as String? ?? '',
-            sentAt: msg['sentAt'] as String? ?? '',
-            hasScreenshot: msg['hasScreenshot'] as bool? ?? false,
-          );
-        }).toList();
-        _cases = _cases.map((c) {
-          if (c.id != caseId) return c;
-          return c.copyWith(status: 'APPROVED', chat: chat);
-        }).toList();
-      }
-    } catch (_) {
-      _cases = _cases.map((c) {
-        if (c.id != caseId) return c;
-        return c.copyWith(status: 'APPROVED');
-      }).toList();
+      _applyCaseResponse(caseId, data);
+      // Refresh list so admin-side status stays in sync next poll.
+      await load();
+    } catch (e) {
+      debugPrint('Fee screenshot upload failed: $e');
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
-    _loading = false;
-    notifyListeners();
   }
-
 }

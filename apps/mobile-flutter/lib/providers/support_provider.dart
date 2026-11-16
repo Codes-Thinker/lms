@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 
@@ -25,6 +27,8 @@ class ChatMessage {
   final String senderName;
   final String text;
   final String sentAt;
+  final String? imageData;
+  final String? imageName;
 
   ChatMessage({
     required this.id,
@@ -32,6 +36,8 @@ class ChatMessage {
     required this.senderName,
     required this.text,
     required this.sentAt,
+    this.imageData,
+    this.imageName,
   });
 }
 
@@ -64,6 +70,25 @@ class SupportProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  ChatMessage _mapMsg(Map<String, dynamic> map) {
+    final raw = map['sentAt']?.toString() ?? '';
+    String stamp = raw;
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      stamp =
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {}
+    return ChatMessage(
+      id: map['id']?.toString() ?? '',
+      senderRole: map['senderRole']?.toString() ?? 'USER',
+      senderName: map['senderName']?.toString() ?? '',
+      text: map['text']?.toString() ?? '',
+      sentAt: stamp,
+      imageData: map['imageData']?.toString(),
+      imageName: map['imageName']?.toString(),
+    );
+  }
+
   Future<void> submitSurvey() async {
     _loading = true;
     notifyListeners();
@@ -83,6 +108,34 @@ class SupportProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadMyTickets() async {
+    _loading = true;
+    notifyListeners();
+    try {
+      final data = await ApiClient.instance.get('/support/tickets/me');
+      if (data is List) {
+        _tickets
+          ..clear()
+          ..addAll(data.map((e) {
+            final m = Map<String, dynamic>.from(e as Map);
+            return SupportTicket(
+              id: m['id']?.toString() ?? '',
+              kind: m['kind']?.toString() ?? 'REPORT',
+              title: m['title']?.toString() ?? '',
+              body: m['body']?.toString() ?? '',
+              status: m['status']?.toString() ?? 'OPEN',
+              createdAt: DateTime.tryParse(m['createdAt']?.toString() ?? '') ??
+                  DateTime.now(),
+            );
+          }));
+      }
+    } catch (e) {
+      debugPrint('Load tickets: $e');
+    }
+    _loading = false;
+    notifyListeners();
+  }
+
   Future<void> submitTicket({
     required String kind,
     required String title,
@@ -97,17 +150,8 @@ class SupportProvider extends ChangeNotifier {
         'title': title.trim(),
         'body': body.trim(),
       });
-      _tickets.insert(
-        0,
-        SupportTicket(
-          id: 't-${DateTime.now().millisecondsSinceEpoch}',
-          kind: kind,
-          title: title.trim(),
-          body: body.trim(),
-          status: 'OPEN',
-          createdAt: DateTime.now(),
-        ),
-      );
+      await loadMyTickets();
+      return;
     } catch (e) {
       debugPrint('Ticket: $e');
     }
@@ -126,23 +170,7 @@ class SupportProvider extends ChangeNotifier {
       final msgs = (data['messages'] as List?) ?? [];
       _chat
         ..clear()
-        ..addAll(msgs.map((m) {
-          final map = m as Map<String, dynamic>;
-          final raw = map['sentAt']?.toString() ?? '';
-          String stamp = raw;
-          try {
-            final dt = DateTime.parse(raw).toLocal();
-            stamp =
-                '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-          } catch (_) {}
-          return ChatMessage(
-            id: map['id']?.toString() ?? '',
-            senderRole: map['senderRole']?.toString() ?? 'USER',
-            senderName: map['senderName']?.toString() ?? '',
-            text: map['text']?.toString() ?? '',
-            sentAt: stamp,
-          );
-        }));
+        ..addAll(msgs.map((m) => _mapMsg(Map<String, dynamic>.from(m as Map))));
     } catch (e) {
       debugPrint('Load chat: $e');
     }
@@ -153,8 +181,13 @@ class SupportProvider extends ChangeNotifier {
   Future<bool> sendChat({
     required String senderName,
     required String text,
+    String? imageData,
+    String? imageName,
   }) async {
-    if (text.trim().isEmpty) return false;
+    final trimmed = text.trim();
+    if (trimmed.isEmpty && (imageData == null || imageData.isEmpty)) {
+      return false;
+    }
     if (_threadId == null) {
       await loadAdminChat();
     }
@@ -164,8 +197,10 @@ class SupportProvider extends ChangeNotifier {
       id: 'local-${DateTime.now().millisecondsSinceEpoch}',
       senderRole: 'USER',
       senderName: senderName,
-      text: text.trim(),
+      text: trimmed.isEmpty ? '📷 Photo' : trimmed,
       sentAt: _nowStamp(),
+      imageData: imageData,
+      imageName: imageName,
     );
     _chat.add(optimistic);
     notifyListeners();
@@ -173,28 +208,16 @@ class SupportProvider extends ChangeNotifier {
     try {
       final data = await ApiClient.instance.post(
         '/support/chats/$_threadId/messages',
-        body: {'text': text.trim()},
+        body: {
+          if (trimmed.isNotEmpty) 'text': trimmed,
+          if (imageData != null) 'imageData': imageData,
+          if (imageName != null) 'imageName': imageName,
+        },
       ) as Map<String, dynamic>;
       final msgs = (data['messages'] as List?) ?? [];
       _chat
         ..clear()
-        ..addAll(msgs.map((m) {
-          final map = m as Map<String, dynamic>;
-          final raw = map['sentAt']?.toString() ?? '';
-          String stamp = raw;
-          try {
-            final dt = DateTime.parse(raw).toLocal();
-            stamp =
-                '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-          } catch (_) {}
-          return ChatMessage(
-            id: map['id']?.toString() ?? '',
-            senderRole: map['senderRole']?.toString() ?? 'USER',
-            senderName: map['senderName']?.toString() ?? '',
-            text: map['text']?.toString() ?? '',
-            sentAt: stamp,
-          );
-        }));
+        ..addAll(msgs.map((m) => _mapMsg(Map<String, dynamic>.from(m as Map))));
       notifyListeners();
       return true;
     } catch (e) {
@@ -203,6 +226,21 @@ class SupportProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<bool> sendChatImage({
+    required String senderName,
+    required List<int> bytes,
+    String fileName = 'chat.jpg',
+    String caption = '',
+  }) {
+    final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    return sendChat(
+      senderName: senderName,
+      text: caption,
+      imageData: dataUrl,
+      imageName: fileName,
+    );
   }
 
   String _nowStamp() {

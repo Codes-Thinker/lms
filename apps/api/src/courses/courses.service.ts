@@ -778,6 +778,60 @@ export class CoursesService {
     return { ok: true };
   }
 
+  /**
+   * Teacher roster: courses where this user is instructor (admins see all).
+   * Includes enrolled students for assignment targeting.
+   */
+  async listTeachingRoster(userId: string, accountType: string) {
+    const isAdmin = accountType === "SUPER_ADMIN";
+    const courses = await this.prisma.course.findMany({
+      where: isAdmin ? undefined : { instructorId: userId },
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        batchLabel: true,
+        instructorId: true,
+        enrollments: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                phone: true,
+                accountType: true,
+                status: true,
+                batch: { select: { code: true, name: true } },
+              },
+            },
+          },
+          orderBy: { enrolledAt: "desc" },
+        },
+        _count: { select: { enrollments: true } },
+      },
+      orderBy: { title: "asc" },
+    });
+
+    return courses.map((c) => ({
+      id: c.id,
+      title: c.title,
+      category: c.category,
+      batch: c.batchLabel,
+      instructorId: c.instructorId,
+      enrolledCount: c._count.enrollments,
+      students: c.enrollments.map((e) => ({
+        id: e.user.id,
+        name: e.user.fullName,
+        email: e.user.email,
+        phone: e.user.phone,
+        accountType: e.user.accountType,
+        status: e.user.status,
+        batch: e.user.batch?.code ?? c.batchLabel,
+      })),
+    }));
+  }
+
   /** Admin: enrolled students for a course with fee + attendance summary. */
   async listEnrolledStudents(courseId: string) {
     await this.prisma.course.findUniqueOrThrow({ where: { id: courseId } });

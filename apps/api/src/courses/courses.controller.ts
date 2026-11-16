@@ -30,6 +30,13 @@ export class CoursesController {
     return this.courses.list(user.sub, publishedOnly);
   }
 
+  /** Teacher/staff: courses they instruct + enrolled students. */
+  @Get("teaching/mine")
+  @Roles("SUPER_ADMIN", "STAFF")
+  myTeaching(@CurrentUser() user: AuthUser) {
+    return this.courses.listTeachingRoster(user.sub, user.accountType);
+  }
+
   /** Dynamic course categories from the database. */
   @Get("categories")
   categories() {

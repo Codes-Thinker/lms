@@ -11,6 +11,7 @@ import 'providers/notification_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/support_provider.dart';
 import 'providers/task_provider.dart';
+import 'providers/teaching_provider.dart';
 import 'providers/ui_provider.dart';
 import 'providers/version_provider.dart';
 import 'services/push_notification_service.dart';
@@ -111,6 +112,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => FeeProvider()),
         ChangeNotifierProvider(create: (_) => SupportProvider()),
+        ChangeNotifierProvider(create: (_) => TeachingProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
         ChangeNotifierProvider(create: (_) => VersionProvider()),
       ],

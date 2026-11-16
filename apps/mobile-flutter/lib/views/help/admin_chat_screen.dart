@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -17,7 +19,15 @@ class AdminChatScreen extends StatefulWidget {
 class _AdminChatScreenState extends State<AdminChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  final _picker = ImagePicker();
   Timer? _poll;
+  bool _showEmoji = false;
+  bool _sending = false;
+
+  static const _emojis = [
+    '😀', '😁', '😂', '😊', '😍', '🤝', '👍', '👏',
+    '🔥', '🎉', '✅', '📌', '📷', '🙏', '💯', '😎',
+  ];
 
   @override
   void initState() {
@@ -26,7 +36,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
       await context.read<SupportProvider>().loadAdminChat();
       _scrollToEnd();
     });
-    _poll = Timer.periodic(const Duration(seconds: 8), (_) async {
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!mounted) return;
       await context.read<SupportProvider>().loadAdminChat();
     });
@@ -51,6 +61,63 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     });
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final auth = context.read<AuthProvider>();
+    final support = context.read<SupportProvider>();
+    final ui = context.read<UiProvider>();
+    final file = await _picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 72,
+    );
+    if (file == null || !mounted) return;
+    setState(() => _sending = true);
+    try {
+      final bytes = await file.readAsBytes();
+      final ok = await support.sendChatImage(
+        senderName: auth.user?.name ?? 'User',
+        bytes: bytes,
+        fileName: file.name.isEmpty ? 'chat.jpg' : file.name,
+        caption: _controller.text,
+      );
+      if (!mounted) return;
+      if (ok) {
+        _controller.clear();
+        _scrollToEnd();
+      } else {
+        ui.showSnack('Could not send photo', tone: AppSnackTone.error);
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _chooseSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Camera'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    await _pickImage(source);
+  }
+
   @override
   Widget build(BuildContext context) {
     final support = context.watch<SupportProvider>();
@@ -67,7 +134,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             Text(
-              'Support chat · replies in real time',
+              'Support chat · live sync',
               style: TextStyle(
                 fontSize: 12,
                 color: AppColors.muted,
@@ -102,7 +169,12 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
                             color: mine ? AppColors.blue : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: Radius.circular(mine ? 16 : 4),
+                              bottomRight: Radius.circular(mine ? 4 : 16),
+                            ),
                             border:
                                 mine ? null : Border.all(color: AppColors.line),
                           ),
@@ -117,14 +189,41 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                   fontSize: 11,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                msg.text,
-                                style: TextStyle(
-                                  color: mine ? Colors.white : AppColors.ink,
-                                  height: 1.35,
+                              if (msg.imageData != null &&
+                                  msg.imageData!.startsWith('data:image')) ...[
+                                const SizedBox(height: 6),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.memory(
+                                    base64Decode(
+                                      msg.imageData!.contains(',')
+                                          ? msg.imageData!.split(',').last
+                                          : msg.imageData!,
+                                    ),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Text(
+                                      msg.imageName ?? 'Photo',
+                                      style: TextStyle(
+                                        color: mine
+                                            ? Colors.white
+                                            : AppColors.ink,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
+                              if (msg.text.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  msg.text,
+                                  style: TextStyle(
+                                    color: mine ? Colors.white : AppColors.ink,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -132,11 +231,49 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                     },
                   ),
           ),
+          if (_showEmoji)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              color: Colors.white,
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: _emojis
+                    .map(
+                      (e) => InkWell(
+                        onTap: () {
+                          _controller.text = '${_controller.text}$e';
+                          _controller.selection = TextSelection.fromPosition(
+                            TextPosition(offset: _controller.text.length),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Text(e, style: const TextStyle(fontSize: 22)),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: _sending
+                        ? null
+                        : () => setState(() => _showEmoji = !_showEmoji),
+                    icon: const Icon(Icons.emoji_emotions_outlined),
+                    color: AppColors.blue,
+                  ),
+                  IconButton(
+                    onPressed: _sending ? null : _chooseSource,
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    color: AppColors.blue,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -153,13 +290,22 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   IconButton.filled(
-                    onPressed: () => _send(auth, support),
+                    onPressed: _sending ? null : () => _send(auth, support),
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.blue,
                     ),
-                    icon: const Icon(Icons.send_rounded, color: Colors.white),
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.send_rounded, color: Colors.white),
                   ),
                 ],
               ),
@@ -174,17 +320,21 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     final text = _controller.text;
     if (text.trim().isEmpty) return;
     _controller.clear();
+    setState(() {
+      _showEmoji = false;
+      _sending = true;
+    });
     final ok = await support.sendChat(
       senderName: auth.user?.name ?? 'User',
       text: text,
     );
     if (!mounted) return;
+    setState(() => _sending = false);
     _scrollToEnd();
     final ui = context.read<UiProvider>();
-    if (ok) {
-      ui.showSnack('Message sent', tone: AppSnackTone.success);
-    } else {
-      ui.showSnack('Could not send message. Try again.', tone: AppSnackTone.error);
+    if (!ok) {
+      ui.showSnack('Could not send message. Try again.',
+          tone: AppSnackTone.error);
     }
   }
 }

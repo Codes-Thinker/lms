@@ -21,22 +21,31 @@ import '../notifications/notifications_screen.dart';
 import '../report/report_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
+import '../../providers/teaching_provider.dart';
+import 'teacher_class_screen.dart';
 
-/// Teacher / Staff dashboard — full A→Z app data (batches, class, tasks, fees, attendance).
-class TeacherHomeScreen extends StatelessWidget {
+/// Teacher / Staff dashboard — own courses, students, tasks, attendance.
+class TeacherHomeScreen extends StatefulWidget {
   const TeacherHomeScreen({super.key});
 
-  static const _trainees = [
-    ('Ali Khan', 'Student', 'CT-FLUTTER-NOV-26', 'Flutter Development'),
-    ('Fatima Noor', 'Student', 'CT-MERN-OCT-26', 'MERN Stack'),
-    ('Bilal Ahmed', 'Intern', 'CT-FLUTTER-NOV-26', 'Flutter Intern'),
-    ('Usman Tariq', 'Intern', 'CT-FLUTTER-NOV-26', 'Mobile Interns'),
-  ];
+  @override
+  State<TeacherHomeScreen> createState() => _TeacherHomeScreenState();
+}
+
+class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TeachingProvider>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
+    final teaching = context.watch<TeachingProvider>();
     final tasks = context.watch<TaskProvider>();
     final fees = context.watch<FeeProvider>();
     final attendance = context.watch<AttendanceProvider>();
@@ -44,7 +53,10 @@ class TeacherHomeScreen extends StatelessWidget {
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
 
-    final batches = courses.courses;
+    final taughtIds = teaching.courses.map((c) => c.id).toSet();
+    final batches = taughtIds.isEmpty
+        ? courses.courses
+        : courses.courses.where((c) => taughtIds.contains(c.id)).toList();
     // Live catalog only — no mock class schedule.
     final sessions = batches
         .take(5)
@@ -61,10 +73,6 @@ class TeacherHomeScreen extends StatelessWidget {
     final staffId = auth.user?.id ?? '';
     final myTasks = tasks.tasksForUser(staffId);
     final openTasks = myTasks.where((t) => t.status != 'DONE').toList();
-    final avgAttend = batches.isEmpty
-        ? 0.0
-        : batches.map((c) => c.attendancePercent).reduce((a, b) => a + b) /
-            batches.length;
     final feePending = fees.pendingAmount;
     final checkedIn = attendance.today.where((m) => m.isCheckedIn).length;
 
@@ -141,16 +149,26 @@ class TeacherHomeScreen extends StatelessWidget {
                     const SizedBox(height: 18),
                     Row(
                       children: [
-                        Expanded(child: _statBox('Batches', '${batches.length}')),
-                        const SizedBox(width: 8),
                         Expanded(
                           child: _statBox(
-                            'Attend',
-                            '${avgAttend.toStringAsFixed(0)}%',
+                            'Classes',
+                            '${teaching.courses.isNotEmpty ? teaching.courses.length : batches.length}',
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Expanded(child: _statBox('Tasks', '${openTasks.length}')),
+                        Expanded(
+                          child: _statBox(
+                            'Students',
+                            '${teaching.totalStudents}',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _statBox(
+                            'Assigned',
+                            '${teaching.assigned.length}',
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -188,8 +206,13 @@ class TeacherHomeScreen extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         _chip(
+                          'My students',
+                          () => _push(context, const TeacherClassScreen()),
+                        ),
+                        _chip(
                           'Attendance',
                           () => _push(context, const AttendanceScreen()),
+                          outline: true,
                         ),
                         _chip(
                           'My tasks',
@@ -435,32 +458,67 @@ class TeacherHomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Students / trainees
+            // Students from courses this teacher instructs
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Section('STUDENTS / TRAINEES'),
-                    const SizedBox(height: 2),
-                    ...List.generate(_trainees.length, (i) {
-                      final t = _trainees[i];
-                      return Column(
-                        children: [
-                          _row(
-                            icon: CupertinoIcons.person,
-                            title: t.$1,
-                            subtitle: '${t.$2} · ${t.$3} · ${t.$4}',
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              ui.showSnack('${t.$1} · ${t.$2} · ${t.$3}');
-                            },
+                    Row(
+                      children: [
+                        const Expanded(child: _Section('MY STUDENTS')),
+                        GestureDetector(
+                          onTap: () =>
+                              _push(context, const TeacherClassScreen()),
+                          child: const Text(
+                            'Manage',
+                            style: TextStyle(
+                              color: AppColors.blue,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                           ),
-                          if (i < _trainees.length - 1) const _Line(),
-                        ],
-                      );
-                    }),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    if (teaching.courses.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No students yet — admin must set you as course instructor.',
+                          style: TextStyle(color: AppColors.muted, height: 1.35),
+                        ),
+                      )
+                    else
+                      ...() {
+                        final flat = teaching.courses
+                            .expand(
+                              (c) => c.students.map(
+                                (s) => (s, c.title, c.batch ?? c.category),
+                              ),
+                            )
+                            .take(8)
+                            .toList();
+                        return List.generate(flat.length, (i) {
+                          final row = flat[i];
+                          final s = row.$1;
+                          return Column(
+                            children: [
+                              _row(
+                                icon: CupertinoIcons.person,
+                                title: s.name,
+                                subtitle:
+                                    '${s.accountType} · ${row.$3} · ${row.$2}',
+                                onTap: () =>
+                                    _push(context, const TeacherClassScreen()),
+                              ),
+                              if (i < flat.length - 1) const _Line(),
+                            ],
+                          );
+                        });
+                      }(),
                   ],
                 ),
               ),

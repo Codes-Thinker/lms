@@ -511,7 +511,10 @@ model ChatMessage {
   sender     User?      @relation(fields: [senderId], references: [id])
   senderName String
   senderRole String
-  text       String
+  text       String     @default("")
+  /// Optional image attachment (data URL or base64) for chat media.
+  imageData  String?
+  imageName  String?
   createdAt  DateTime   @default(now())
 }
 

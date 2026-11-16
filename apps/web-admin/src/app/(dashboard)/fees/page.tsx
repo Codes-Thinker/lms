@@ -20,6 +20,14 @@ type CourseTab = {
   category?: string;
 };
 
+type PendingSubmission = {
+  id: string;
+  amount: number;
+  screenshotName?: string | null;
+  createdAt: string;
+  screenshotData?: string | null;
+};
+
 type FeeRow = {
   id: string;
   studentId: string;
@@ -36,6 +44,19 @@ type FeeRow = {
   status: string;
   dueDate?: string | null;
   reminders?: unknown[];
+  hasScreenshot?: boolean;
+  hasPendingScreenshot?: boolean;
+  pendingSubmission?: PendingSubmission | null;
+};
+
+type FeeSubmission = {
+  id: string;
+  amount: number;
+  status: string;
+  screenshotData?: string | null;
+  screenshotName?: string | null;
+  createdAt: string;
+  rejectionReason?: string | null;
 };
 
 function shortId(id: string) {
@@ -46,9 +67,9 @@ function tabLabel(c: CourseTab) {
   return c.title?.trim() || c.category?.trim() || "Course";
 }
 
-function money(n: number | undefined) {
-  if (n === undefined || Number.isNaN(n)) return "—";
-  return `Rs ${n.toLocaleString()}`;
+function money(n: number | null | undefined) {
+  if (n == null || Number.isNaN(Number(n))) return "—";
+  return `Rs ${Number(n).toLocaleString()}`;
 }
 
 function FeesPageInner() {
@@ -66,6 +87,10 @@ function FeesPageInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
+  const [reviewFee, setReviewFee] = useState<FeeRow | null>(null);
+  const [reviewShot, setReviewShot] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const replaceCourse = useCallback(
     (courseId: string) => {
@@ -106,15 +131,34 @@ function FeesPageInner() {
     }
   }, [load, show]);
 
+  const pendingCount = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          Boolean(r.hasPendingScreenshot) ||
+          String(r.status || "").toUpperCase() === "SENT"
+      ).length,
+    [rows]
+  );
+
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     load()
-      .catch((e) => show(e instanceof Error ? e.message : "Load failed"))
-      .finally(() => setLoading(false));
+      .catch((e) => {
+        if (!cancelled) show(e instanceof Error ? e.message : "Load failed");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    // Stable poll — avoid re-subscribing when pendingCount flips.
     const id = window.setInterval(() => {
       load().catch(() => {});
-    }, 30000);
-    return () => window.clearInterval(id);
+    }, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, [load, show]);
 
   const tabs = useMemo(
@@ -125,8 +169,52 @@ function FeesPageInner() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((r) => r.studentName.toLowerCase().includes(q));
+    return rows.filter((r) =>
+      (r.studentName || "").toLowerCase().includes(q)
+    );
   }, [rows, search]);
+
+  async function openReview(fee: FeeRow) {
+    setReviewFee(fee);
+    setRejectReason("");
+    setReviewShot(null);
+    setReviewLoading(true);
+    try {
+      const subs = await api<FeeSubmission[]>(`/fees/${fee.id}/submissions`);
+      const pending =
+        subs.find((s) => s.status === "PENDING_VERIFICATION") ?? subs[0];
+      setReviewShot(pending?.screenshotData ?? null);
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Could not load screenshot");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
+  async function verifyPayment(approved: boolean) {
+    if (!reviewFee) return;
+    setActingId(reviewFee.id);
+    try {
+      await api(`/fees/${reviewFee.id}/verify`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          approved,
+          rejectionReason: approved
+            ? undefined
+            : rejectReason.trim() || "Payment could not be verified",
+        }),
+      });
+      show(approved ? "Payment approved" : "Payment rejected");
+      setReviewFee(null);
+      setReviewShot(null);
+      await load();
+      await refreshBadges();
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Verify failed");
+    } finally {
+      setActingId(null);
+    }
+  }
 
   async function patchStatus(id: string, status: string) {
     setActingId(id);
@@ -164,17 +252,24 @@ function FeesPageInner() {
         <div>
           <h2 className="text-lg font-semibold">Student fees</h2>
           <p className="text-sm text-slate-500">
-            Balances, reminders, and payment status
+            Balances, payment screenshots, and approvals
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={loading}
-          onClick={() => void refresh()}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {pendingCount > 0 ? (
+            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+              {pendingCount} awaiting review
+            </Badge>
+          ) : null}
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={loading}
+            onClick={() => void refresh()}
+          >
+            {loading ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {error ? (
@@ -227,6 +322,7 @@ function FeesPageInner() {
                 <th className="px-5 py-3 font-medium">Paid</th>
                 <th className="px-5 py-3 font-medium">Remaining</th>
                 <th className="px-5 py-3 font-medium">Next payment</th>
+                <th className="px-5 py-3 font-medium">Proof</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium"></th>
               </tr>
@@ -234,14 +330,14 @@ function FeesPageInner() {
             <tbody>
               {loading && filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={13} className="px-5 py-10 text-center text-slate-500">
                     Loading fees…
                   </td>
                 </tr>
               ) : null}
               {!loading && filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={13} className="px-5 py-10 text-center text-slate-500">
                     No fee records for this view
                   </td>
                 </tr>
@@ -250,6 +346,10 @@ function FeesPageInner() {
                 const busy = actingId === r.id;
                 const reminderCount = r.reminders?.length ?? 0;
                 const canAct = r.status !== "PAID" && r.status !== "WAIVED";
+                const needsReview =
+                  r.hasPendingScreenshot ||
+                  r.status === "SENT" ||
+                  Boolean(r.pendingSubmission);
                 return (
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className="px-5 py-3.5">
@@ -288,10 +388,30 @@ function FeesPageInner() {
                       ) : null}
                     </td>
                     <td className="px-5 py-3.5">
+                      {needsReview ? (
+                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                          Screenshot
+                        </Badge>
+                      ) : r.hasScreenshot ? (
+                        <span className="text-xs text-slate-500">Attached</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
                       <FeeStatusBadge status={r.status} />
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1.5">
+                        {needsReview ? (
+                          <Button
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => void openReview(r)}
+                          >
+                            Review proof
+                          </Button>
+                        ) : null}
                         {canAct ? (
                           <>
                             <Button
@@ -302,21 +422,25 @@ function FeesPageInner() {
                             >
                               Remind
                             </Button>
-                            <Button
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => void patchStatus(r.id, "PAID")}
-                            >
-                              Mark paid
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={busy}
-                              onClick={() => void patchStatus(r.id, "WAIVED")}
-                            >
-                              Mark waived
-                            </Button>
+                            {!needsReview ? (
+                              <>
+                                <Button
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => void patchStatus(r.id, "PAID")}
+                                >
+                                  Mark paid
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={busy}
+                                  onClick={() => void patchStatus(r.id, "WAIVED")}
+                                >
+                                  Mark waived
+                                </Button>
+                              </>
+                            ) : null}
                           </>
                         ) : (
                           <Link
@@ -335,6 +459,95 @@ function FeesPageInner() {
           </table>
         </div>
       </div>
+
+      {reviewFee ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (actingId) return;
+            setReviewFee(null);
+            setReviewShot(null);
+          }}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Review payment proof
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {reviewFee.studentName} · {reviewFee.courseTitle}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-2 py-1 text-sm text-slate-500 hover:bg-slate-100"
+                onClick={() => {
+                  setReviewFee(null);
+                  setReviewShot(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {reviewLoading ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Loading screenshot…
+              </p>
+            ) : reviewShot ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={reviewShot}
+                alt="Payment screenshot"
+                className="mb-4 max-h-80 w-full rounded-xl border border-slate-200 object-contain bg-slate-50"
+              />
+            ) : (
+              <div className="mb-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
+                No screenshot attached for this submission
+              </div>
+            )}
+
+            <p className="mb-3 text-sm text-slate-600">
+              Amount:{" "}
+              <span className="font-semibold text-slate-900">
+                {money(
+                  reviewFee.pendingSubmission?.amount ??
+                    reviewFee.monthlyFee
+                )}
+              </span>
+            </p>
+
+            <Input
+              placeholder="Rejection reason (optional)"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="mb-4"
+            />
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                disabled={actingId === reviewFee.id}
+                onClick={() => void verifyPayment(true)}
+              >
+                Approve & mark paid
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={actingId === reviewFee.id}
+                onClick={() => void verifyPayment(false)}
+              >
+                Reject
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

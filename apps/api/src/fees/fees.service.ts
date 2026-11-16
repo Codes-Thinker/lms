@@ -47,6 +47,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     dueDate: Date;
     monthlyFee?: number | null;
     dueDay?: number;
+    paymentScreenshotData?: string | null;
     student: {
       fullName: string;
       batch?: { code: string; name: string } | null;
@@ -97,6 +98,8 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       status: f.status,
       dueDate: f.dueDate.toISOString().slice(0, 10),
       dueDay: f.dueDay ?? 5,
+      hasScreenshot: Boolean(f.paymentScreenshotData),
+      paymentScreenshotData: f.paymentScreenshotData ?? null,
       reminders: (f.reminderLogs ?? []).map((r) => ({
         id: r.id,
         kind: r.kind,
@@ -117,7 +120,8 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     const where: Record<string, unknown> = {};
     if (studentId) where.studentId = studentId;
     if (courseId) where.courseId = courseId;
-    // List stays light — no chat messages (those load on get/:id).
+    // Student "my fees" needs chat; admin list stays light (no full chat dump).
+    const includeChat = Boolean(studentId);
     const rows = await this.prisma.feeCase.findMany({
       where,
       include: {
@@ -139,16 +143,57 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
             durationMonths: true,
           },
         },
+        messages: includeChat
+          ? { orderBy: { createdAt: "asc" } }
+          : false,
         reminderLogs: {
           select: { id: true, kind: true, sentAt: true },
           orderBy: { sentAt: "desc" },
           take: 5,
         },
-        submissions: { select: { amount: true, status: true } },
+        submissions: {
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            // Keep list light — full screenshotData is fetched on review.
+            screenshotName: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        },
       },
       orderBy: { dueDate: "desc" },
     });
-    return rows.map((r) => this.map({ ...r, messages: [] }));
+    return rows.map((r) => {
+      const shotOnCase = (r as { paymentScreenshotData?: string | null })
+        .paymentScreenshotData;
+      const mapped = this.map({
+        ...r,
+        messages: includeChat && Array.isArray(r.messages) ? r.messages : [],
+        paymentScreenshotData: shotOnCase,
+      });
+      const pendingSub = (r.submissions ?? []).find(
+        (s) => s.status === "PENDING_VERIFICATION"
+      );
+      return {
+        ...mapped,
+        hasPendingScreenshot: Boolean(
+          pendingSub || (shotOnCase && r.status === FeeStatus.SENT)
+        ),
+        pendingSubmission: pendingSub
+          ? {
+              id: pendingSub.id,
+              amount: pendingSub.amount,
+              screenshotName: pendingSub.screenshotName,
+              createdAt: pendingSub.createdAt.toISOString(),
+            }
+          : null,
+        // Student "my fees" needs the image preview; admin list stays light.
+        paymentScreenshotData: includeChat ? shotOnCase || null : null,
+      };
+    });
   }
 
   async get(id: string) {

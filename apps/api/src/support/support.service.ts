@@ -297,11 +297,16 @@ export class SupportService {
       senderId?: string;
       senderName: string;
       senderRole: string;
-      text: string;
+      text?: string;
+      imageData?: string;
+      imageName?: string;
     }
   ) {
-    const text = input.text.trim();
-    if (!text) throw new NotFoundException("Message required");
+    const text = (input.text ?? "").trim();
+    const imageData = input.imageData?.trim() || null;
+    if (!text && !imageData) {
+      throw new NotFoundException("Message or image required");
+    }
 
     const thread = await this.prisma.chatThread.findUnique({
       where: { id: threadId },
@@ -315,22 +320,27 @@ export class SupportService {
         senderId: input.senderId,
         senderName: input.senderName,
         senderRole: input.senderRole,
-        text,
+        text: text || (imageData ? "📷 Photo" : ""),
+        imageData,
+        imageName: input.imageName ?? null,
       },
     });
 
     const isAdmin = input.senderRole === "ADMIN";
+    const lastMessage =
+      text || (imageData ? "📷 Photo" : "");
     await this.prisma.chatThread.update({
       where: { id: threadId },
       data: {
-        lastMessage: text,
+        lastMessage,
         unreadByAdmin: isAdmin ? 0 : { increment: 1 },
         unreadByUser: isAdmin ? { increment: 1 } : 0,
       },
     });
 
     // Push + in-app notification
-    const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text;
+    const preview =
+      lastMessage.length > 80 ? `${lastMessage.slice(0, 77)}…` : lastMessage;
     if (isAdmin) {
       await this.notifications.notifyUser({
         userId: thread.userId,
@@ -371,6 +381,8 @@ export class SupportService {
       senderName: string;
       senderRole: string;
       text: string;
+      imageData?: string | null;
+      imageName?: string | null;
       createdAt: Date;
     }[];
   }) {
@@ -390,6 +402,8 @@ export class SupportService {
         senderName: m.senderName,
         senderRole: m.senderRole,
         text: m.text,
+        imageData: m.imageData ?? null,
+        imageName: m.imageName ?? null,
         sentAt: m.createdAt.toISOString(),
       })),
     };

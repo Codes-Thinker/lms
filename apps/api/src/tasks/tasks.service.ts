@@ -95,6 +95,117 @@ export class TasksService {
     return (await this.listTasks()).find((x) => x.id === t.id);
   }
 
+  /**
+   * Assign the same task to many students (whole course/batch or selected IDs).
+   * Teachers may only target students enrolled in courses they instruct.
+   */
+  async assignToStudents(
+    teacherId: string,
+    accountType: string,
+    data: {
+      title: string;
+      description?: string;
+      studyNotes?: string;
+      courseId: string;
+      assigneeIds?: string[];
+      dueAt?: string;
+      timerMinutes?: number;
+    },
+  ) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: data.courseId },
+      select: { id: true, title: true, instructorId: true },
+    });
+    if (!course) throw new NotFoundException("Course not found");
+    if (
+      accountType !== "SUPER_ADMIN" &&
+      course.instructorId &&
+      course.instructorId !== teacherId
+    ) {
+      throw new ForbiddenException("You can only assign for your courses");
+    }
+
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { courseId: data.courseId },
+      select: { userId: true },
+    });
+    const enrolledIds = new Set(enrollments.map((e) => e.userId));
+    let targets =
+      data.assigneeIds && data.assigneeIds.length > 0
+        ? data.assigneeIds.filter((id) => enrolledIds.has(id))
+        : [...enrolledIds];
+
+    if (targets.length === 0) {
+      throw new NotFoundException("No students to assign");
+    }
+
+    const created = [];
+    for (const assigneeId of targets) {
+      const row = await this.createTask({
+        title: data.title,
+        description: data.description,
+        studyNotes: data.studyNotes,
+        audience: AccountType.STUDENT,
+        assigneeId,
+        createdById: teacherId,
+        courseId: data.courseId,
+        dueAt: data.dueAt,
+        timerMinutes: data.timerMinutes,
+      });
+      if (row) created.push(row);
+    }
+    return { courseId: data.courseId, assigned: created.length, tasks: created };
+  }
+
+  /** Tasks created by this teacher (to track student completion). */
+  async listAssignedBy(teacherId: string, accountType: string) {
+    if (accountType === "SUPER_ADMIN") {
+      return this.listTasks({ audience: AccountType.STUDENT });
+    }
+    const rows = await this.prisma.task.findMany({
+      where: { createdById: teacherId },
+      include: {
+        assignee: true,
+        createdBy: true,
+        course: { select: { id: true, title: true } },
+        messages: { orderBy: { createdAt: "asc" } },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    return rows.map((t) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description,
+      studyNotes: t.studyNotes,
+      assignedToId: t.assigneeId,
+      assignedToName: t.assignee?.fullName ?? null,
+      assignedBy: t.createdBy?.fullName ?? null,
+      audience: t.audience,
+      status: t.status,
+      dueAt: t.dueAt?.toISOString() ?? null,
+      timerMinutes: t.timerMinutes,
+      spentMinutes: t.spentMinutes,
+      courseId: t.courseId,
+      courseTitle: t.course?.title ?? null,
+      submissionText: t.submissionText,
+      submissionFileName: t.submissionFileName,
+      submittedAt: t.submittedAt?.toISOString() ?? null,
+      reviewerId: t.reviewerId,
+      reviewedAt: t.reviewedAt?.toISOString() ?? null,
+      feedback: t.feedback,
+      reviewStatus: t.reviewStatus,
+      createdAt: t.createdAt.toISOString(),
+      updatedAt: t.updatedAt.toISOString(),
+      chat: t.messages.map((m) => ({
+        id: m.id,
+        senderName: m.senderName,
+        senderRole: m.senderRole,
+        text: m.text,
+        sentAt: m.createdAt.toISOString(),
+      })),
+    }));
+  }
+
   /** Student submits an assignment (text response + optional file). */
   async submitAssignment(
     taskId: string,

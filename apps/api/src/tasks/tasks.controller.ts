@@ -46,6 +46,32 @@ export class TasksController {
     });
   }
 
+  /** Teacher: assign to whole course/batch or selected students. */
+  @Post("tasks/assign")
+  @Roles("SUPER_ADMIN", "STAFF")
+  assignMany(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      title: string;
+      description?: string;
+      studyNotes?: string;
+      courseId: string;
+      assigneeIds?: string[];
+      dueAt?: string;
+      timerMinutes?: number;
+    }
+  ) {
+    return this.tasks.assignToStudents(user.sub, user.accountType, body);
+  }
+
+  /** Teacher: tasks I assigned (track completion). */
+  @Get("tasks/assigned-by-me")
+  @Roles("SUPER_ADMIN", "STAFF")
+  assignedByMe(@CurrentUser() user: AuthUser) {
+    return this.tasks.listAssignedBy(user.sub, user.accountType);
+  }
+
   /** Get tasks for a specific student (admin view). */
   @Get("tasks/student/:userId")
   @Roles("SUPER_ADMIN", "STAFF")

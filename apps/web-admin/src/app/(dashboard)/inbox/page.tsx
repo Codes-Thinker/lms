@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useChatInbox } from "@/components/ui/chat-inbox-provider";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ type Message = {
   senderName: string;
   senderRole: string;
   text: string;
+  imageData?: string | null;
+  imageName?: string | null;
   sentAt: string;
 };
 
@@ -25,6 +27,20 @@ type Thread = {
   messages?: Message[];
 };
 
+const EMOJIS = [
+  "😀", "😁", "😂", "😊", "😍", "🤝", "👍", "👏",
+  "🔥", "🎉", "✅", "📌", "📷", "🙏", "💯", "😎",
+];
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function InboxPage() {
   const { refresh } = useChatInbox();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -33,6 +49,9 @@ export default function InboxPage() {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -47,6 +66,7 @@ export default function InboxPage() {
   const openThread = useCallback(
     async (id: string) => {
       setSelectedId(id);
+      setShowEmoji(false);
       try {
         await api(`/support/chats/${id}/read`, { method: "POST" });
         const full = await api<Thread>(`/support/chats/${id}`);
@@ -81,14 +101,22 @@ export default function InboxPage() {
     return () => window.clearInterval(id);
   }, [selectedId]);
 
-  async function onSend(e: FormEvent) {
-    e.preventDefault();
-    if (!selectedId || !text.trim() || sending) return;
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [active?.messages?.length]);
+
+  async function sendPayload(payload: {
+    text?: string;
+    imageData?: string;
+    imageName?: string;
+  }) {
+    if (!selectedId || sending) return;
     setSending(true);
+    setShowEmoji(false);
     try {
       const full = await api<Thread>(`/support/chats/${selectedId}/messages`, {
         method: "POST",
-        body: JSON.stringify({ text: text.trim() }),
+        body: JSON.stringify(payload),
       });
       setActive(full);
       setText("");
@@ -101,13 +129,37 @@ export default function InboxPage() {
     }
   }
 
+  async function onSend(e: FormEvent) {
+    e.preventDefault();
+    if (!text.trim()) return;
+    await sendPayload({ text: text.trim() });
+  }
+
+  async function onPickImage(file: File | null) {
+    if (!file || !selectedId) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Only images are supported");
+      return;
+    }
+    try {
+      const imageData = await fileToDataUrl(file);
+      await sendPayload({
+        text: text.trim() || undefined,
+        imageData,
+        imageName: file.name,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed");
+    }
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="space-y-3">
         <div className="glass-card p-4">
           <h2 className="text-lg font-semibold">Chat inbox</h2>
           <p className="text-sm text-slate-500">
-            Students · interns · staff · teachers
+            Students · interns · staff · teachers — emoji & photos supported
           </p>
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
         </div>
@@ -157,7 +209,9 @@ export default function InboxPage() {
               <p className="font-semibold">
                 {active.userName} · {active.userRole}
               </p>
-              <p className="text-xs text-slate-500">Admin reply sends a push to their app</p>
+              <p className="text-xs text-slate-500">
+                Replies sync to their app with push notification
+              </p>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
               {(active.messages || []).map((m) => {
@@ -169,10 +223,10 @@ export default function InboxPage() {
                   >
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm",
                         mine
-                          ? "bg-blue-600 text-white"
-                          : "border border-slate-200 bg-white text-slate-800"
+                          ? "rounded-br-md bg-blue-600 text-white"
+                          : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
                       )}
                     >
                       <p
@@ -183,16 +237,71 @@ export default function InboxPage() {
                       >
                         {m.senderName}
                       </p>
-                      <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                      {m.imageData ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={m.imageData}
+                          alt={m.imageName || "Photo"}
+                          className="mb-2 max-h-56 w-full rounded-xl object-cover"
+                        />
+                      ) : null}
+                      {m.text ? (
+                        <p className="whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                      ) : null}
                     </div>
                   </div>
                 );
               })}
+              <div ref={bottomRef} />
             </div>
+            {showEmoji ? (
+              <div className="flex flex-wrap gap-1 border-t border-slate-100 px-3 py-2">
+                {EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    className="rounded-lg px-2 py-1 text-lg hover:bg-slate-100"
+                    onClick={() => setText((t) => t + e)}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <form
               onSubmit={onSend}
-              className="flex gap-2 border-t border-slate-200 p-3"
+              className="flex items-center gap-2 border-t border-slate-200 p-3"
             >
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void onPickImage(f);
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={sending}
+                onClick={() => setShowEmoji((v) => !v)}
+              >
+                😊
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={sending}
+                onClick={() => fileRef.current?.click()}
+              >
+                📷
+              </Button>
               <Input
                 value={text}
                 onChange={(e) => setText(e.target.value)}

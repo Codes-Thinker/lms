@@ -6,6 +6,7 @@ class FeeChatMessage {
   final String sentAt;
   final bool hasScreenshot;
   final String? screenshotLabel;
+  final String? screenshotData;
 
   const FeeChatMessage({
     required this.id,
@@ -15,6 +16,7 @@ class FeeChatMessage {
     required this.sentAt,
     this.hasScreenshot = false,
     this.screenshotLabel,
+    this.screenshotData,
   });
 }
 
@@ -26,6 +28,7 @@ class FeePaymentCase {
   final int amount;
   final String status; // DUE | SENT | APPROVED | REJECTED
   final List<FeeChatMessage> chat;
+  final String? paymentScreenshotData;
 
   const FeePaymentCase({
     required this.id,
@@ -35,11 +38,13 @@ class FeePaymentCase {
     required this.amount,
     required this.status,
     required this.chat,
+    this.paymentScreenshotData,
   });
 
   FeePaymentCase copyWith({
     String? status,
     List<FeeChatMessage>? chat,
+    String? paymentScreenshotData,
   }) {
     return FeePaymentCase(
       id: id,
@@ -49,6 +54,8 @@ class FeePaymentCase {
       amount: amount,
       status: status ?? this.status,
       chat: chat ?? this.chat,
+      paymentScreenshotData:
+          paymentScreenshotData ?? this.paymentScreenshotData,
     );
   }
 }

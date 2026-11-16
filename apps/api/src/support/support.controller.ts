@@ -115,7 +115,8 @@ export class SupportController {
   async postMessage(
     @Param("id") id: string,
     @CurrentUser() user: AuthUser,
-    @Body() body: { text: string }
+    @Body()
+    body: { text?: string; imageData?: string; imageName?: string }
   ) {
     const isAdmin =
       user.accountType === "SUPER_ADMIN" || user.roles?.includes("SUPER_ADMIN");
@@ -134,6 +135,8 @@ export class SupportController {
       senderName,
       senderRole: isAdmin ? "ADMIN" : "USER",
       text: body.text ?? "",
+      imageData: body.imageData,
+      imageName: body.imageName,
     });
   }
 }
