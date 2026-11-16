@@ -41,6 +41,15 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function messagesFingerprint(msgs?: Message[]) {
+  return (msgs || [])
+    .map(
+      (m) =>
+        `${m.id}:${m.imageData ? "1" : "0"}:${(m.text || "").length}`
+    )
+    .join("|");
+}
+
 export default function InboxPage() {
   const { refresh } = useChatInbox();
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -52,6 +61,7 @@ export default function InboxPage() {
   const [showEmoji, setShowEmoji] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sendingRef = useRef(false);
 
   const loadList = useCallback(async () => {
     try {
@@ -89,10 +99,20 @@ export default function InboxPage() {
   useEffect(() => {
     if (!selectedId) return;
     const id = window.setInterval(() => {
+      if (sendingRef.current) return;
       void (async () => {
         try {
           const full = await api<Thread>(`/support/chats/${selectedId}`);
-          setActive(full);
+          setActive((prev) => {
+            if (
+              prev &&
+              messagesFingerprint(prev.messages) ===
+                messagesFingerprint(full.messages)
+            ) {
+              return prev;
+            }
+            return full;
+          });
         } catch {
           /* ignore */
         }
@@ -112,7 +132,25 @@ export default function InboxPage() {
   }) {
     if (!selectedId || sending) return;
     setSending(true);
+    sendingRef.current = true;
     setShowEmoji(false);
+
+    const optimisticId = `local-${Date.now()}`;
+    const optimistic: Message = {
+      id: optimisticId,
+      senderName: "Admin",
+      senderRole: "ADMIN",
+      text: payload.text || (payload.imageData ? "📷 Photo" : ""),
+      imageData: payload.imageData,
+      imageName: payload.imageName,
+      sentAt: new Date().toISOString(),
+    };
+    setActive((prev) =>
+      prev
+        ? { ...prev, messages: [...(prev.messages || []), optimistic] }
+        : prev
+    );
+
     try {
       const full = await api<Thread>(`/support/chats/${selectedId}/messages`, {
         method: "POST",
@@ -123,9 +161,18 @@ export default function InboxPage() {
       await loadList();
       await refresh();
     } catch (err) {
+      setActive((prev) =>
+        prev
+          ? {
+              ...prev,
+              messages: (prev.messages || []).filter((m) => m.id !== optimisticId),
+            }
+          : prev
+      );
       setError(err instanceof Error ? err.message : "Send failed");
     } finally {
       setSending(false);
+      sendingRef.current = false;
     }
   }
 
@@ -240,9 +287,11 @@ export default function InboxPage() {
                       {m.imageData ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
+                          key={`img-${m.id}`}
                           src={m.imageData}
                           alt={m.imageName || "Photo"}
                           className="mb-2 max-h-56 w-full rounded-xl object-cover"
+                          loading="eager"
                         />
                       ) : null}
                       {m.text ? (

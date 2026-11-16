@@ -36,9 +36,14 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
       await context.read<SupportProvider>().loadAdminChat();
       _scrollToEnd();
     });
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _poll = Timer.periodic(const Duration(seconds: 4), (_) async {
       if (!mounted) return;
-      await context.read<SupportProvider>().loadAdminChat();
+      final support = context.read<SupportProvider>();
+      if (support.sending) return;
+      final before = support.chat.length;
+      await support.loadAdminChat(silent: true);
+      if (!mounted) return;
+      if (support.chat.length > before) _scrollToEnd();
     });
   }
 
@@ -161,6 +166,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                           ? (auth.user?.name ?? 'You')
                           : "Code's Thinker";
                       return Align(
+                        key: ValueKey(msg.id),
                         alignment:
                             mine ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
@@ -200,9 +206,11 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                           ? msg.imageData!.split(',').last
                                           : msg.imageData!,
                                     ),
+                                    key: ValueKey('img-${msg.id}'),
                                     height: 160,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
+                                    gaplessPlayback: true,
                                     errorBuilder: (_, __, ___) => Text(
                                       msg.imageName ?? 'Photo',
                                       style: TextStyle(

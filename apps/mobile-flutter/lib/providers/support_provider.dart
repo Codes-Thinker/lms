@@ -43,6 +43,7 @@ class ChatMessage {
 
 class SupportProvider extends ChangeNotifier {
   bool _loading = false;
+  bool _sending = false;
   bool _surveyDone = false;
   String? _threadId;
   int _unreadByUser = 0;
@@ -58,6 +59,7 @@ class SupportProvider extends ChangeNotifier {
   final Map<String, String> _surveyAnswers = {};
 
   bool get loading => _loading;
+  bool get sending => _sending;
   bool get surveyDone => _surveyDone;
   String? get threadId => _threadId;
   int get unreadByUser => _unreadByUser;
@@ -159,23 +161,73 @@ class SupportProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadAdminChat() async {
-    _loading = true;
-    notifyListeners();
+  /// [silent] = poll refresh — no spinner, merge so photos do not blink/dup.
+  Future<void> loadAdminChat({bool silent = false}) async {
+    if (_sending && silent) return;
+    if (!silent) {
+      _loading = true;
+      notifyListeners();
+    }
     try {
       final data = await ApiClient.instance.get('/support/chats/me')
           as Map<String, dynamic>;
       _threadId = data['id']?.toString();
       _unreadByUser = (data['unreadByUser'] as num?)?.toInt() ?? 0;
-      final msgs = (data['messages'] as List?) ?? [];
-      _chat
-        ..clear()
-        ..addAll(msgs.map((m) => _mapMsg(Map<String, dynamic>.from(m as Map))));
+      final msgs = ((data['messages'] as List?) ?? [])
+          .map((m) => _mapMsg(Map<String, dynamic>.from(m as Map)))
+          .toList();
+      final merged = _mergeChat(_chat, msgs);
+      if (!_sameChatIds(_chat, merged)) {
+        _chat
+          ..clear()
+          ..addAll(merged);
+        notifyListeners();
+      }
     } catch (e) {
       debugPrint('Load chat: $e');
     }
-    _loading = false;
-    notifyListeners();
+    if (!silent) {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  bool _sameChatIds(List<ChatMessage> a, List<ChatMessage> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+      // Image payload may arrive after text-only stub — treat as change.
+      final aImg = a[i].imageData ?? '';
+      final bImg = b[i].imageData ?? '';
+      if (aImg.length != bImg.length) return false;
+    }
+    return true;
+  }
+
+  List<ChatMessage> _mergeChat(
+    List<ChatMessage> local,
+    List<ChatMessage> remote,
+  ) {
+    final seen = <String>{};
+    final out = <ChatMessage>[];
+    for (final m in remote) {
+      if (m.id.isEmpty) continue;
+      if (seen.add(m.id)) out.add(m);
+    }
+    for (final m in local) {
+      if (m.id.startsWith('local-')) {
+        final dup = remote.any(
+          (r) =>
+              r.senderRole == m.senderRole &&
+              r.text == m.text &&
+              ((r.imageData == null) == (m.imageData == null) ||
+                  (r.imageData != null && m.imageData != null)),
+        );
+        if (dup) continue;
+      }
+      if (seen.add(m.id)) out.add(m);
+    }
+    return out;
   }
 
   Future<bool> sendChat({
@@ -193,6 +245,7 @@ class SupportProvider extends ChangeNotifier {
     }
     if (_threadId == null) return false;
 
+    _sending = true;
     final optimistic = ChatMessage(
       id: 'local-${DateTime.now().millisecondsSinceEpoch}',
       senderRole: 'USER',
@@ -214,15 +267,20 @@ class SupportProvider extends ChangeNotifier {
           if (imageName != null) 'imageName': imageName,
         },
       ) as Map<String, dynamic>;
-      final msgs = (data['messages'] as List?) ?? [];
+      final msgs = ((data['messages'] as List?) ?? [])
+          .map((m) => _mapMsg(Map<String, dynamic>.from(m as Map)))
+          .toList();
+      // Drop optimistic; keep server list (stable ids) so photo does not flash twice.
       _chat
         ..clear()
-        ..addAll(msgs.map((m) => _mapMsg(Map<String, dynamic>.from(m as Map))));
+        ..addAll(msgs);
+      _sending = false;
       notifyListeners();
       return true;
     } catch (e) {
       debugPrint('Send chat: $e');
       _chat.removeWhere((m) => m.id == optimistic.id);
+      _sending = false;
       notifyListeners();
       return false;
     }
