@@ -91,6 +91,52 @@ function displayOrNone(value?: string | null) {
   return v || "Not set";
 }
 
+type RoleTab = "ALL" | "STUDENT" | "STAFF" | "INTERN";
+
+type CourseTab = { id: string; title: string; batch?: string | null };
+
+/** Courses linked to a user (enrolled for students, taught for teachers). */
+function userCourseTabs(u: UserRow): CourseTab[] {
+  if (u.accountType === "STAFF" && u.taughtCourses?.length) {
+    return u.taughtCourses.map((c) => ({
+      id: c.id,
+      title: c.title,
+      batch: c.batch,
+    }));
+  }
+  if (u.courses?.length) {
+    return u.courses.map((c) => ({
+      id: c.id,
+      title: c.title,
+      batch: c.batch,
+    }));
+  }
+  if (u.assignedCourses?.length) {
+    return u.assignedCourses.map((title) => ({
+      id: `title:${title}`,
+      title,
+    }));
+  }
+  return [];
+}
+
+function userMatchesCourse(u: UserRow, courseId: string): boolean {
+  if (courseId === "all") return true;
+  if (courseId === "unassigned") return userCourseTabs(u).length === 0;
+  return userCourseTabs(u).some(
+    (c) => c.id === courseId || `title:${c.title}` === courseId
+  );
+}
+
+function tabChip(active: boolean) {
+  return cn(
+    "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+    active
+      ? "bg-[#2563EB] text-white"
+      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+  );
+}
+
 function UsersPageInner() {
   const { show } = useSnackbar();
   const searchParams = useSearchParams();
@@ -104,6 +150,8 @@ function UsersPageInner() {
   const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [q, setQ] = useState(qFromUrl);
+  const [roleTab, setRoleTab] = useState<RoleTab>("ALL");
+  const [courseTab, setCourseTab] = useState("all");
 
   const load = useCallback(async (searchQ?: string) => {
     setLoading(true);
@@ -156,6 +204,60 @@ function UsersPageInner() {
     if (monthly > 0 && months > 0) return monthly * months;
     return null;
   }, [studentFee.monthlyFee, studentFee.courseDurationMonths]);
+
+  const roleCounts = useMemo(() => {
+    const counts = { ALL: items.length, STUDENT: 0, STAFF: 0, INTERN: 0 };
+    for (const u of items) {
+      if (u.accountType === "STUDENT") counts.STUDENT += 1;
+      else if (u.accountType === "STAFF") counts.STAFF += 1;
+      else if (u.accountType === "INTERN") counts.INTERN += 1;
+    }
+    return counts;
+  }, [items]);
+
+  const roleFiltered = useMemo(() => {
+    if (roleTab === "ALL") return items;
+    return items.filter((u) => u.accountType === roleTab);
+  }, [items, roleTab]);
+
+  const courseTabs = useMemo(() => {
+    if (roleTab !== "STUDENT" && roleTab !== "STAFF") return [] as CourseTab[];
+    const map = new Map<string, CourseTab>();
+    let unassigned = 0;
+    for (const u of roleFiltered) {
+      const courses = userCourseTabs(u);
+      if (courses.length === 0) {
+        unassigned += 1;
+        continue;
+      }
+      for (const c of courses) {
+        if (!map.has(c.id)) map.set(c.id, c);
+      }
+    }
+    const list: CourseTab[] = [
+      { id: "all", title: "All courses" },
+      ...Array.from(map.values()).sort((a, b) =>
+        a.title.localeCompare(b.title)
+      ),
+    ];
+    if (unassigned > 0) {
+      list.push({
+        id: "unassigned",
+        title: roleTab === "STAFF" ? "No course assigned" : "Not enrolled",
+      });
+    }
+    return list;
+  }, [roleFiltered, roleTab]);
+
+  const visibleUsers = useMemo(() => {
+    if (roleTab !== "STUDENT" && roleTab !== "STAFF") return roleFiltered;
+    return roleFiltered.filter((u) => userMatchesCourse(u, courseTab));
+  }, [roleFiltered, roleTab, courseTab]);
+
+  function selectRole(next: RoleTab) {
+    setRoleTab(next);
+    setCourseTab("all");
+  }
 
   function setField<K extends keyof typeof emptyForm>(
     key: K,
@@ -605,11 +707,15 @@ function UsersPageInner() {
         </div>
       </form>
 
-      <div className="glass-card table-scroll overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 className="font-semibold">
-            All users {loading ? "…" : `(${items.length})`}
-          </h3>
+      <div className="glass-card space-y-4 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold">Browse by category</h3>
+            <p className="text-xs text-slate-500">
+              Filter role, then course — students by enrollment, teachers by
+              courses they teach
+            </p>
+          </div>
           <Button
             type="button"
             variant="secondary"
@@ -619,6 +725,82 @@ function UsersPageInner() {
             Refresh
           </Button>
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["ALL", "All", roleCounts.ALL],
+              ["STUDENT", "Students", roleCounts.STUDENT],
+              ["STAFF", "Teachers", roleCounts.STAFF],
+              ["INTERN", "Interns", roleCounts.INTERN],
+            ] as const
+          ).map(([id, label, count]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => selectRole(id)}
+              className={tabChip(roleTab === id)}
+            >
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+
+        {courseTabs.length > 0 ? (
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              {roleTab === "STAFF" ? "Teacher courses" : "Student courses"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {courseTabs.map((t) => {
+                const count =
+                  t.id === "all"
+                    ? roleFiltered.length
+                    : roleFiltered.filter((u) => userMatchesCourse(u, t.id))
+                        .length;
+                const label =
+                  t.id === "all" || t.id === "unassigned"
+                    ? t.title
+                    : t.batch
+                      ? `${t.title} · ${t.batch}`
+                      : t.title;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setCourseTab(t.id)}
+                    className={tabChip(courseTab === t.id)}
+                    title={label}
+                  >
+                    {label} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="glass-card table-scroll overflow-hidden">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h3 className="font-semibold">
+            {roleTab === "ALL"
+              ? "All users"
+              : roleTab === "STUDENT"
+                ? "Students"
+                : roleTab === "STAFF"
+                  ? "Teachers"
+                  : "Interns"}{" "}
+            {loading ? "…" : `(${visibleUsers.length})`}
+          </h3>
+          <p className="text-xs text-slate-500">
+            {roleTab === "STUDENT" && courseTab !== "all"
+              ? "Filtered by enrolled course"
+              : roleTab === "STAFF" && courseTab !== "all"
+                ? "Filtered by taught course"
+                : "Tap a name for full profile"}
+          </p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50/80 text-slate-500">
@@ -626,7 +808,9 @@ function UsersPageInner() {
                 <th className="px-5 py-3 font-medium">Full name</th>
                 <th className="px-5 py-3 font-medium">Email</th>
                 <th className="px-5 py-3 font-medium">Role</th>
-                <th className="px-5 py-3 font-medium">Assigned course(s)</th>
+                <th className="px-5 py-3 font-medium">
+                  {roleTab === "STAFF" ? "Teaches" : "Assigned course(s)"}
+                </th>
                 <th className="px-5 py-3 font-medium">Batch</th>
                 <th className="px-5 py-3 font-medium">Progress</th>
                 <th className="px-5 py-3 font-medium">Enrollment</th>
@@ -634,7 +818,7 @@ function UsersPageInner() {
               </tr>
             </thead>
             <tbody>
-              {items.map((u) => {
+              {visibleUsers.map((u) => {
                 const display = u.name || u.fullName || u.email;
                 const batch = displayOrNone(u.batch || u.batchName);
                 const coursesLabel = assignedCourseLabel(u);
@@ -700,13 +884,13 @@ function UsersPageInner() {
                   </tr>
                 );
               })}
-              {!loading && items.length === 0 && !error ? (
+              {!loading && visibleUsers.length === 0 && !error ? (
                 <tr>
                   <td
                     colSpan={8}
                     className="px-5 py-8 text-center text-slate-500"
                   >
-                    No users yet
+                    No users in this category
                   </td>
                 </tr>
               ) : null}
