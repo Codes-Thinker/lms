@@ -11,26 +11,51 @@ export class ReportsService {
   ) {}
 
   async overview() {
-    const [students, interns, staff, fees, tasks, projects, todayAttendance] =
-      await Promise.all([
-        this.prisma.user.count({ where: { accountType: "STUDENT" } }),
-        this.prisma.user.count({ where: { accountType: "INTERN" } }),
-        this.prisma.user.count({ where: { accountType: "STAFF" } }),
-        this.prisma.feeCase.findMany({
-          where: { status: { not: FeeStatus.PAID } },
-        }),
-        this.prisma.task.count({ where: { status: { not: "DONE" } } }),
-        this.prisma.project.count({ where: { status: { not: "DONE" } } }),
-        this.prisma.attendanceRecord.findMany({
-          where: {
-            date: (() => {
-              const d = new Date();
-              d.setHours(0, 0, 0, 0);
-              return d;
-            })(),
-          },
-        }),
-      ]);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [
+      students,
+      interns,
+      staff,
+      fees,
+      tasks,
+      projects,
+      todayAttendance,
+      newStudentsThisMonth,
+      courseAgg,
+      surveyResponses,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { accountType: "STUDENT" } }),
+      this.prisma.user.count({ where: { accountType: "INTERN" } }),
+      this.prisma.user.count({ where: { accountType: "STAFF" } }),
+      this.prisma.feeCase.findMany({
+        where: { status: { not: FeeStatus.PAID } },
+      }),
+      this.prisma.task.count({ where: { status: { not: "DONE" } } }),
+      this.prisma.project.count({ where: { status: { not: "DONE" } } }),
+      this.prisma.attendanceRecord.findMany({
+        where: {
+          date: (() => {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })(),
+        },
+      }),
+      this.prisma.user.count({
+        where: {
+          accountType: "STUDENT",
+          createdAt: { gte: monthStart },
+        },
+      }),
+      this.prisma.course.aggregate({
+        _avg: { rating: true },
+        _count: { _all: true },
+      }),
+      this.prisma.surveyResponse.count(),
+    ]);
 
     const presentish = todayAttendance.filter(
       (a) =>
@@ -43,10 +68,20 @@ export class ReportsService {
         ? 0
         : Math.round((presentish / todayAttendance.length) * 100);
 
+    const avgCourseRating = Number(
+      (courseAgg._avg.rating ?? 0).toFixed(1)
+    );
+
     return {
       students,
       interns,
       staff,
+      teachers: staff,
+      allUsers: students + interns + staff,
+      newStudentsThisMonth,
+      avgCourseRating,
+      coursesCount: courseAgg._count._all,
+      surveyResponses,
       attendanceTodayPercent,
       feesPending: fees.reduce((s, f) => s + f.amount, 0),
       openStaffTasks: tasks,

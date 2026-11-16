@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   GraduationCap,
@@ -14,9 +14,13 @@ import {
   AlertCircle,
   ClipboardCheck,
   Radio,
+  Users,
+  Star,
+  UserPlus,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { StatRing } from "@/components/ui/stat-ring";
 import { api, getAdminUser } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -27,10 +31,17 @@ type Overview = {
   students: number;
   interns: number;
   staff: number;
+  teachers?: number;
+  allUsers: number;
+  newStudentsThisMonth: number;
+  avgCourseRating: number;
+  coursesCount: number;
+  surveyResponses: number;
   attendanceTodayPercent: number;
   feesPending: number;
   openStaffTasks: number;
   openInternProjects: number;
+  attendanceTodayCount?: number;
 };
 
 type AttendanceRow = {
@@ -87,6 +98,13 @@ type Activity = {
   }[];
 };
 
+function monthLabel() {
+  return new Date().toLocaleString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export default function DashboardPage() {
   const { unread } = useNotifications();
   const { chatUnread: unreadMessages } = useAdminActivity();
@@ -110,7 +128,10 @@ export default function DashboardPage() {
     setAttendance(att.slice(0, 5));
     setFees(
       feeList
-        .filter((f) => f.status === "SENT" || f.status === "DUE" || f.status === "PARTIAL")
+        .filter(
+          (f) =>
+            f.status === "SENT" || f.status === "DUE" || f.status === "PARTIAL"
+        )
         .slice(0, 5)
     );
     setPeople(users.items);
@@ -123,10 +144,10 @@ export default function DashboardPage() {
       try {
         await loadCore();
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Failed to load");
       }
     })();
-    // Slower poll — activity badges already refresh separately
     const id = window.setInterval(() => {
       loadCore().catch(() => {});
     }, 45000);
@@ -136,36 +157,22 @@ export default function DashboardPage() {
     };
   }, [loadCore]);
 
-  const kpis = [
-    {
-      label: "Students",
-      value: String(overview?.students ?? "—"),
-      href: "/students",
-      icon: GraduationCap,
-      tone: "bg-blue-50 text-blue-600",
-    },
-    {
-      label: "Interns",
-      value: String(overview?.interns ?? "—"),
-      href: "/interns",
-      icon: FolderKanban,
-      tone: "bg-sky-50 text-sky-600",
-    },
-    {
-      label: "Teachers",
-      value: String(overview?.staff ?? "—"),
-      href: "/staff",
-      icon: BriefcaseBusiness,
-      tone: "bg-emerald-50 text-emerald-600",
-    },
-    {
-      label: "Attendance today",
-      value: overview ? `${overview.attendanceTodayPercent}%` : "—",
-      href: "/attendance",
-      icon: CalendarCheck,
-      tone: "bg-amber-50 text-amber-600",
-    },
-  ];
+  const students = overview?.students ?? 0;
+  const teachers = overview?.teachers ?? overview?.staff ?? 0;
+  const interns = overview?.interns ?? 0;
+  const allUsers = overview?.allUsers ?? students + teachers + interns;
+  const rating = overview?.avgCourseRating ?? 0;
+  const newStudents = overview?.newStudentsThisMonth ?? 0;
+  const attendancePct = overview?.attendanceTodayPercent ?? 0;
+
+  const breakdown = useMemo(() => {
+    const parts = [
+      { key: "students", label: "Students", count: students, color: "bg-blue-500", href: "/students" },
+      { key: "teachers", label: "Teachers", count: teachers, color: "bg-emerald-500", href: "/staff" },
+      { key: "interns", label: "Interns", count: interns, color: "bg-sky-400", href: "/interns" },
+    ];
+    return parts;
+  }, [students, teachers, interns]);
 
   const supportCards = [
     {
@@ -188,7 +195,7 @@ export default function DashboardPage() {
     },
     {
       label: "Survey answers",
-      value: activity?.surveys ?? 0,
+      value: activity?.surveys ?? overview?.surveyResponses ?? 0,
       href: "/feedback",
       icon: ClipboardCheck,
     },
@@ -202,15 +209,27 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-[#EFF6FF] via-white to-[#F0FDFA] p-6 sm:p-7">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-400/15 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-teal-300/20 blur-3xl"
+        />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold">Welcome, {name}</h2>
-            <p className="text-sm text-slate-500">
-              Live Help &amp; support from the app — fees, reports, chat, surveys
+            <p className="text-sm font-medium text-blue-700/80">Dashboard</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+              Welcome, {name}
+            </h2>
+            <p className="mt-1.5 max-w-xl text-sm text-slate-500">
+              People, attendance, ratings, and live support — at a glance.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="success" className="gap-1">
               <Radio className="h-3 w-3" />
               Live
@@ -221,39 +240,162 @@ export default function DashboardPage() {
             ) : null}
           </div>
         </div>
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-      </div>
+        {error ? (
+          <p className="relative mt-3 text-sm text-red-600">{error}</p>
+        ) : null}
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Link
-              key={kpi.label}
-              href={kpi.href}
-              className="glass-card block p-5 transition hover:-translate-y-0.5"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-500">{kpi.label}</p>
-                <span className={cn("rounded-xl p-2", kpi.tone)}>
-                  <Icon className="h-4 w-4" />
-                </span>
+      {/* All users + rings */}
+      <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
+        <div className="glass-card overflow-hidden p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className="rounded-2xl bg-blue-50 p-2.5 text-blue-600">
+                <Users className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-sm font-medium text-slate-500">All users</p>
+                <p className="mt-0.5 text-4xl font-semibold tracking-tight text-slate-900">
+                  {overview ? allUsers : "—"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Students + teachers + interns
+                </p>
               </div>
-              <p className="mt-3 text-2xl font-semibold tracking-tight">{kpi.value}</p>
+            </div>
+            <Link
+              href="/users"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              Manage users
             </Link>
-          );
-        })}
-      </div>
+          </div>
 
+          {/* Segmented proportion bar */}
+          <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
+            {breakdown.map((b) => {
+              const pct = allUsers > 0 ? (b.count / allUsers) * 100 : 0;
+              if (pct <= 0) return null;
+              return (
+                <div
+                  key={b.key}
+                  className={cn(b.color, "transition-all duration-500")}
+                  style={{ width: `${pct}%` }}
+                  title={`${b.label}: ${b.count}`}
+                />
+              );
+            })}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            {breakdown.map((b) => {
+              const Icon =
+                b.key === "students"
+                  ? GraduationCap
+                  : b.key === "teachers"
+                    ? BriefcaseBusiness
+                    : FolderKanban;
+              return (
+                <Link
+                  key={b.key}
+                  href={b.href}
+                  className="group rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5 transition hover:border-blue-200 hover:bg-blue-50/40"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-slate-500">
+                      {b.label}
+                    </span>
+                    <Icon className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-blue-600" />
+                  </div>
+                  <p className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
+                    {overview ? b.count : "—"}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="glass-card flex flex-col justify-center p-5 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-900">Pulse</h3>
+              <p className="text-sm text-slate-500">
+                Rings for today · {monthLabel()}
+              </p>
+            </div>
+            <Link
+              href="/attendance"
+              className="text-sm font-medium text-blue-600 hover:underline"
+            >
+              Attendance
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <StatRing
+              value={attendancePct}
+              label="Attendance"
+              sublabel="Today"
+              tone="amber"
+              size={100}
+            />
+            <StatRing
+              value={rating}
+              max={5}
+              display={overview ? rating.toFixed(1) : "—"}
+              label="Rating"
+              sublabel={
+                overview
+                  ? `${overview.coursesCount} courses · ★`
+                  : "Courses"
+              }
+              tone="emerald"
+              size={100}
+            />
+            <StatRing
+              value={newStudents}
+              max={Math.max(10, newStudents)}
+              display={overview ? String(newStudents) : "—"}
+              label="New students"
+              sublabel="This month"
+              tone="sky"
+              size={100}
+            />
+          </div>
+          <div className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
+            <div className="flex flex-col items-center gap-1">
+              <CalendarCheck className="h-3.5 w-3.5 text-amber-600" />
+              <span>
+                {overview?.attendanceTodayCount ?? 0} marks
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <Star className="h-3.5 w-3.5 text-emerald-600" />
+              <span>
+                {overview?.surveyResponses ?? 0} surveys
+              </span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <UserPlus className="h-3.5 w-3.5 text-sky-600" />
+              <span>{monthLabel()}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Support */}
       <div className="glass-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-semibold">Help &amp; support — live</h3>
+            <h3 className="font-semibold">Help &amp; support</h3>
             <p className="text-sm text-slate-500">
-              Same portions as student app · updates every 5s · bell + sound
+              Live queue from the app — fees, reports, chat, surveys
             </p>
           </div>
-          <Link href="/feedback" className="text-sm font-medium text-blue-600 hover:underline">
+          <Link
+            href="/feedback"
+            className="text-sm font-medium text-blue-600 hover:underline"
+          >
             Open feedback
           </Link>
         </div>
@@ -264,7 +406,7 @@ export default function DashboardPage() {
               <Link
                 key={c.label}
                 href={c.href}
-                className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 transition hover:border-blue-200 hover:bg-blue-50/50"
+                className="rounded-2xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/80 p-3.5 transition hover:border-blue-200 hover:to-blue-50/40"
               >
                 <div className="flex items-center gap-2 text-slate-500">
                   <Icon className="h-3.5 w-3.5 text-blue-600" />
@@ -339,6 +481,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* People */}
       <div className="glass-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -347,7 +490,10 @@ export default function DashboardPage() {
               Students · Interns · Teachers — with profile
             </p>
           </div>
-          <Link href="/users" className="text-sm font-medium text-blue-600 hover:underline">
+          <Link
+            href="/users"
+            className="text-sm font-medium text-blue-600 hover:underline"
+          >
             Manage users
           </Link>
         </div>
@@ -358,7 +504,7 @@ export default function DashboardPage() {
               <Link
                 key={p.id}
                 href={`/users/${p.id}`}
-                className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <UserAvatar
                   name={display}
@@ -367,7 +513,9 @@ export default function DashboardPage() {
                   src={p.profileImage}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900">{display}</p>
+                  <p className="truncate font-semibold text-slate-900">
+                    {display}
+                  </p>
                   <p className="truncate text-xs text-slate-500">
                     {roleLabel(p.accountType)}
                     {p.track ? ` · ${p.track}` : ""}
@@ -377,7 +525,9 @@ export default function DashboardPage() {
             );
           })}
           {people.length === 0 ? (
-            <p className="text-sm text-slate-500">No users yet — add from Users</p>
+            <p className="text-sm text-slate-500">
+              No users yet — add from Users
+            </p>
           ) : null}
         </div>
       </div>
@@ -398,7 +548,10 @@ export default function DashboardPage() {
           </p>
           <ul className="space-y-2 text-sm">
             {fees.map((f) => (
-              <li key={f.id} className="flex justify-between border-t border-slate-100 pt-2">
+              <li
+                key={f.id}
+                className="flex justify-between border-t border-slate-100 pt-2"
+              >
                 {f.studentId ? (
                   <Link
                     href={`/users/${f.studentId}`}
@@ -410,7 +563,8 @@ export default function DashboardPage() {
                   <span>{f.studentName}</span>
                 )}
                 <span className="text-slate-600">
-                  {f.status} · {f.courseTitle} · Rs {f.amount.toLocaleString()}
+                  {f.status} · {f.courseTitle} · Rs{" "}
+                  {f.amount.toLocaleString()}
                 </span>
               </li>
             ))}
@@ -431,7 +585,10 @@ export default function DashboardPage() {
           </p>
           <ul className="space-y-2 text-sm">
             {attendance.map((a) => (
-              <li key={a.id} className="flex justify-between border-t border-slate-100 pt-2">
+              <li
+                key={a.id}
+                className="flex justify-between border-t border-slate-100 pt-2"
+              >
                 <span>
                   {a.personName} · {a.role}
                 </span>
