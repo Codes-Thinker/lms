@@ -145,8 +145,8 @@ class AuthProvider extends ChangeNotifier {
       final logged = AppUser.fromApi(userJson);
       final expected = _roleApi;
       if (logged.role != expected && logged.role != 'SUPER_ADMIN') {
-        _error =
-            'This account is ${logged.roleLabel}. Please select the matching role above.';
+        // Do not reveal the real account type — user must pick the right tab.
+        _error = 'Invalid credentials.';
         _loading = false;
         notifyListeners();
         return false;
