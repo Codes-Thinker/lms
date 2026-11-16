@@ -28,6 +28,14 @@ type StaffRow = {
   taughtCourses: TaughtCourse[];
 };
 
+type TaskChat = {
+  id: string;
+  senderName: string;
+  senderRole: string;
+  text: string;
+  sentAt: string;
+};
+
 type TaskRow = {
   id: string;
   title: string;
@@ -39,6 +47,9 @@ type TaskRow = {
   audience?: string | null;
   status: string;
   dueAt?: string | null;
+  spentMinutes?: number;
+  timerMinutes?: number;
+  chat?: TaskChat[];
 };
 
 function taskDetailLine(t: TaskRow) {
@@ -46,6 +57,8 @@ function taskDetailLine(t: TaskRow) {
   if (t.assignedBy?.trim()) parts.push(`from ${t.assignedBy}`);
   if (t.assignedToName?.trim()) parts.push(`→ ${t.assignedToName}`);
   if (t.courseTitle?.trim()) parts.push(`· ${t.courseTitle}`);
+  if (typeof t.spentMinutes === "number") parts.push(`· ${t.spentMinutes}m worked`);
+  if (t.chat && t.chat.length > 0) parts.push(`· ${t.chat.length} chat`);
   if (t.dueAt) parts.push(`· due ${t.dueAt.slice(0, 10)}`);
   return parts.join(" ");
 }
@@ -90,6 +103,8 @@ export default function StaffPage() {
   const [editTask, setEditTask] = useState<TaskRow | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [chatTask, setChatTask] = useState<TaskRow | null>(null);
+  const [chatText, setChatText] = useState("");
 
   const staffIds = useMemo(() => new Set(staff.map((s) => s.id)), [staff]);
 
@@ -183,11 +198,41 @@ export default function StaffPage() {
     }
   }
 
+  async function sendTaskChat() {
+    if (!chatTask || !chatText.trim()) return;
+    setActingId(chatTask.id);
+    try {
+      await api(`/tasks/${chatTask.id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ text: chatText.trim() }),
+      });
+      setChatText("");
+      await refresh();
+      const latest = (await api<TaskRow[]>(`/tasks`)).find((x) => x.id === chatTask.id);
+      if (latest) setChatTask(latest);
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Chat send failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
   function renderTaskActions(t: TaskRow) {
     const busy = actingId === t.id;
     return (
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
         <Badge variant="secondary">{t.status}</Badge>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => {
+            setChatTask(t);
+            setChatText("");
+          }}
+        >
+          Chat{(t.chat?.length ?? 0) > 0 ? ` (${t.chat!.length})` : ""}
+        </Button>
         <Button
           size="sm"
           variant="secondary"
@@ -404,6 +449,77 @@ export default function StaffPage() {
                 Cancel
               </Button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {chatTask ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (actingId) return;
+            setChatTask(null);
+          }}
+        >
+          <div
+            className="flex max-h-[80vh] w-full max-w-md flex-col rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold">{chatTask.title}</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {chatTask.assignedToName || "Student"}
+              {typeof chatTask.spentMinutes === "number"
+                ? ` · ${chatTask.spentMinutes}m worked`
+                : ""}
+            </p>
+            <div className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl bg-slate-50 p-3 text-sm">
+              {(chatTask.chat || []).length === 0 ? (
+                <p className="text-slate-500">No messages yet</p>
+              ) : (
+                (chatTask.chat || []).map((m) => (
+                  <div
+                    key={m.id}
+                    className={`rounded-xl px-3 py-2 ${
+                      m.senderRole === "ADMIN"
+                        ? "ml-6 bg-blue-600 text-white"
+                        : "mr-6 bg-white text-slate-800"
+                    }`}
+                  >
+                    <div className="text-[11px] opacity-70">
+                      {m.senderName} · {m.sentAt.slice(11, 16) || m.sentAt}
+                    </div>
+                    <div>{m.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                placeholder="Reply to student…"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void sendTaskChat();
+                }}
+              />
+              <Button
+                disabled={actingId === chatTask.id || !chatText.trim()}
+                onClick={() => void sendTaskChat()}
+              >
+                Send
+              </Button>
+            </div>
+            <Button
+              className="mt-2"
+              variant="secondary"
+              disabled={actingId === chatTask.id}
+              onClick={() => setChatTask(null)}
+            >
+              Close
+            </Button>
           </div>
         </div>
       ) : null}

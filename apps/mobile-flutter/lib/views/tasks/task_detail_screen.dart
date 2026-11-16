@@ -1,16 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/task_provider.dart';
-import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/live_countdown.dart';
 
-class TaskDetailScreen extends StatelessWidget {
+class TaskDetailScreen extends StatefulWidget {
   final String taskId;
 
   const TaskDetailScreen({super.key, required this.taskId});
+
+  @override
+  State<TaskDetailScreen> createState() => _TaskDetailScreenState();
+}
+
+class _TaskDetailScreenState extends State<TaskDetailScreen> {
+  Timer? _poll;
 
   String _fmt(int totalSeconds) {
     final m = (totalSeconds ~/ 60).toString().padLeft(2, '0');
@@ -19,15 +27,34 @@ class TaskDetailScreen extends StatelessWidget {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // Keep chat + spent time in sync with backend / teacher replies.
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      context.read<TaskProvider>().load(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final tasks = context.watch<TaskProvider>();
-    final task = tasks.byId(taskId);
-    final running = tasks.isTimerRunning(taskId);
+    final task = tasks.byId(widget.taskId);
+    final running = tasks.isTimerRunning(widget.taskId);
 
     if (task == null) {
       return const Scaffold(body: Center(child: AppLoader()));
     }
+
+    final teacherName =
+        task.assignedBy.trim().isEmpty ? 'your teacher' : task.assignedBy;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -41,7 +68,9 @@ class TaskDetailScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text(task.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                Text(task.title,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
                 Text(
                   '${task.courseTitle} · assigned by ${task.assignedBy}',
@@ -56,7 +85,8 @@ class TaskDetailScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Text('Due in', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const Text('Due in',
+                          style: TextStyle(fontWeight: FontWeight.w600)),
                       const Spacer(),
                       LiveCountdown(
                         target: task.dueAt,
@@ -78,7 +108,7 @@ class TaskDetailScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        _fmt(task.remainingSeconds),
+                        _fmt(task.elapsedSeconds),
                         style: const TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.w800,
@@ -87,9 +117,23 @@ class TaskDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Task timer · ${task.timerMinutes} min total',
+                        task.timerMinutes > 0
+                            ? 'Worked ${_fmt(task.elapsedSeconds)} · goal ${task.timerMinutes} min'
+                            : 'Work timer · counting up (saved to teacher)',
+                        textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.muted),
                       ),
+                      if (task.remainingSeconds != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Remaining ${_fmt(task.remainingSeconds!)}',
+                          style: const TextStyle(
+                            color: AppColors.blue,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -97,18 +141,18 @@ class TaskDetailScreen extends StatelessWidget {
                             child: ElevatedButton(
                               onPressed: task.isComplete
                                   ? null
-                                  : () {
-                                      tasks.toggleTimer(task.id);
-                                      context.read<UiProvider>().showSnack(running ? 'Timer paused' : 'Timer started', tone: AppSnackTone.info);
-                                    },
+                                  : () => tasks.toggleTimer(task.id),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.blue,
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    AppColors.line.withValues(alpha: 0.5),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: Text(running ? 'Pause timer' : 'Start timer'),
+                              child: Text(
+                                  running ? 'Pause timer' : 'Start timer'),
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -116,18 +160,19 @@ class TaskDetailScreen extends StatelessWidget {
                             child: ElevatedButton(
                               onPressed: task.isComplete
                                   ? null
-                                  : () {
-                                      tasks.completeTask(task.id);
-                                      context.read<UiProvider>().showSnack('Task marked complete', tone: AppSnackTone.success);
-                                    },
+                                  : () => tasks.completeTask(task.id),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.green,
                                 foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    AppColors.line.withValues(alpha: 0.5),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              child: Text(task.isComplete ? 'Completed' : 'Mark complete'),
+                              child: Text(task.isComplete
+                                  ? 'Completed'
+                                  : 'Mark complete'),
                             ),
                           ),
                         ],
@@ -136,7 +181,9 @@ class TaskDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('What to study / do', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const Text('What to study / do',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 const SizedBox(height: 8),
                 Container(
                   width: double.infinity,
@@ -145,25 +192,47 @@ class TaskDetailScreen extends StatelessWidget {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Text(task.description, style: const TextStyle(height: 1.4)),
+                  child: Text(task.description,
+                      style: const TextStyle(height: 1.4)),
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.softBlue,
-                    borderRadius: BorderRadius.circular(16),
+                if (task.studyNotes.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.softBlue,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(task.studyNotes,
+                        style: const TextStyle(height: 1.45)),
                   ),
-                  child: Text(task.studyNotes, style: const TextStyle(height: 1.45)),
-                ),
+                ],
                 const SizedBox(height: 16),
-                const Text('Chat', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text(
+                  'Chat with $teacherName',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Messages go to your teacher (and admin Teachers page). Live sync every few seconds.',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
                 const SizedBox(height: 8),
+                if (task.chat.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'No messages yet — ask a question or send an update.',
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                  ),
                 ...task.chat.map((msg) {
                   final mine = msg.senderRole == 'USER';
                   return Align(
-                    alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                    alignment:
+                        mine ? Alignment.centerRight : Alignment.centerLeft,
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
@@ -185,7 +254,8 @@ class TaskDetailScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             msg.text,
-                            style: TextStyle(color: mine ? Colors.white : AppColors.ink),
+                            style: TextStyle(
+                                color: mine ? Colors.white : AppColors.ink),
                           ),
                         ],
                       ),
@@ -205,7 +275,7 @@ class TaskDetailScreen extends StatelessWidget {
   }
 }
 
-/// Holds TextEditingController only — no setState.
+/// Holds TextEditingController only — no setState for list/timer.
 class _TaskChatBar extends StatefulWidget {
   final String taskId;
   final String senderName;
@@ -218,11 +288,32 @@ class _TaskChatBar extends StatefulWidget {
 
 class _TaskChatBarState extends State<_TaskChatBar> {
   final _controller = TextEditingController();
+  bool _sending = false;
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    _controller.clear();
+    try {
+      await context.read<TaskProvider>().sendChat(
+            taskId: widget.taskId,
+            senderName: widget.senderName,
+            text: text,
+          );
+    } catch (_) {
+      if (mounted) {
+        _controller.text = text;
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
@@ -235,8 +326,10 @@ class _TaskChatBarState extends State<_TaskChatBar> {
             Expanded(
               child: TextField(
                 controller: _controller,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
                 decoration: InputDecoration(
-                  hintText: 'Ask / update on this task...',
+                  hintText: 'Message your teacher…',
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(
@@ -248,19 +341,18 @@ class _TaskChatBarState extends State<_TaskChatBar> {
             ),
             const SizedBox(width: 8),
             IconButton.filled(
-              onPressed: () {
-                final text = _controller.text.trim();
-                if (text.isEmpty) return;
-                context.read<TaskProvider>().sendChat(
-                      taskId: widget.taskId,
-                      senderName: widget.senderName,
-                      text: text,
-                    );
-                _controller.clear();
-                context.read<UiProvider>().showSnack('Message sent', tone: AppSnackTone.info);
-              },
+              onPressed: _sending ? null : _send,
               style: IconButton.styleFrom(backgroundColor: AppColors.blue),
-              icon: const Icon(Icons.send_rounded, color: Colors.white),
+              icon: _sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.send_rounded, color: Colors.white),
             ),
           ],
         ),

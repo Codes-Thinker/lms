@@ -10,6 +10,7 @@ class TaskProvider extends ChangeNotifier {
   bool _loading = false;
   String? _activeTimerTaskId;
   Timer? _workTimer;
+  int _ticksSinceSync = 0;
 
   List<AssignedTask> get tasks => List.unmodifiable(_tasks);
   bool get loading => _loading;
@@ -23,12 +24,14 @@ class TaskProvider extends ChangeNotifier {
   int openCountFor(String userId) =>
       tasksForUser(userId).where((t) => t.status != 'DONE').length;
 
-  Future<void> load() async {
-    _loading = true;
-    notifyListeners();
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      _loading = true;
+      notifyListeners();
+    }
 
     final cached = await LocalCache.getList(LocalCache.tasks);
-    if (cached.isNotEmpty) {
+    if (!silent && cached.isNotEmpty && _tasks.isEmpty) {
       _tasks = cached
           .whereType<Map>()
           .map((e) => _fromApi(Map<String, dynamic>.from(e)))
@@ -40,21 +43,53 @@ class TaskProvider extends ChangeNotifier {
     try {
       final data = await ApiClient.instance.get('/tasks/me');
       if (data is List) {
-        _tasks = data.map((e) => _fromApi(e as Map<String, dynamic>)).toList();
+        final incoming = data
+            .map((e) => _fromApi(e as Map<String, dynamic>))
+            .toList();
+        _tasks = _mergeKeepingActiveTimer(incoming);
         await LocalCache.setJson(LocalCache.tasks, data);
-      } else if (cached.isEmpty) {
+      } else if (cached.isEmpty && _tasks.isEmpty) {
         _tasks = [];
       }
     } catch (e) {
       debugPrint('Tasks fetch failed: $e');
-      if (cached.isEmpty) _tasks = [];
+      if (cached.isEmpty && _tasks.isEmpty) _tasks = [];
     }
-    _loading = false;
+    if (!silent) _loading = false;
     notifyListeners();
   }
 
+  /// Keep local elapsed seconds for the running timer so poll/load does not reset it.
+  List<AssignedTask> _mergeKeepingActiveTimer(List<AssignedTask> incoming) {
+    final activeId = _activeTimerTaskId;
+    if (activeId == null) return incoming;
+    final local = byId(activeId);
+    if (local == null) return incoming;
+    return incoming.map((t) {
+      if (t.id != activeId) return t;
+      return AssignedTask(
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        studyNotes: t.studyNotes,
+        courseTitle: t.courseTitle,
+        assignedToId: t.assignedToId,
+        assignedToName: t.assignedToName,
+        assignedBy: t.assignedBy,
+        status: local.status == 'IN_PROGRESS' ? local.status : t.status,
+        dueAt: t.dueAt,
+        timerMinutes: t.timerMinutes,
+        spentSeconds: local.spentSeconds > t.spentSeconds
+            ? local.spentSeconds
+            : t.spentSeconds,
+        updatedAt: t.updatedAt,
+        chat: t.chat,
+      );
+    }).toList();
+  }
+
   void clearMemory() {
-    stopTimer();
+    stopTimer(persist: false);
     _tasks = [];
     notifyListeners();
   }
@@ -69,7 +104,7 @@ class TaskProvider extends ChangeNotifier {
         senderName: msg['senderName'] as String? ?? '',
         senderRole: msg['senderRole'] as String? ?? 'USER',
         text: msg['text'] as String? ?? '',
-        sentAt: msg['sentAt'] as String? ?? '',
+        sentAt: _formatSentAt(msg['sentAt'] as String? ?? ''),
       );
     }).toList();
     return AssignedTask(
@@ -77,17 +112,29 @@ class TaskProvider extends ChangeNotifier {
       title: json['title'] as String? ?? '',
       description: json['description'] as String? ?? '',
       studyNotes: json['studyNotes'] as String? ?? '',
-      courseTitle: 'Staff Ops',
+      courseTitle: (json['courseTitle'] as String?)?.trim().isNotEmpty == true
+          ? json['courseTitle'] as String
+          : 'Course',
       assignedToId: json['assignedToId'] as String? ?? '',
       assignedToName: json['assignedToName'] as String? ?? '',
       assignedBy: json['assignedBy'] as String? ?? '',
       status: status,
-      dueAt: DateTime.tryParse(json['dueAt'] as String? ?? '') ?? DateTime.now(),
+      dueAt: DateTime.tryParse(json['dueAt'] as String? ?? '') ??
+          DateTime.now().add(const Duration(days: 1)),
       timerMinutes: (json['timerMinutes'] as num?)?.toInt() ?? 0,
       spentSeconds: ((json['spentMinutes'] as num?)?.toInt() ?? 0) * 60,
       updatedAt: json['updatedAt'] as String? ?? '',
       chat: chat,
     );
+  }
+
+  String _formatSentAt(String raw) {
+    final dt = DateTime.tryParse(raw)?.toLocal();
+    if (dt != null) {
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+    if (raw.contains(':') && raw.length <= 5) return raw;
+    return raw;
   }
 
   AssignedTask? byId(String id) {
@@ -98,78 +145,156 @@ class TaskProvider extends ChangeNotifier {
     }
   }
 
-  void startTimer(String taskId) {
+  Future<void> startTimer(String taskId) async {
     final task = byId(taskId);
     if (task == null || task.isComplete) return;
+
+    // Cap only when teacher set a positive timer goal.
+    if (task.timerMinutes > 0 &&
+        task.spentSeconds >= task.timerMinutes * 60) {
+      return;
+    }
+
     _workTimer?.cancel();
     _activeTimerTaskId = taskId;
-    if (task.status == 'PENDING') task.status = 'IN_PROGRESS';
+    _ticksSinceSync = 0;
+    if (task.status == 'PENDING' || task.status == 'ASSIGNED') {
+      task.status = 'IN_PROGRESS';
+      unawaited(_persistProgress(taskId, status: 'IN_PROGRESS'));
+    }
     notifyListeners();
+
     _workTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       tickTimer(taskId);
-      if (task.spentSeconds >= task.timerMinutes * 60) {
-        stopTimer();
-      }
     });
   }
 
-  void stopTimer() {
+  void stopTimer({bool persist = true}) {
+    final id = _activeTimerTaskId;
     _workTimer?.cancel();
     _workTimer = null;
     _activeTimerTaskId = null;
+    _ticksSinceSync = 0;
     notifyListeners();
+    if (persist && id != null) {
+      unawaited(_persistProgress(id));
+    }
   }
 
-  void toggleTimer(String taskId) {
+  Future<void> toggleTimer(String taskId) async {
     if (isTimerRunning(taskId)) {
-      stopTimer();
+      stopTimer(persist: true);
     } else {
-      startTimer(taskId);
+      await startTimer(taskId);
     }
   }
 
   void tickTimer(String taskId) {
     final task = byId(taskId);
-    if (task == null || task.isComplete) return;
-    if (task.spentSeconds >= task.timerMinutes * 60) return;
+    if (task == null || task.isComplete) {
+      stopTimer(persist: true);
+      return;
+    }
+
+    final limit = task.timerMinutes > 0 ? task.timerMinutes * 60 : null;
+    if (limit != null && task.spentSeconds >= limit) {
+      stopTimer(persist: true);
+      return;
+    }
+
     task.spentSeconds += 1;
-    if (task.status == 'PENDING') task.status = 'IN_PROGRESS';
+    if (task.status == 'PENDING' || task.status == 'ASSIGNED') {
+      task.status = 'IN_PROGRESS';
+    }
+    _ticksSinceSync += 1;
     notifyListeners();
+
+    if (limit != null && task.spentSeconds >= limit) {
+      stopTimer(persist: true);
+      return;
+    }
+
+    // Sync elapsed minutes to backend every 15s while running.
+    if (_ticksSinceSync >= 15) {
+      _ticksSinceSync = 0;
+      unawaited(_persistProgress(taskId, status: 'IN_PROGRESS'));
+    }
+  }
+
+  Future<void> _persistProgress(String taskId, {String? status}) async {
+    final task = byId(taskId);
+    if (task == null) return;
+    final minutes = (task.spentSeconds / 60).ceil();
+    try {
+      await ApiClient.instance.patch('/tasks/$taskId', body: {
+        if (status != null) 'status': status,
+        'spentMinutes': minutes < 0 ? 0 : minutes,
+      });
+    } catch (e) {
+      debugPrint('Timer persist failed: $e');
+    }
   }
 
   Future<void> completeTask(String taskId) async {
     final task = byId(taskId);
     if (task == null) return;
-    if (_activeTimerTaskId == taskId) stopTimer();
+    if (_activeTimerTaskId == taskId) stopTimer(persist: false);
     task.status = 'DONE';
     notifyListeners();
     try {
       await ApiClient.instance.patch('/tasks/$taskId', body: {
         'status': 'DONE',
-        'spentMinutes': task.spentSeconds ~/ 60,
+        'spentMinutes': (task.spentSeconds / 60).ceil(),
       });
     } catch (_) {}
   }
 
-  void sendChat({
+  /// Posts to the assigning teacher (and shows in admin Teachers dashboard).
+  Future<void> sendChat({
     required String taskId,
     required String senderName,
     required String text,
-  }) {
+  }) async {
     final task = byId(taskId);
-    if (task == null || text.trim().isEmpty) return;
+    final trimmed = text.trim();
+    if (task == null || trimmed.isEmpty) return;
+
     final now = DateTime.now();
-    task.chat.add(
-      TaskChatMessage(
-        id: 'c-${now.millisecondsSinceEpoch}',
-        senderName: senderName,
-        senderRole: 'USER',
-        text: text.trim(),
-        sentAt:
-            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-      ),
+    final optimistic = TaskChatMessage(
+      id: 'local-${now.millisecondsSinceEpoch}',
+      senderName: senderName,
+      senderRole: 'USER',
+      text: trimmed,
+      sentAt:
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
     );
+    task.chat.add(optimistic);
     notifyListeners();
+
+    try {
+      final data = await ApiClient.instance.post(
+        '/tasks/$taskId/messages',
+        body: {'text': trimmed},
+      );
+      if (data is Map<String, dynamic>) {
+        final idx = task.chat.indexWhere((m) => m.id == optimistic.id);
+        if (idx >= 0) {
+          task.chat[idx] = TaskChatMessage(
+            id: data['id'] as String? ?? optimistic.id,
+            senderName: data['senderName'] as String? ?? senderName,
+            senderRole: data['senderRole'] as String? ?? 'USER',
+            text: data['text'] as String? ?? trimmed,
+            sentAt: _formatSentAt(data['sentAt'] as String? ?? optimistic.sentAt),
+          );
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Task chat send failed: $e');
+      task.chat.removeWhere((m) => m.id == optimistic.id);
+      notifyListeners();
+      rethrow;
+    }
   }
 
   @override

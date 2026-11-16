@@ -47,9 +47,13 @@ class AssignedTask {
     required this.chat,
   });
 
-  int get remainingSeconds {
-    final total = timerMinutes * 60;
-    final left = total - spentSeconds;
+  /// Count-up elapsed work time (always).
+  int get elapsedSeconds => spentSeconds < 0 ? 0 : spentSeconds;
+
+  /// Remaining only when teacher set a positive timer goal; else null.
+  int? get remainingSeconds {
+    if (timerMinutes <= 0) return null;
+    final left = timerMinutes * 60 - spentSeconds;
     return left < 0 ? 0 : left;
   }
 

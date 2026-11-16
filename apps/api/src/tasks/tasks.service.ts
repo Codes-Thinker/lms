@@ -298,6 +298,76 @@ export class TasksService {
     return this.listTasks({ assigneeId: studentId });
   }
 
+  /**
+   * Task-thread chat: student ↔ assigning teacher (admin can also post).
+   * Messages are stored on the task and the other party is notified.
+   */
+  async addMessage(
+    taskId: string,
+    actor: { actorId: string; accountType: string; fullName?: string },
+    text: string,
+  ) {
+    const trimmed = text.trim();
+    if (!trimmed) throw new NotFoundException("Message text required");
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { assignee: true, createdBy: true },
+    });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const isAdmin = actor.accountType === "SUPER_ADMIN";
+    const isAssignee = task.assigneeId === actor.actorId;
+    const isCreator = task.createdById === actor.actorId;
+    if (!isAdmin && !isAssignee && !isCreator) {
+      throw new ForbiddenException("Not allowed to chat on this task");
+    }
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: actor.actorId },
+      select: { fullName: true, accountType: true },
+    });
+    const senderRole =
+      isAdmin || actor.accountType === "STAFF" || isCreator ? "ADMIN" : "USER";
+    const senderName =
+      actor.fullName?.trim() ||
+      sender?.fullName ||
+      (senderRole === "ADMIN" ? "Teacher" : "Student");
+
+    const msg = await this.prisma.taskMessage.create({
+      data: {
+        taskId,
+        senderId: actor.actorId,
+        senderName,
+        senderRole,
+        text: trimmed,
+      },
+    });
+
+    // Notify the other party (teacher if student wrote, student if teacher wrote).
+    const notifyIds = new Set<string>();
+    if (isAssignee && task.createdById) notifyIds.add(task.createdById);
+    if ((isCreator || isAdmin) && task.assigneeId) notifyIds.add(task.assigneeId);
+    for (const userId of notifyIds) {
+      if (userId === actor.actorId) continue;
+      await this.notifications.notifyUser({
+        userId,
+        title: isAssignee ? "Student message on assignment" : "Teacher replied on assignment",
+        body: `${task.title}: ${trimmed.slice(0, 120)}`,
+        type: NotificationType.TASK,
+        data: { taskId, event: "chat" },
+      });
+    }
+
+    return {
+      id: msg.id,
+      senderName: msg.senderName,
+      senderRole: msg.senderRole,
+      text: msg.text,
+      sentAt: msg.createdAt.toISOString(),
+    };
+  }
+
   async updateTask(
     id: string,
     data: Partial<{

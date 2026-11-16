@@ -101,6 +101,20 @@ export class TasksController {
     return this.tasks.reviewAssignment(id, user.sub, body);
   }
 
+  /** Student ↔ teacher chat on a single assignment. */
+  @Post("tasks/:id/messages")
+  addMessage(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+    @Body() body: { text?: string },
+  ) {
+    return this.tasks.addMessage(
+      id,
+      { actorId: user.sub, accountType: user.accountType },
+      String(body.text ?? ""),
+    );
+  }
+
   @Patch("tasks/:id")
   updateTask(
     @Param("id") id: string,

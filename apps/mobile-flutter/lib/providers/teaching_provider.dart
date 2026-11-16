@@ -61,6 +61,37 @@ class TeachingCourse {
       );
 }
 
+class TaskThreadMessage {
+  final String id;
+  final String senderName;
+  final String senderRole;
+  final String text;
+  final String sentAt;
+
+  const TaskThreadMessage({
+    required this.id,
+    required this.senderName,
+    required this.senderRole,
+    required this.text,
+    required this.sentAt,
+  });
+
+  factory TaskThreadMessage.fromJson(Map<String, dynamic> j) {
+    final raw = j['sentAt']?.toString() ?? '';
+    final dt = DateTime.tryParse(raw)?.toLocal();
+    final sentAt = dt != null
+        ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
+        : raw;
+    return TaskThreadMessage(
+      id: j['id']?.toString() ?? '',
+      senderName: j['senderName']?.toString() ?? '',
+      senderRole: j['senderRole']?.toString() ?? 'USER',
+      text: j['text']?.toString() ?? '',
+      sentAt: sentAt,
+    );
+  }
+}
+
 class AssignedStudentTask {
   final String id;
   final String title;
@@ -72,6 +103,9 @@ class AssignedStudentTask {
   final String? courseTitle;
   final String? submittedAt;
   final String? reviewStatus;
+  final int timerMinutes;
+  final int spentMinutes;
+  final List<TaskThreadMessage> chat;
 
   const AssignedStudentTask({
     required this.id,
@@ -84,6 +118,9 @@ class AssignedStudentTask {
     this.courseTitle,
     this.submittedAt,
     this.reviewStatus,
+    this.timerMinutes = 0,
+    this.spentMinutes = 0,
+    this.chat = const [],
   });
 
   factory AssignedStudentTask.fromJson(Map<String, dynamic> j) =>
@@ -98,6 +135,12 @@ class AssignedStudentTask {
         courseTitle: j['courseTitle']?.toString(),
         submittedAt: j['submittedAt']?.toString(),
         reviewStatus: j['reviewStatus']?.toString(),
+        timerMinutes: (j['timerMinutes'] as num?)?.toInt() ?? 0,
+        spentMinutes: (j['spentMinutes'] as num?)?.toInt() ?? 0,
+        chat: ((j['chat'] as List?) ?? const [])
+            .map((e) => TaskThreadMessage.fromJson(
+                Map<String, dynamic>.from(e as Map)))
+            .toList(),
       );
 
   bool get isDone =>
@@ -254,6 +297,7 @@ class TeachingProvider extends ChangeNotifier {
     String? description,
     List<String>? assigneeIds,
     String? dueAt,
+    int? timerMinutes,
   }) async {
     _loading = true;
     notifyListeners();
@@ -266,6 +310,7 @@ class TeachingProvider extends ChangeNotifier {
         if (assigneeIds != null && assigneeIds.isNotEmpty)
           'assigneeIds': assigneeIds,
         if (dueAt != null) 'dueAt': dueAt,
+        if (timerMinutes != null) 'timerMinutes': timerMinutes,
       };
       final data = await ApiClient.instance.post('/tasks/assign', body: body)
           as Map<String, dynamic>;
@@ -334,6 +379,41 @@ class TeachingProvider extends ChangeNotifier {
       rethrow;
     } finally {
       _loading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Teacher reply on assignment thread (student gets push + sees in Task chat).
+  Future<void> sendAssignmentMessage({
+    required String taskId,
+    required String text,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final data = await ApiClient.instance.post(
+      '/tasks/$taskId/messages',
+      body: {'text': trimmed},
+    );
+    if (data is Map<String, dynamic>) {
+      final msg = TaskThreadMessage.fromJson(data);
+      _assigned = _assigned.map((t) {
+        if (t.id != taskId) return t;
+        return AssignedStudentTask(
+          id: t.id,
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          assignedToId: t.assignedToId,
+          assignedToName: t.assignedToName,
+          courseId: t.courseId,
+          courseTitle: t.courseTitle,
+          submittedAt: t.submittedAt,
+          reviewStatus: t.reviewStatus,
+          timerMinutes: t.timerMinutes,
+          spentMinutes: t.spentMinutes,
+          chat: [...t.chat, msg],
+        );
+      }).toList();
       notifyListeners();
     }
   }

@@ -142,6 +142,7 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
                             onSearch: teaching.setAssignmentQuery,
                             onEdit: _editAssignment,
                             onDelete: _deleteAssignment,
+                            onChat: _openAssignmentChat,
                           ),
                         ],
                       ),
@@ -149,6 +150,20 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
                   ],
                 ),
     );
+  }
+
+  Future<void> _openAssignmentChat(AssignedStudentTask task) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _AssignmentChatSheet(taskId: task.id),
+    );
+    if (!mounted) return;
+    await context.read<TeachingProvider>().load();
   }
 
   Future<void> _editAssignment(AssignedStudentTask task) async {
@@ -237,6 +252,7 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
         title: result.title,
         description: result.description,
         assigneeIds: result.assigneeIds,
+        timerMinutes: result.timerMinutes,
       );
       if (!mounted) return;
       teaching.setTabIndex(1);
@@ -257,11 +273,13 @@ class _AssignSheetResult {
   final String description;
   /// null = whole batch
   final List<String>? assigneeIds;
+  final int timerMinutes;
 
   const _AssignSheetResult({
     required this.title,
     required this.description,
     required this.assigneeIds,
+    required this.timerMinutes,
   });
 }
 
@@ -283,6 +301,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _descCtrl;
   late final TextEditingController _filterCtrl;
+  late final TextEditingController _timerCtrl;
   late final Set<String> _selectedIds;
   late bool _assignAll;
 
@@ -292,6 +311,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
     _titleCtrl = TextEditingController();
     _descCtrl = TextEditingController();
     _filterCtrl = TextEditingController();
+    _timerCtrl = TextEditingController(text: '30');
     _selectedIds = {...?(widget.preselect)};
     _assignAll = widget.preselect == null || widget.preselect!.isEmpty;
   }
@@ -301,6 +321,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _filterCtrl.dispose();
+    _timerCtrl.dispose();
     super.dispose();
   }
 
@@ -320,12 +341,14 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) return;
     if (!_assignAll && _selectedIds.isEmpty) return;
+    final mins = int.tryParse(_timerCtrl.text.trim()) ?? 0;
     Navigator.pop(
       context,
       _AssignSheetResult(
         title: title,
         description: _descCtrl.text.trim(),
         assigneeIds: _assignAll ? null : _selectedIds.toList(),
+        timerMinutes: mins < 0 ? 0 : mins,
       ),
     );
   }
@@ -386,6 +409,14 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
               decoration: _fieldDec('Instructions — what should they do?'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _timerCtrl,
+              keyboardType: TextInputType.number,
+              decoration: _fieldDec(
+                'Timer minutes (0 = open stopwatch)',
+              ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -656,6 +687,7 @@ class _AssignmentsTab extends StatelessWidget {
   final ValueChanged<String> onSearch;
   final ValueChanged<AssignedStudentTask> onEdit;
   final ValueChanged<AssignedStudentTask> onDelete;
+  final ValueChanged<AssignedStudentTask> onChat;
 
   const _AssignmentsTab({
     required this.searchController,
@@ -663,6 +695,7 @@ class _AssignmentsTab extends StatelessWidget {
     required this.onSearch,
     required this.onEdit,
     required this.onDelete,
+    required this.onChat,
   });
 
   @override
@@ -729,7 +762,8 @@ class _AssignmentsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  t.assignedToName ?? 'Student',
+                  '${t.assignedToName ?? 'Student'} · ${t.spentMinutes}m worked'
+                  '${t.chat.isEmpty ? '' : ' · ${t.chat.length} chat'}',
                   style:
                       const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
@@ -749,6 +783,11 @@ class _AssignmentsTab extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
+                    TextButton.icon(
+                      onPressed: () => onChat(t),
+                      icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                      label: const Text('Chat'),
+                    ),
                     TextButton.icon(
                       onPressed: () => onEdit(t),
                       icon: const Icon(Icons.edit_outlined, size: 16),
@@ -922,6 +961,189 @@ class _EditAssignmentSheetState extends State<_EditAssignmentSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Live assignment thread — student ↔ this teacher.
+class _AssignmentChatSheet extends StatefulWidget {
+  final String taskId;
+
+  const _AssignmentChatSheet({required this.taskId});
+
+  @override
+  State<_AssignmentChatSheet> createState() => _AssignmentChatSheetState();
+}
+
+class _AssignmentChatSheetState extends State<_AssignmentChatSheet> {
+  final _controller = TextEditingController();
+  bool _sending = false;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      context.read<TeachingProvider>().load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    _controller.clear();
+    try {
+      await context.read<TeachingProvider>().sendAssignmentMessage(
+            taskId: widget.taskId,
+            text: text,
+          );
+    } catch (e) {
+      if (mounted) {
+        _controller.text = text;
+        context.read<UiProvider>().showSnack(
+              ApiErrors.friendly(e),
+              tone: AppSnackTone.error,
+            );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AssignedStudentTask? task;
+    try {
+      task = context
+          .watch<TeachingProvider>()
+          .assigned
+          .firstWhere((t) => t.id == widget.taskId);
+    } catch (_) {
+      task = null;
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.7,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.line,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            Text(
+              task?.title ?? 'Assignment chat',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+            ),
+            Text(
+              '${task?.assignedToName ?? 'Student'} · ${task?.spentMinutes ?? 0}m worked',
+              style: const TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ListView(
+                children: [
+                  if (task == null || task.chat.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'No messages yet. Student updates show here in realtime.',
+                        style: TextStyle(color: AppColors.muted),
+                      ),
+                    ),
+                  ...?(task?.chat.map((msg) {
+                    final mine = msg.senderRole == 'ADMIN';
+                    return Align(
+                      alignment: mine
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        decoration: BoxDecoration(
+                          color: mine ? AppColors.blue : AppColors.bg,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${msg.senderName} · ${msg.sentAt}',
+                              style: TextStyle(
+                                color:
+                                    mine ? Colors.white70 : AppColors.muted,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              msg.text,
+                              style: TextStyle(
+                                color: mine ? Colors.white : AppColors.ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  })),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
+                    decoration: InputDecoration(
+                      hintText: 'Reply to student…',
+                      filled: true,
+                      fillColor: AppColors.bg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _sending ? null : _send,
+                  style:
+                      IconButton.styleFrom(backgroundColor: AppColors.blue),
+                  icon: const Icon(Icons.send_rounded, color: Colors.white),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
