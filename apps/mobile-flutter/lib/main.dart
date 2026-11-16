@@ -18,6 +18,8 @@ import 'services/push_notification_service.dart';
 import 'views/help/admin_chat_screen.dart';
 import 'views/shell/app_shell.dart';
 import 'views/splash/splash_screen.dart';
+import 'views/tasks/task_detail_screen.dart';
+import 'views/teacher/teacher_class_screen.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/force_update_sheet.dart';
@@ -68,6 +70,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
 
   void _openFromNotification(String type) {
     final upper = type.toUpperCase();
+    final taskId = NotificationRouter.pendingTaskId;
     final tab = NotificationRouter.tabForType(type);
     _ui.setNavIndex(tab);
 
@@ -79,7 +82,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
       return;
     }
 
-    // Jump to shell, then open Code's Thinker chat when it's a CHAT push.
+    // Jump to shell, then open chat / assignment when needed.
     nav.pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AppShell()),
       (route) => false,
@@ -94,6 +97,22 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
           MaterialPageRoute(builder: (_) => const AdminChatScreen()),
         );
         NotificationRouter.takeOpenAdminChat();
+      });
+    } else if (upper == 'TASK' && taskId != null && taskId.isNotEmpty) {
+      Future<void>.delayed(const Duration(milliseconds: 280), () {
+        final n = appNavigatorKey.currentState;
+        if (n == null) return;
+        if (_auth.isStaff) {
+          n.push(
+            MaterialPageRoute(builder: (_) => const TeacherClassScreen()),
+          );
+        } else {
+          n.push(
+            MaterialPageRoute(
+              builder: (_) => TaskDetailScreen(taskId: taskId),
+            ),
+          );
+        }
       });
     }
 

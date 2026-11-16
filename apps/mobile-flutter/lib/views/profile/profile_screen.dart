@@ -30,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
       try {
         await auth.setAvatarPath(path);
         if (!context.mounted) return;
-        ui.showSnack('Photo saved — visible on admin dashboard');
+        ui.showSnack('Profile photo updated', tone: AppSnackTone.success);
       } finally {
         ui.hideLoading();
       }

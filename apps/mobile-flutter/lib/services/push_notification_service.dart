@@ -152,6 +152,7 @@ class PushNotificationService {
     if (!_isForMe(message.data)) return;
 
     final type = (message.data['type'] ?? 'GENERAL').toString();
+    final taskId = message.data['taskId']?.toString();
     final rawTitle = message.notification?.title ??
         message.data['title']?.toString() ??
         '';
@@ -162,22 +163,19 @@ class PushNotificationService {
     final text = body.trim().isNotEmpty
         ? body.trim()
         : (rawTitle.trim().isNotEmpty ? rawTitle.trim() : 'New update');
-    final isChat = type.toUpperCase() == 'CHAT';
-
     _ui?.showSnack(
       text,
       title: title.isNotEmpty ? title : null,
       tone: AppSnackTone.info,
       duration: const Duration(seconds: 3, milliseconds: 500),
-      onTap: isChat
-          ? () {
-              NotificationRouter.setPending(type: 'CHAT');
-              _onOpenInApp?.call('CHAT');
-            }
-          : () {
-              NotificationRouter.setPending(type: type);
-              _onOpenInApp?.call(type);
-            },
+      onTap: () {
+        NotificationRouter.setPending(
+          type: type,
+          taskId: taskId,
+          notificationId: message.data['notificationId']?.toString(),
+        );
+        _onOpenInApp?.call(type);
+      },
     );
   }
 
@@ -187,6 +185,7 @@ class PushNotificationService {
     NotificationRouter.setPending(
       type: type,
       notificationId: message.data['notificationId']?.toString(),
+      taskId: message.data['taskId']?.toString(),
       fromLaunch: fromLaunch,
     );
     _onOpenInApp?.call(type);
@@ -201,6 +200,7 @@ class PushNotificationService {
       NotificationRouter.setPending(
         type: type,
         notificationId: map['notificationId']?.toString(),
+        taskId: map['taskId']?.toString(),
         fromLaunch: false,
       );
       if (fromTap) _onOpenInApp?.call(type);

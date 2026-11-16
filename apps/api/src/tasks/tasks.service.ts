@@ -344,18 +344,25 @@ export class TasksService {
       },
     });
 
-    // Notify the other party (teacher if student wrote, student if teacher wrote).
+    // Notify the other party (teacher ↔ student) with a clean chat-style alert.
     const notifyIds = new Set<string>();
     if (isAssignee && task.createdById) notifyIds.add(task.createdById);
     if ((isCreator || isAdmin) && task.assigneeId) notifyIds.add(task.assigneeId);
+    const preview =
+      trimmed.length > 100 ? `${trimmed.slice(0, 97)}…` : trimmed;
     for (const userId of notifyIds) {
       if (userId === actor.actorId) continue;
       await this.notifications.notifyUser({
         userId,
-        title: isAssignee ? "Student message on assignment" : "Teacher replied on assignment",
-        body: `${task.title}: ${trimmed.slice(0, 120)}`,
+        title: senderName,
+        body: `${task.title} · ${preview}`,
         type: NotificationType.TASK,
-        data: { taskId, event: "chat" },
+        data: {
+          taskId,
+          event: "chat",
+          senderName,
+          senderRole,
+        },
       });
     }
 

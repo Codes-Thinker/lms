@@ -9,8 +9,11 @@ import '../../providers/notification_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../help/admin_chat_screen.dart';
 import '../fees/fees_screen.dart';
+import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
 import '../attendance/attendance_screen.dart';
+import '../teacher/teacher_class_screen.dart';
+import '../../providers/auth_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -28,16 +31,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
-  IconData _iconFor(String type) {
-    switch (type.toUpperCase()) {
-      case 'CHAT':
-        return Icons.chat_bubble_outline_rounded;
+  IconData _iconFor(AppNotificationItem n) {
+    final type = n.type.toUpperCase();
+    final event = n.data?['event']?.toString();
+    if (type == 'CHAT' || event == 'chat') {
+      return Icons.chat_bubble_outline_rounded;
+    }
+    switch (type) {
       case 'FEE':
         return Icons.payments_outlined;
       case 'ATTENDANCE':
         return Icons.fingerprint_rounded;
       case 'TASK':
-        return Icons.task_alt_rounded;
+        return Icons.assignment_outlined;
       default:
         return Icons.notifications_none_rounded;
     }
@@ -54,6 +60,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     await context.read<NotificationProvider>().markRead(n.id);
     if (!mounted) return;
     final type = n.type.toUpperCase();
+    final taskId = n.data?['taskId']?.toString();
+    final event = n.data?['event']?.toString();
+    final isStaff = context.read<AuthProvider>().isStaff;
+
     if (type == 'CHAT') {
       Navigator.of(context).push(
         AppMotion.fadeSlide(const AdminChatScreen()),
@@ -65,6 +75,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       return;
     }
     if (type == 'TASK') {
+      if (taskId != null && taskId.isNotEmpty && !isStaff) {
+        Navigator.of(context).push(
+          AppMotion.fadeSlide(TaskDetailScreen(taskId: taskId)),
+        );
+        return;
+      }
+      if (isStaff && event == 'chat') {
+        // Teacher: open My classes so they can reply on the assignment thread.
+        Navigator.of(context).push(
+          AppMotion.fadeSlide(const TeacherClassScreen()),
+        );
+        return;
+      }
+      if (taskId != null && taskId.isNotEmpty) {
+        Navigator.of(context).push(
+          AppMotion.fadeSlide(TaskDetailScreen(taskId: taskId)),
+        );
+        return;
+      }
       Navigator.of(context).push(AppMotion.fadeSlide(const TasksScreen()));
       return;
     }
@@ -150,7 +179,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
-                                  _iconFor(n.type),
+                                  _iconFor(n),
                                   color: AppColors.blue,
                                   size: 20,
                                 ),

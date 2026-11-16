@@ -4,16 +4,21 @@ class NotificationRouter {
 
   static String? pendingType;
   static String? pendingNotificationId;
+  static String? pendingTaskId;
   static bool launchedFromNotification = false;
   static bool openAdminChat = false;
 
   static void setPending({
     required String? type,
     String? notificationId,
+    String? taskId,
     bool fromLaunch = false,
   }) {
     pendingType = type;
     pendingNotificationId = notificationId;
+    if (taskId != null && taskId.isNotEmpty) {
+      pendingTaskId = taskId;
+    }
     if ((type ?? '').toUpperCase() == 'CHAT') {
       openAdminChat = true;
     }
@@ -23,6 +28,7 @@ class NotificationRouter {
   static void clear() {
     pendingType = null;
     pendingNotificationId = null;
+    pendingTaskId = null;
     launchedFromNotification = false;
     // openAdminChat cleared after HelpHub consumes it
   }
@@ -31,6 +37,12 @@ class NotificationRouter {
     final v = openAdminChat;
     openAdminChat = false;
     return v;
+  }
+
+  static String? takePendingTaskId() {
+    final id = pendingTaskId;
+    pendingTaskId = null;
+    return id;
   }
 
   /// Shell tab for notification type (same for all roles).
@@ -54,7 +66,7 @@ class NotificationRouter {
   static String labelForType(String? type) {
     switch ((type ?? '').toUpperCase()) {
       case 'TASK':
-        return 'Task';
+        return 'Assignment';
       case 'FEE':
         return 'Fee';
       case 'ATTENDANCE':
