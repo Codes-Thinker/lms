@@ -443,7 +443,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                               icon: CupertinoIcons.checkmark_seal,
                               title: t.title,
                               subtitle:
-                                  '${t.status} · ${t.spentMinutes}m worked · ${t.courseTitle}',
+                                  '${t.status} · ${(t.spentSeconds / 60).floor()}m worked · ${t.courseTitle}',
                               onTap: () => _push(
                                 context,
                                 TaskDetailScreen(taskId: t.id),
