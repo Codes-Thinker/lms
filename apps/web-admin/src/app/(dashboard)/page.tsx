@@ -102,15 +102,15 @@ export default function DashboardPage() {
       api<Overview>("/reports/overview"),
       api<AttendanceRow[]>("/attendance"),
       api<FeeRow[]>("/fees"),
-      api<{ items: UserRow[] }>("/users?pageSize=24"),
+      api<{ items: UserRow[] }>("/users?pageSize=12"),
       api<Activity>("/support/activity-summary"),
     ]);
     setOverview(ov);
-    setAttendance(att.slice(0, 6));
+    setAttendance(att.slice(0, 5));
     setFees(
       feeList
         .filter((f) => f.status === "SENT" || f.status === "DUE" || f.status === "PARTIAL")
-        .slice(0, 6)
+        .slice(0, 5)
     );
     setPeople(users.items);
     setActivity(act);
@@ -125,9 +125,10 @@ export default function DashboardPage() {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
       }
     })();
+    // Slower poll — activity badges already refresh separately
     const id = window.setInterval(() => {
       loadCore().catch(() => {});
-    }, 15000);
+    }, 45000);
     return () => {
       cancelled = true;
       window.clearInterval(id);

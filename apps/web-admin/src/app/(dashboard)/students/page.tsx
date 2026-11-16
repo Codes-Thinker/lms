@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
 const CACHE_KEY = "lms_cache_students_v2";
 const PAGE_SIZE = 25;
@@ -91,7 +92,7 @@ function mapStudent(u: Record<string, unknown>): StudentRow {
   };
 }
 
-export default function StudentsPage() {
+function StudentsPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -227,8 +228,7 @@ export default function StudentsPage() {
         <div>
           <h2 className="text-lg font-semibold">Students</h2>
           <p className="text-sm text-slate-500">
-            Roster by course · profiles at{" "}
-            <span className="font-medium text-slate-700">/users/:id</span>
+            Filter by course, then open a student for the full profile
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -450,5 +450,13 @@ export default function StudentsPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function StudentsPage() {
+  return (
+    <SearchParamsBoundary>
+      <StudentsPageInner />
+    </SearchParamsBoundary>
   );
 }

@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 import { cn } from "@/lib/utils";
 
 type CourseTab = {
@@ -62,7 +63,7 @@ function statusVariant(status: string) {
   return "secondary" as const;
 }
 
-export default function AttendancePage() {
+function AttendancePageInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -320,5 +321,13 @@ export default function AttendancePage() {
         </table>
       </div>
     </div>
+  );
+}
+
+export default function AttendancePage() {
+  return (
+    <SearchParamsBoundary>
+      <AttendancePageInner />
+    </SearchParamsBoundary>
   );
 }

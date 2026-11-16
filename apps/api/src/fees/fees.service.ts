@@ -117,10 +117,20 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     const where: Record<string, unknown> = {};
     if (studentId) where.studentId = studentId;
     if (courseId) where.courseId = courseId;
+    // List stays light — no chat messages (those load on get/:id).
     const rows = await this.prisma.feeCase.findMany({
       where,
       include: {
-        student: { include: { batch: true } },
+        student: {
+          select: {
+            fullName: true,
+            monthlyFee: true,
+            totalCourseFee: true,
+            courseDurationMonths: true,
+            paymentType: true,
+            batch: { select: { code: true, name: true } },
+          },
+        },
         course: {
           select: {
             id: true,
@@ -129,13 +139,16 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
             durationMonths: true,
           },
         },
-        messages: { orderBy: { createdAt: "asc" } },
-        reminderLogs: { orderBy: { sentAt: "desc" } },
+        reminderLogs: {
+          select: { id: true, kind: true, sentAt: true },
+          orderBy: { sentAt: "desc" },
+          take: 5,
+        },
         submissions: { select: { amount: true, status: true } },
       },
       orderBy: { dueDate: "desc" },
     });
-    return rows.map((r) => this.map(r));
+    return rows.map((r) => this.map({ ...r, messages: [] }));
   }
 
   async get(id: string) {

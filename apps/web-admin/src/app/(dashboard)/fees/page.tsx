@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { useAdminActivity } from "@/components/ui/admin-activity-provider";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
 type CourseTab = {
   id: string;
@@ -50,7 +51,7 @@ function money(n: number | undefined) {
   return `Rs ${n.toLocaleString()}`;
 }
 
-export default function FeesPage() {
+function FeesPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -112,7 +113,7 @@ export default function FeesPage() {
       .finally(() => setLoading(false));
     const id = window.setInterval(() => {
       load().catch(() => {});
-    }, 15000);
+    }, 30000);
     return () => window.clearInterval(id);
   }, [load, show]);
 
@@ -163,7 +164,7 @@ export default function FeesPage() {
         <div>
           <h2 className="text-lg font-semibold">Student fees</h2>
           <p className="text-sm text-slate-500">
-            Balances, reminders, and status · refreshes every 15s
+            Balances, reminders, and payment status
           </p>
         </div>
         <Button
@@ -335,5 +336,13 @@ export default function FeesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function FeesPage() {
+  return (
+    <SearchParamsBoundary>
+      <FeesPageInner />
+    </SearchParamsBoundary>
   );
 }

@@ -92,12 +92,13 @@ function NavLinks({
             href={item.href}
             title={collapsed ? item.label : undefined}
             onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "nav-link relative flex items-center rounded-xl py-2.5 text-sm font-medium",
               collapsed ? "justify-center px-2" : "gap-3 px-3",
               active
                 ? "bg-[#2563EB] text-white"
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                : "bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />

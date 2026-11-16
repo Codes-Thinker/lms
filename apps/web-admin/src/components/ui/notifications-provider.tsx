@@ -132,7 +132,7 @@ export function NotificationsProvider({
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 15000);
+    const id = window.setInterval(() => void refresh(), 30000);
     return () => window.clearInterval(id);
   }, [refresh]);
 

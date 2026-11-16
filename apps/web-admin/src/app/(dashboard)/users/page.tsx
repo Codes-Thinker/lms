@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 import { cacheGet, cacheGetSync, cacheSet } from "@/lib/local-db";
 
 const USERS_CACHE_KEY = "lms_cache_users_v1";
@@ -77,7 +78,7 @@ function assignedCourseLabel(u: UserRow): string {
   return "—";
 }
 
-export default function UsersPage() {
+function UsersPageInner() {
   const { show } = useSnackbar();
   const searchParams = useSearchParams();
   const qFromUrl = (searchParams.get("q") || "").trim();
@@ -686,5 +687,13 @@ export default function UsersPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <SearchParamsBoundary>
+      <UsersPageInner />
+    </SearchParamsBoundary>
   );
 }
