@@ -358,21 +358,28 @@ export default function InboxPage() {
                         {m.imageData ? (
                           <button
                             type="button"
-                            className="mb-1 block w-full overflow-hidden rounded-xl text-left focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="mb-1 block w-full text-left focus:outline-none focus:ring-2 focus:ring-blue-400"
                             onClick={() => setPreviewSrc(m.imageData || null)}
                             title="Open full size"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              key={`img-${m.id}`}
-                              src={m.imageData}
-                              alt={m.imageName || "Photo"}
-                              className="max-h-64 w-full cursor-zoom-in rounded-xl object-cover"
-                              loading="eager"
-                            />
                             <span
                               className={cn(
-                                "mt-1 block text-[11px]",
+                                "flex max-h-64 items-center justify-center overflow-hidden rounded-xl",
+                                mine ? "bg-black/20" : "bg-slate-100"
+                              )}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                key={`img-${m.id}`}
+                                src={m.imageData}
+                                alt={m.imageName || "Photo"}
+                                className="max-h-64 max-w-full cursor-zoom-in object-contain"
+                                loading="eager"
+                              />
+                            </span>
+                            <span
+                              className={cn(
+                                "mt-1 block text-center text-[11px]",
                                 mine ? "text-blue-100" : "text-slate-400"
                               )}
                             >
@@ -457,21 +464,31 @@ export default function InboxPage() {
 
       {previewSrc ? (
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/80 p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/85 p-3 sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label="Image preview"
           onClick={() => setPreviewSrc(null)}
         >
+          {/* Always-visible close — never clipped by tall images */}
+          <button
+            type="button"
+            className="absolute right-3 top-3 z-[210] flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl font-bold leading-none text-slate-800 shadow-lg hover:bg-slate-100 sm:right-6 sm:top-6"
+            aria-label="Close"
+            onClick={() => setPreviewSrc(null)}
+          >
+            ×
+          </button>
+
           <div
-            className="relative max-h-[92vh] max-w-[min(960px,96vw)] overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="relative flex max-h-[min(88vh,900px)] w-full max-w-[min(920px,96vw)] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
               <p className="text-sm font-semibold text-slate-800">
                 Screenshot / photo
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <a
                   href={previewSrc}
                   download="chat-photo.jpg"
@@ -488,12 +505,12 @@ export default function InboxPage() {
                 </button>
               </div>
             </div>
-            <div className="max-h-[calc(92vh-3.5rem)] overflow-auto bg-slate-100 p-3">
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-slate-100 p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={previewSrc}
                 alt="Full size"
-                className="mx-auto max-h-[80vh] w-auto max-w-full object-contain"
+                className="mx-auto max-h-[min(72vh,720px)] w-auto max-w-full object-contain"
               />
             </div>
           </div>

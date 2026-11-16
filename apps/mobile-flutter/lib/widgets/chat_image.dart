@@ -14,7 +14,6 @@ Uint8List? chatImageBytes(String? dataUrl) {
   try {
     final raw = dataUrl.contains(',') ? dataUrl.split(',').last : dataUrl;
     final bytes = base64Decode(raw);
-    // Cap cache size roughly.
     if (_chatImageBytesCache.length > 40) {
       _chatImageBytesCache.remove(_chatImageBytesCache.keys.first);
     }
@@ -36,7 +35,7 @@ class ChatImageThumb extends StatelessWidget {
     required this.imageData,
     this.label,
     this.mine = false,
-    this.height = 160,
+    this.height = 180,
   });
 
   void _open(BuildContext context) {
@@ -65,22 +64,30 @@ class ChatImageThumb extends StatelessWidget {
     return GestureDetector(
       onTap: () => _open(context),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+          Container(
+            height: height,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: mine ? Colors.black26 : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
             child: Image.memory(
               bytes,
               height: height,
               width: double.infinity,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
               gaplessPlayback: true,
               filterQuality: FilterQuality.medium,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           Text(
             'Tap to view',
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: mine ? Colors.white70 : AppColors.muted,
               fontSize: 11,
@@ -105,6 +112,10 @@ class _ChatImageViewer extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: const Text('Photo'),
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: Center(
         child: InteractiveViewer(
