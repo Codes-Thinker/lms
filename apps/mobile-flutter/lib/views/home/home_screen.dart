@@ -481,7 +481,7 @@ class HomeScreen extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${task.status} · ${task.timerMinutes}m',
+                                            '${task.status} · ${(task.spentSeconds / 60).floor()}m worked',
                                             style: const TextStyle(
                                               color: AppColors.muted,
                                               fontSize: 12,

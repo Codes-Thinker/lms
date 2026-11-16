@@ -37,7 +37,7 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
     });
     _poll = Timer.periodic(const Duration(seconds: 8), (_) {
       if (!mounted) return;
-      context.read<TeachingProvider>().load();
+      context.read<TeachingProvider>().load(silent: true);
     });
   }
 
@@ -163,7 +163,7 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
       builder: (ctx) => _AssignmentChatSheet(taskId: task.id),
     );
     if (!mounted) return;
-    await context.read<TeachingProvider>().load();
+    await context.read<TeachingProvider>().load(silent: true);
   }
 
   Future<void> _editAssignment(AssignedStudentTask task) async {
@@ -986,7 +986,7 @@ class _AssignmentChatSheetState extends State<_AssignmentChatSheet> {
     super.initState();
     _poll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) return;
-      context.read<TeachingProvider>().load();
+      context.read<TeachingProvider>().load(silent: true);
     });
   }
 
@@ -1006,6 +1006,7 @@ class _AssignmentChatSheetState extends State<_AssignmentChatSheet> {
       await context.read<TeachingProvider>().sendAssignmentMessage(
             taskId: widget.taskId,
             text: text,
+            senderName: 'You',
           );
     } catch (e) {
       if (mounted) {

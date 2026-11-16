@@ -138,7 +138,7 @@ class TasksScreen extends StatelessWidget {
                                       ],
                                       const SizedBox(height: 6),
                                       Text(
-                                        '${task.status} · ${task.timerMinutes}m · ${task.chat.length} chat',
+                                        '${task.status} · ${(task.spentSeconds / 60).floor()}m worked · ${task.chat.length} chat',
                                         style: const TextStyle(
                                           color: AppColors.muted,
                                           fontSize: 12,

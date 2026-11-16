@@ -245,10 +245,12 @@ class TeachingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> load() async {
-    _loading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> load({bool silent = false}) async {
+    if (!silent) {
+      _loading = true;
+      _error = null;
+      notifyListeners();
+    }
     try {
       final roster = await ApiClient.instance.get('/courses/teaching/mine');
       if (roster is List) {
@@ -266,17 +268,65 @@ class TeachingProvider extends ChangeNotifier {
       }
       final tasks = await ApiClient.instance.get('/tasks/assigned-by-me');
       if (tasks is List) {
-        _assigned = tasks
+        final incoming = tasks
             .map((e) => AssignedStudentTask.fromJson(
                 Map<String, dynamic>.from(e as Map)))
             .toList();
+        // Merge so a slow poll cannot wipe messages just appended after send.
+        _assigned = _mergeAssigned(incoming);
       }
     } catch (e) {
       _error = e.toString();
       debugPrint('Teaching load failed: $e');
     }
-    _loading = false;
+    if (!silent) _loading = false;
     notifyListeners();
+  }
+
+  List<AssignedStudentTask> _mergeAssigned(List<AssignedStudentTask> incoming) {
+    final prevById = {for (final t in _assigned) t.id: t};
+    return incoming.map((remote) {
+      final local = prevById[remote.id];
+      if (local == null) return remote;
+      return AssignedStudentTask(
+        id: remote.id,
+        title: remote.title,
+        description: remote.description,
+        status: remote.status,
+        assignedToId: remote.assignedToId,
+        assignedToName: remote.assignedToName,
+        courseId: remote.courseId,
+        courseTitle: remote.courseTitle,
+        submittedAt: remote.submittedAt,
+        reviewStatus: remote.reviewStatus,
+        timerMinutes: remote.timerMinutes,
+        spentMinutes: local.spentMinutes > remote.spentMinutes
+            ? local.spentMinutes
+            : remote.spentMinutes,
+        chat: _mergeChat(local.chat, remote.chat),
+      );
+    }).toList();
+  }
+
+  List<TaskThreadMessage> _mergeChat(
+    List<TaskThreadMessage> local,
+    List<TaskThreadMessage> remote,
+  ) {
+    final seen = <String>{};
+    final out = <TaskThreadMessage>[];
+    for (final m in remote) {
+      if (seen.add(m.id)) out.add(m);
+    }
+    for (final m in local) {
+      if (m.id.startsWith('local-') &&
+          remote.any(
+            (r) => r.text == m.text && r.senderRole == m.senderRole,
+          )) {
+        continue;
+      }
+      if (seen.add(m.id)) out.add(m);
+    }
+    return out;
   }
 
   void clearMemory() {
@@ -387,15 +437,79 @@ class TeachingProvider extends ChangeNotifier {
   Future<void> sendAssignmentMessage({
     required String taskId,
     required String text,
+    String senderName = 'You',
   }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
-    final data = await ApiClient.instance.post(
-      '/tasks/$taskId/messages',
-      body: {'text': trimmed},
+
+    final optimisticId = 'local-${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now();
+    final optimistic = TaskThreadMessage(
+      id: optimisticId,
+      senderName: senderName,
+      senderRole: 'ADMIN',
+      text: trimmed,
+      sentAt:
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
     );
-    if (data is Map<String, dynamic>) {
-      final msg = TaskThreadMessage.fromJson(data);
+    _assigned = _assigned.map((t) {
+      if (t.id != taskId) return t;
+      return AssignedStudentTask(
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        status: t.status,
+        assignedToId: t.assignedToId,
+        assignedToName: t.assignedToName,
+        courseId: t.courseId,
+        courseTitle: t.courseTitle,
+        submittedAt: t.submittedAt,
+        reviewStatus: t.reviewStatus,
+        timerMinutes: t.timerMinutes,
+        spentMinutes: t.spentMinutes,
+        chat: [...t.chat, optimistic],
+      );
+    }).toList();
+    notifyListeners();
+
+    try {
+      final data = await ApiClient.instance.post(
+        '/tasks/$taskId/messages',
+        body: {'text': trimmed},
+      );
+      if (data is Map<String, dynamic>) {
+        final msg = TaskThreadMessage.fromJson(data);
+        _assigned = _assigned.map((t) {
+          if (t.id != taskId) return t;
+          final chat = t.chat.map((m) {
+            if (m.id == optimisticId) return msg;
+            return m;
+          }).toList();
+          // Dedupe if poll already inserted the server copy.
+          final seen = <String>{};
+          final deduped = <TaskThreadMessage>[];
+          for (final m in chat) {
+            if (seen.add(m.id)) deduped.add(m);
+          }
+          return AssignedStudentTask(
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            status: t.status,
+            assignedToId: t.assignedToId,
+            assignedToName: t.assignedToName,
+            courseId: t.courseId,
+            courseTitle: t.courseTitle,
+            submittedAt: t.submittedAt,
+            reviewStatus: t.reviewStatus,
+            timerMinutes: t.timerMinutes,
+            spentMinutes: t.spentMinutes,
+            chat: deduped,
+          );
+        }).toList();
+        notifyListeners();
+      }
+    } catch (e) {
       _assigned = _assigned.map((t) {
         if (t.id != taskId) return t;
         return AssignedStudentTask(
@@ -411,10 +525,11 @@ class TeachingProvider extends ChangeNotifier {
           reviewStatus: t.reviewStatus,
           timerMinutes: t.timerMinutes,
           spentMinutes: t.spentMinutes,
-          chat: [...t.chat, msg],
+          chat: t.chat.where((m) => m.id != optimisticId).toList(),
         );
       }).toList();
       notifyListeners();
+      rethrow;
     }
   }
 }

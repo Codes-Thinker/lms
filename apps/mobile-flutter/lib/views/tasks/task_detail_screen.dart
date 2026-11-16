@@ -117,9 +117,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        task.timerMinutes > 0
-                            ? 'Worked ${_fmt(task.elapsedSeconds)} · goal ${task.timerMinutes} min'
-                            : 'Work timer · counting up (saved to teacher)',
+                        task.isComplete
+                            ? 'Saved · ${(task.elapsedSeconds / 60).ceil()} min worked'
+                            : task.timerMinutes > 0
+                                ? 'Counting up · goal ${task.timerMinutes} min'
+                                : 'Counting up · saved to teacher on pause',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.muted),
                       ),

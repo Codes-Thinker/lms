@@ -59,33 +59,60 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Keep local elapsed seconds for the running timer so poll/load does not reset it.
+  /// Keep running timer + any chat the last poll has not returned yet.
   List<AssignedTask> _mergeKeepingActiveTimer(List<AssignedTask> incoming) {
+    final prevById = {for (final t in _tasks) t.id: t};
     final activeId = _activeTimerTaskId;
-    if (activeId == null) return incoming;
-    final local = byId(activeId);
-    if (local == null) return incoming;
-    return incoming.map((t) {
-      if (t.id != activeId) return t;
+    return incoming.map((remote) {
+      final local = prevById[remote.id];
+      if (local == null) return remote;
+      final keepTimer = activeId == remote.id;
+      final spent = keepTimer && local.spentSeconds > remote.spentSeconds
+          ? local.spentSeconds
+          : (local.spentSeconds > remote.spentSeconds
+              ? local.spentSeconds
+              : remote.spentSeconds);
+      final status = keepTimer && local.status == 'IN_PROGRESS'
+          ? local.status
+          : remote.status;
       return AssignedTask(
-        id: t.id,
-        title: t.title,
-        description: t.description,
-        studyNotes: t.studyNotes,
-        courseTitle: t.courseTitle,
-        assignedToId: t.assignedToId,
-        assignedToName: t.assignedToName,
-        assignedBy: t.assignedBy,
-        status: local.status == 'IN_PROGRESS' ? local.status : t.status,
-        dueAt: t.dueAt,
-        timerMinutes: t.timerMinutes,
-        spentSeconds: local.spentSeconds > t.spentSeconds
-            ? local.spentSeconds
-            : t.spentSeconds,
-        updatedAt: t.updatedAt,
-        chat: t.chat,
+        id: remote.id,
+        title: remote.title,
+        description: remote.description,
+        studyNotes: remote.studyNotes,
+        courseTitle: remote.courseTitle,
+        assignedToId: remote.assignedToId,
+        assignedToName: remote.assignedToName,
+        assignedBy: remote.assignedBy,
+        status: status,
+        dueAt: remote.dueAt,
+        timerMinutes: remote.timerMinutes,
+        spentSeconds: spent,
+        updatedAt: remote.updatedAt,
+        chat: _mergeChat(local.chat, remote.chat),
       );
     }).toList();
+  }
+
+  List<TaskChatMessage> _mergeChat(
+    List<TaskChatMessage> local,
+    List<TaskChatMessage> remote,
+  ) {
+    final seen = <String>{};
+    final out = <TaskChatMessage>[];
+    for (final m in remote) {
+      if (seen.add(m.id)) out.add(m);
+    }
+    for (final m in local) {
+      if (m.id.startsWith('local-') &&
+          remote.any(
+            (r) => r.text == m.text && r.senderRole == m.senderRole,
+          )) {
+        continue;
+      }
+      if (seen.add(m.id)) out.add(m);
+    }
+    return out;
   }
 
   void clearMemory() {
