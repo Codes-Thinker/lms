@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/support_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../widgets/chat_image.dart';
 
 class AdminChatScreen extends StatefulWidget {
   const AdminChatScreen({super.key});
@@ -198,31 +198,17 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                               if (msg.imageData != null &&
                                   msg.imageData!.startsWith('data:image')) ...[
                                 const SizedBox(height: 6),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.memory(
-                                    base64Decode(
-                                      msg.imageData!.contains(',')
-                                          ? msg.imageData!.split(',').last
-                                          : msg.imageData!,
-                                    ),
-                                    key: ValueKey('img-${msg.id}'),
-                                    height: 160,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    gaplessPlayback: true,
-                                    errorBuilder: (_, __, ___) => Text(
-                                      msg.imageName ?? 'Photo',
-                                      style: TextStyle(
-                                        color: mine
-                                            ? Colors.white
-                                            : AppColors.ink,
-                                      ),
-                                    ),
-                                  ),
+                                ChatImageThumb(
+                                  key: ValueKey('img-${msg.imageData.hashCode}'),
+                                  imageData: msg.imageData!,
+                                  label: msg.imageName,
+                                  mine: mine,
                                 ),
                               ],
-                              if (msg.text.isNotEmpty) ...[
+                              if (msg.text.isNotEmpty &&
+                                  !(msg.imageData != null &&
+                                      (msg.text.trim() == '📷 Photo' ||
+                                          msg.text.trim() == 'Photo'))) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   msg.text,

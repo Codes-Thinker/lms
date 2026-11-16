@@ -270,10 +270,26 @@ class SupportProvider extends ChangeNotifier {
       final msgs = ((data['messages'] as List?) ?? [])
           .map((m) => _mapMsg(Map<String, dynamic>.from(m as Map)))
           .toList();
-      // Drop optimistic; keep server list (stable ids) so photo does not flash twice.
-      _chat
-        ..clear()
-        ..addAll(msgs);
+      // Swap optimistic bubble in-place so the photo does not remount/blink.
+      final optIdx = _chat.indexWhere((m) => m.id == optimistic.id);
+      final known = _chat
+          .where((m) => !m.id.startsWith('local-'))
+          .map((m) => m.id)
+          .toSet();
+      final newcomers = msgs.where((m) => !known.contains(m.id)).toList();
+      if (optIdx >= 0 && newcomers.isNotEmpty) {
+        _chat[optIdx] = newcomers.last;
+        for (final m in newcomers) {
+          if (!_chat.any((c) => c.id == m.id)) _chat.add(m);
+        }
+      } else {
+        _chat
+          ..clear()
+          ..addAll(_mergeChat(
+            _chat.where((m) => m.id != optimistic.id).toList(),
+            msgs,
+          ));
+      }
       _sending = false;
       notifyListeners();
       return true;
