@@ -112,13 +112,62 @@ class TeachingProvider extends ChangeNotifier {
   List<TeachingCourse> _courses = [];
   List<AssignedStudentTask> _assigned = [];
 
+  /// 0 = Students, 1 = Assignments
+  int _tabIndex = 0;
+  String? _selectedCourseId;
+  String _studentQuery = '';
+  String _assignmentQuery = '';
+
   bool get loading => _loading;
   String? get error => _error;
   List<TeachingCourse> get courses => List.unmodifiable(_courses);
   List<AssignedStudentTask> get assigned => List.unmodifiable(_assigned);
+  int get tabIndex => _tabIndex;
+  String? get selectedCourseId => _selectedCourseId;
+  String get studentQuery => _studentQuery;
+  String get assignmentQuery => _assignmentQuery;
 
   int get totalStudents =>
       _courses.fold(0, (s, c) => s + c.students.length);
+
+  TeachingCourse? get selectedCourse {
+    if (_courses.isEmpty) return null;
+    if (_selectedCourseId == null) return _courses.first;
+    return courseById(_selectedCourseId!) ?? _courses.first;
+  }
+
+  List<TeachingStudent> get filteredStudents {
+    final course = selectedCourse;
+    if (course == null) return const [];
+    final q = _studentQuery.trim().toLowerCase();
+    if (q.isEmpty) return course.students;
+    return course.students
+        .where(
+          (s) =>
+              s.name.toLowerCase().contains(q) ||
+              (s.batch ?? '').toLowerCase().contains(q) ||
+              s.email.toLowerCase().contains(q),
+        )
+        .toList();
+  }
+
+  List<AssignedStudentTask> get filteredAssignments {
+    final course = selectedCourse;
+    final courseId = course?.id;
+    final base = _assigned
+        .where((t) => courseId == null || t.courseId == courseId)
+        .toList();
+    final q = _assignmentQuery.trim().toLowerCase();
+    if (q.isEmpty) return base;
+    return base
+        .where(
+          (t) =>
+              t.title.toLowerCase().contains(q) ||
+              (t.assignedToName ?? '').toLowerCase().contains(q) ||
+              t.status.toLowerCase().contains(q),
+        )
+        .toList();
+  }
 
   TeachingCourse? courseById(String id) {
     try {
@@ -126,6 +175,28 @@ class TeachingProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  void setTabIndex(int index) {
+    if (_tabIndex == index) return;
+    _tabIndex = index;
+    notifyListeners();
+  }
+
+  void selectCourse(String courseId) {
+    if (_selectedCourseId == courseId) return;
+    _selectedCourseId = courseId;
+    notifyListeners();
+  }
+
+  void setStudentQuery(String value) {
+    _studentQuery = value;
+    notifyListeners();
+  }
+
+  void setAssignmentQuery(String value) {
+    _assignmentQuery = value;
+    notifyListeners();
   }
 
   Future<void> load() async {
@@ -139,6 +210,13 @@ class TeachingProvider extends ChangeNotifier {
             .map((e) =>
                 TeachingCourse.fromJson(Map<String, dynamic>.from(e as Map)))
             .toList();
+        if (_selectedCourseId == null && _courses.isNotEmpty) {
+          _selectedCourseId = _courses.first.id;
+        } else if (_selectedCourseId != null &&
+            courseById(_selectedCourseId!) == null &&
+            _courses.isNotEmpty) {
+          _selectedCourseId = _courses.first.id;
+        }
       }
       final tasks = await ApiClient.instance.get('/tasks/assigned-by-me');
       if (tasks is List) {
@@ -159,6 +237,10 @@ class TeachingProvider extends ChangeNotifier {
     _courses = [];
     _assigned = [];
     _error = null;
+    _selectedCourseId = null;
+    _studentQuery = '';
+    _assignmentQuery = '';
+    _tabIndex = 0;
     notifyListeners();
   }
 
