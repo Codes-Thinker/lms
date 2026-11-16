@@ -305,13 +305,84 @@ export class TasksService {
       spentMinutes: number;
       title: string;
       description: string;
-    }>
+      studyNotes: string;
+      dueAt: string | null;
+    }>,
+    actor?: { actorId: string; accountType: string },
   ) {
-    await this.prisma.task.update({ where: { id }, data });
+    const task = await this.prisma.task.findUnique({ where: { id } });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const isAdmin = actor?.accountType === "SUPER_ADMIN";
+    const isCreator = actor && task.createdById === actor.actorId;
+    const isAssignee = actor && task.assigneeId === actor.actorId;
+    // Assignees may only patch status/spentMinutes (timer/complete).
+    const contentEdit =
+      data.title !== undefined ||
+      data.description !== undefined ||
+      data.studyNotes !== undefined ||
+      data.dueAt !== undefined;
+    if (actor && contentEdit && !isAdmin && !isCreator) {
+      throw new ForbiddenException("Only the teacher who assigned this can edit it");
+    }
+    if (actor && !isAdmin && !isCreator && !isAssignee) {
+      throw new ForbiddenException("Not allowed to update this task");
+    }
+
+    const patch: Record<string, unknown> = {};
+    if (data.status !== undefined) patch.status = data.status;
+    if (data.spentMinutes !== undefined) patch.spentMinutes = data.spentMinutes;
+    if (isAdmin || isCreator || !actor) {
+      if (data.title !== undefined) patch.title = data.title.trim();
+      if (data.description !== undefined) patch.description = data.description;
+      if (data.studyNotes !== undefined) patch.studyNotes = data.studyNotes;
+      if (data.dueAt !== undefined) {
+        patch.dueAt = data.dueAt ? new Date(data.dueAt) : null;
+      }
+    }
+
+    await this.prisma.task.update({ where: { id }, data: patch });
+
+    if ((isAdmin || isCreator) && contentEdit && task.assigneeId) {
+      await this.notifications.notifyUser({
+        userId: task.assigneeId,
+        title: "Assignment updated",
+        body: data.title?.trim() || task.title,
+        type: NotificationType.TASK,
+        data: { taskId: id, event: "updated" },
+      });
+    }
+
     const list = await this.listTasks();
     const row = list.find((x) => x.id === id);
     if (!row) throw new NotFoundException("Task not found");
     return row;
+  }
+
+  async deleteTask(
+    id: string,
+    actor: { actorId: string; accountType: string },
+  ) {
+    const task = await this.prisma.task.findUnique({ where: { id } });
+    if (!task) throw new NotFoundException("Task not found");
+
+    const isAdmin = actor.accountType === "SUPER_ADMIN";
+    if (!isAdmin && task.createdById !== actor.actorId) {
+      throw new ForbiddenException("Only the teacher who assigned this can delete it");
+    }
+
+    if (task.assigneeId) {
+      await this.notifications.notifyUser({
+        userId: task.assigneeId,
+        title: "Assignment removed",
+        body: `"${task.title}" was deleted by your teacher`,
+        type: NotificationType.TASK,
+        data: { taskId: id, event: "deleted" },
+      });
+    }
+
+    await this.prisma.task.delete({ where: { id } });
+    return { ok: true, id };
   }
 
   async listProjects(internId?: string) {

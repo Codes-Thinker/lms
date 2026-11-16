@@ -31,6 +31,7 @@ type StaffRow = {
 type TaskRow = {
   id: string;
   title: string;
+  description?: string | null;
   assignedToId?: string | null;
   assignedToName?: string | null;
   assignedBy?: string | null;
@@ -74,7 +75,7 @@ function mapStaff(u: Record<string, unknown>): StaffRow {
     phone: (u.phone as string) || null,
     track: (u.track as string) || null,
     designation: (u.designation as string) || null,
-    status: String(u.status || "—"),
+    status: String(u.status || "ACTIVE"),
     taughtCourses: taught,
   };
 }
@@ -85,6 +86,10 @@ export default function StaffPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
+  const [editTask, setEditTask] = useState<TaskRow | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const staffIds = useMemo(() => new Set(staff.map((s) => s.id)), [staff]);
 
@@ -94,6 +99,16 @@ export default function StaffPage() {
         (t) =>
           t.audience === "STAFF" ||
           (t.assignedToId != null && staffIds.has(t.assignedToId))
+      ),
+    [tasks, staffIds]
+  );
+
+  const studentAssignments = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          t.audience === "STUDENT" ||
+          (t.assignedToId != null && !staffIds.has(t.assignedToId))
       ),
     [tasks, staffIds]
   );
@@ -127,7 +142,75 @@ export default function StaffPage() {
       setLoading(false);
     }
     refresh().catch((e) => show(e instanceof Error ? e.message : "Load failed"));
+    const id = window.setInterval(() => {
+      refresh().catch(() => {});
+    }, 15000);
+    return () => window.clearInterval(id);
   }, [refresh, show]);
+
+  async function saveEdit() {
+    if (!editTask || !editTitle.trim()) return;
+    setActingId(editTask.id);
+    try {
+      await api(`/tasks/${editTask.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          description: editDescription.trim(),
+        }),
+      });
+      show("Assignment updated");
+      setEditTask(null);
+      await refresh();
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function removeTask(t: TaskRow) {
+    if (!window.confirm(`Delete "${t.title}"? Student will be notified.`)) return;
+    setActingId(t.id);
+    try {
+      await api(`/tasks/${t.id}`, { method: "DELETE" });
+      show("Assignment deleted");
+      await refresh();
+    } catch (e) {
+      show(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  function renderTaskActions(t: TaskRow) {
+    const busy = actingId === t.id;
+    return (
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <Badge variant="secondary">{t.status}</Badge>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => {
+            setEditTask(t);
+            setEditTitle(t.title);
+            setEditDescription(t.description || "");
+          }}
+        >
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => void removeTask(t)}
+        >
+          Delete
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,15 +218,14 @@ export default function StaffPage() {
         <div>
           <h2 className="text-lg font-semibold">Teachers</h2>
           <p className="text-sm text-slate-500">
-            Teaching staff — open profile for full details
+            Teaching staff and live student assignments
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            To assign courses to a teacher, edit the course and set the{" "}
-            <span className="font-medium text-slate-700">instructor</span> field in{" "}
+            Set course instructor in{" "}
             <Link href="/courses" className="text-blue-600 hover:underline">
               Courses
             </Link>
-            .
+            . Teachers create/edit/delete assignments from the app.
           </p>
         </div>
         <Button
@@ -180,8 +262,9 @@ export default function StaffPage() {
                   ? s.taughtCourses
                       .map((c) => (c.batch ? `${c.title} (${c.batch})` : c.title))
                       .join(", ")
-                  : "—";
-              const trackLine = [s.track, s.designation].filter(Boolean).join(" · ") || "—";
+                  : "Not assigned";
+              const trackLine =
+                [s.track, s.designation].filter(Boolean).join(" · ") || "Not set";
               return (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className="px-5 py-3.5">
@@ -200,7 +283,9 @@ export default function StaffPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <p className="text-xs">{s.email}</p>
-                    <p className="text-xs text-slate-500">{s.phone || "—"}</p>
+                    <p className="text-xs text-slate-500">
+                      {s.phone?.trim() || "No phone"}
+                    </p>
                   </td>
                   <td className="px-5 py-3.5">{trackLine}</td>
                   <td
@@ -216,7 +301,7 @@ export default function StaffPage() {
             {staff.length === 0 && !loading ? (
               <tr>
                 <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
-                  No teachers yet — add from Users as Teacher
+                  No teachers yet. Add from Users as Teacher.
                 </td>
               </tr>
             ) : null}
@@ -225,24 +310,46 @@ export default function StaffPage() {
       </div>
 
       <div className="glass-card p-5">
-        <h3 className="mb-3 font-semibold">Staff tasks</h3>
+        <h3 className="mb-1 font-semibold">Student assignments</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Tasks assigned to staff or with audience Staff. Admins can assign via POST{" "}
-          <code className="rounded bg-slate-100 px-1">/tasks</code>.
+          Live from teacher app · edit or delete here too · refreshes every 15s
         </p>
         <ul className="space-y-2 text-sm">
-          {staffTasks.map((t) => (
+          {studentAssignments.map((t) => (
             <li
               key={t.id}
-              className="flex justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+              className="flex flex-wrap items-start justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
             >
-              <span>
+              <span className="min-w-0">
                 <span className="font-medium text-slate-900">{t.title}</span>
                 {taskDetailLine(t) ? (
                   <span className="text-slate-500"> {taskDetailLine(t)}</span>
                 ) : null}
               </span>
-              <Badge variant="secondary">{t.status}</Badge>
+              {renderTaskActions(t)}
+            </li>
+          ))}
+          {studentAssignments.length === 0 ? (
+            <li className="text-slate-500">No student assignments yet</li>
+          ) : null}
+        </ul>
+      </div>
+
+      <div className="glass-card p-5">
+        <h3 className="mb-3 font-semibold">Staff tasks</h3>
+        <ul className="space-y-2 text-sm">
+          {staffTasks.map((t) => (
+            <li
+              key={t.id}
+              className="flex flex-wrap items-start justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+            >
+              <span className="min-w-0">
+                <span className="font-medium text-slate-900">{t.title}</span>
+                {taskDetailLine(t) ? (
+                  <span className="text-slate-500"> {taskDetailLine(t)}</span>
+                ) : null}
+              </span>
+              {renderTaskActions(t)}
             </li>
           ))}
           {staffTasks.length === 0 ? (
@@ -250,6 +357,56 @@ export default function StaffPage() {
           ) : null}
         </ul>
       </div>
+
+      {editTask ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            if (actingId) return;
+            setEditTask(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold">Edit assignment</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {editTask.assignedToName || "Assignee"}
+            </p>
+            <input
+              className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Title"
+            />
+            <textarea
+              className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+              rows={4}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Instructions"
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                disabled={actingId === editTask.id || !editTitle.trim()}
+                onClick={() => void saveEdit()}
+              >
+                Save
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={actingId === editTask.id}
+                onClick={() => setEditTask(null)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

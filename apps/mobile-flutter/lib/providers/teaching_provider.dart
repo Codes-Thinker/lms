@@ -64,6 +64,7 @@ class TeachingCourse {
 class AssignedStudentTask {
   final String id;
   final String title;
+  final String? description;
   final String status;
   final String? assignedToId;
   final String? assignedToName;
@@ -75,6 +76,7 @@ class AssignedStudentTask {
   const AssignedStudentTask({
     required this.id,
     required this.title,
+    this.description,
     required this.status,
     this.assignedToId,
     this.assignedToName,
@@ -88,6 +90,7 @@ class AssignedStudentTask {
       AssignedStudentTask(
         id: j['id']?.toString() ?? '',
         title: j['title']?.toString() ?? '',
+        description: j['description']?.toString(),
         status: j['status']?.toString() ?? 'ASSIGNED',
         assignedToId: j['assignedToId']?.toString(),
         assignedToName: j['assignedToName']?.toString(),
@@ -291,5 +294,47 @@ class TeachingProvider extends ChangeNotifier {
       },
     );
     await load();
+  }
+
+  Future<void> updateAssignment({
+    required String taskId,
+    required String title,
+    String? description,
+  }) async {
+    _loading = true;
+    notifyListeners();
+    try {
+      await ApiClient.instance.patch(
+        '/tasks/$taskId',
+        body: {
+          'title': title.trim(),
+          'description': description?.trim() ?? '',
+        },
+      );
+      await load();
+    } catch (e) {
+      debugPrint('Update assignment failed: $e');
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteAssignment(String taskId) async {
+    _loading = true;
+    notifyListeners();
+    try {
+      await ApiClient.instance.delete('/tasks/$taskId');
+      _assigned = _assigned.where((t) => t.id != taskId).toList();
+      notifyListeners();
+      await load();
+    } catch (e) {
+      debugPrint('Delete assignment failed: $e');
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
   }
 }

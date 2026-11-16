@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -103,9 +104,31 @@ export class TasksController {
   @Patch("tasks/:id")
   updateTask(
     @Param("id") id: string,
-    @Body() body: { status?: TaskStatus; spentMinutes?: number }
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: {
+      status?: TaskStatus;
+      spentMinutes?: number;
+      title?: string;
+      description?: string;
+      studyNotes?: string;
+      dueAt?: string | null;
+    }
   ) {
-    return this.tasks.updateTask(id, body);
+    return this.tasks.updateTask(id, body, {
+      actorId: user.sub,
+      accountType: user.accountType,
+    });
+  }
+
+  /** Teacher/admin: delete an assignment they created (or any as admin). */
+  @Delete("tasks/:id")
+  @Roles("SUPER_ADMIN", "STAFF")
+  deleteTask(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.tasks.deleteTask(id, {
+      actorId: user.sub,
+      accountType: user.accountType,
+    });
   }
 
   @Get("projects/me")

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/api_errors.dart';
@@ -20,6 +22,8 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
   final _studentSearch = TextEditingController();
   final _assignmentSearch = TextEditingController();
 
+  Timer? _poll;
+
   @override
   void initState() {
     super.initState();
@@ -31,10 +35,15 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TeachingProvider>().load();
     });
+    _poll = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      context.read<TeachingProvider>().load();
+    });
   }
 
   @override
   void dispose() {
+    _poll?.cancel();
     _tabs.dispose();
     _studentSearch.dispose();
     _assignmentSearch.dispose();
@@ -131,6 +140,8 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
                             searchController: _assignmentSearch,
                             tasks: teaching.filteredAssignments,
                             onSearch: teaching.setAssignmentQuery,
+                            onEdit: _editAssignment,
+                            onDelete: _deleteAssignment,
                           ),
                         ],
                       ),
@@ -138,6 +149,65 @@ class _TeacherClassScreenState extends State<TeacherClassScreen>
                   ],
                 ),
     );
+  }
+
+  Future<void> _editAssignment(AssignedStudentTask task) async {
+    final result = await showModalBottomSheet<_EditSheetResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _EditAssignmentSheet(task: task),
+    );
+    if (result == null || !mounted) return;
+    final ui = context.read<UiProvider>();
+    try {
+      await context.read<TeachingProvider>().updateAssignment(
+            taskId: task.id,
+            title: result.title,
+            description: result.description,
+          );
+      if (!mounted) return;
+      ui.showSnack('Assignment updated', tone: AppSnackTone.success);
+    } catch (e) {
+      if (!mounted) return;
+      ui.showSnack(ApiErrors.friendly(e), tone: AppSnackTone.error);
+    }
+  }
+
+  Future<void> _deleteAssignment(AssignedStudentTask task) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete assignment?'),
+        content: Text(
+          '"${task.title}" for ${task.assignedToName ?? "student"} will be removed. Student will be notified.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final ui = context.read<UiProvider>();
+    try {
+      await context.read<TeachingProvider>().deleteAssignment(task.id);
+      if (!mounted) return;
+      ui.showSnack('Assignment deleted', tone: AppSnackTone.warning);
+    } catch (e) {
+      if (!mounted) return;
+      ui.showSnack(ApiErrors.friendly(e), tone: AppSnackTone.error);
+    }
   }
 
   Future<void> _openAssign(
@@ -584,11 +654,15 @@ class _AssignmentsTab extends StatelessWidget {
   final TextEditingController searchController;
   final List<AssignedStudentTask> tasks;
   final ValueChanged<String> onSearch;
+  final ValueChanged<AssignedStudentTask> onEdit;
+  final ValueChanged<AssignedStudentTask> onDelete;
 
   const _AssignmentsTab({
     required this.searchController,
     required this.tasks,
     required this.onSearch,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -659,10 +733,36 @@ class _AssignmentsTab extends StatelessWidget {
                   style:
                       const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),
-                if (t.isSubmitted && !t.isDone) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
+                if ((t.description ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    t.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => onEdit(t),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => onDelete(t),
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      style: TextButton.styleFrom(
+                          foregroundColor: AppColors.danger),
+                      label: const Text('Delete'),
+                    ),
+                    const Spacer(),
+                    if (t.isSubmitted && !t.isDone) ...[
                       TextButton(
                         onPressed: () async {
                           await context.read<TeachingProvider>().reviewTask(
@@ -685,16 +785,144 @@ class _AssignmentsTab extends StatelessWidget {
                                 feedback: 'Please revise',
                               );
                         },
-                        child: const Text('Ask revision'),
+                        child: const Text('Revise'),
                       ),
                     ],
-                  ),
-                ],
+                  ],
+                ),
               ],
             ),
           );
         }),
       ],
+    );
+  }
+}
+
+class _EditSheetResult {
+  final String title;
+  final String description;
+
+  const _EditSheetResult({required this.title, required this.description});
+}
+
+class _EditAssignmentSheet extends StatefulWidget {
+  final AssignedStudentTask task;
+
+  const _EditAssignmentSheet({required this.task});
+
+  @override
+  State<_EditAssignmentSheet> createState() => _EditAssignmentSheetState();
+}
+
+class _EditAssignmentSheetState extends State<_EditAssignmentSheet> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.task.title);
+    _descCtrl = TextEditingController(text: widget.task.description ?? '');
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: AppColors.line,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const Text(
+            'Edit assignment',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.task.assignedToName ?? 'Student',
+            style: const TextStyle(color: AppColors.muted, fontSize: 13),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _titleCtrl,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: 'Title',
+              filled: true,
+              fillColor: AppColors.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _descCtrl,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: 'Instructions',
+              filled: true,
+              fillColor: AppColors.bg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () {
+                if (_titleCtrl.text.trim().isEmpty) return;
+                Navigator.pop(
+                  context,
+                  _EditSheetResult(
+                    title: _titleCtrl.text.trim(),
+                    description: _descCtrl.text.trim(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.blue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Save changes',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
