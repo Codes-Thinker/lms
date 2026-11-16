@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ type UserCourse = {
   enrollmentStatus?: string;
 };
 
+type TaughtCourse = { id: string; title: string; batch?: string | null };
+
 type UserRow = {
   id: string;
   name?: string;
@@ -33,8 +36,10 @@ type UserRow = {
   status: string;
   track?: string | null;
   phone?: string | null;
+  profileImage?: string | null;
   courses?: UserCourse[];
   assignedCourses?: string[];
+  taughtCourses?: TaughtCourse[];
   progressPercent?: number;
   batch?: string | null;
   batchName?: string | null;
@@ -75,7 +80,15 @@ const emptyStudentFee = {
 function assignedCourseLabel(u: UserRow): string {
   if (u.assignedCourses?.length) return u.assignedCourses.join(", ");
   if (u.courses?.length) return u.courses.map((c) => c.title).join(", ");
-  return "—";
+  if (u.taughtCourses?.length) {
+    return u.taughtCourses.map((c) => c.title).join(", ");
+  }
+  return "Not assigned";
+}
+
+function displayOrNone(value?: string | null) {
+  const v = (value || "").trim();
+  return v || "Not set";
 }
 
 function UsersPageInner() {
@@ -623,11 +636,12 @@ function UsersPageInner() {
             <tbody>
               {items.map((u) => {
                 const display = u.name || u.fullName || u.email;
-                const batch = u.batch || u.batchName || "—";
+                const batch = displayOrNone(u.batch || u.batchName);
+                const coursesLabel = assignedCourseLabel(u);
                 const progress =
                   u.progressPercent !== undefined
                     ? `${u.progressPercent}%`
-                    : "—";
+                    : "0%";
                 return (
                   <tr key={u.id} className="border-t border-slate-100">
                     <td className="px-5 py-3.5">
@@ -639,6 +653,7 @@ function UsersPageInner() {
                           name={display}
                           email={u.email}
                           accountType={u.accountType}
+                          src={u.profileImage}
                           size="sm"
                         />
                         <span className="font-semibold">{display}</span>
@@ -650,10 +665,23 @@ function UsersPageInner() {
                         {roleLabel(u.accountType)}
                       </Badge>
                     </td>
-                    <td className="max-w-[200px] truncate px-5 py-3.5" title={assignedCourseLabel(u)}>
-                      {assignedCourseLabel(u)}
+                    <td
+                      className={cn(
+                        "max-w-[200px] truncate px-5 py-3.5",
+                        coursesLabel === "Not assigned" && "text-slate-400"
+                      )}
+                      title={coursesLabel}
+                    >
+                      {coursesLabel}
                     </td>
-                    <td className="px-5 py-3.5">{batch}</td>
+                    <td
+                      className={cn(
+                        "px-5 py-3.5",
+                        batch === "Not set" && "text-slate-400"
+                      )}
+                    >
+                      {batch}
+                    </td>
                     <td className="px-5 py-3.5">{progress}</td>
                     <td className="px-5 py-3.5">
                       {u.courses?.length ? (

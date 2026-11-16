@@ -139,6 +139,7 @@ export class ReportsService {
         department: user.department?.name ?? null,
         batch: user.batch?.code ?? null,
         phone: user.phone,
+        profileImage: user.profileImage,
         lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
         createdAt: user.createdAt.toISOString(),
         internshipStart: user.internshipStart?.toISOString().slice(0, 10) ?? null,

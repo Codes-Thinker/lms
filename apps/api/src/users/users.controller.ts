@@ -37,6 +37,16 @@ export class UsersController {
     });
   }
 
+  /** App user: update own profile photo / phone. */
+  @Patch("me")
+  @Roles("SUPER_ADMIN", "STAFF", "STUDENT", "INTERN")
+  updateMe(
+    @CurrentUser() actor: AuthUser,
+    @Body() body: { profileImage?: string | null; phone?: string }
+  ) {
+    return this.users.updateSelf(actor.sub, body);
+  }
+
   @Get(":id")
   @Roles("SUPER_ADMIN", "STAFF")
   get(@Param("id") id: string) {

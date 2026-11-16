@@ -58,6 +58,7 @@ type UserRow = {
   accountType: string;
   track?: string | null;
   status?: string;
+  profileImage?: string | null;
 };
 
 type Activity = {
@@ -363,6 +364,7 @@ export default function DashboardPage() {
                   name={display}
                   email={p.email}
                   accountType={p.accountType}
+                  src={p.profileImage}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-slate-900">{display}</p>

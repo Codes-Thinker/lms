@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_errors.dart';
 import '../models/user.dart';
@@ -24,6 +26,26 @@ class AuthProvider extends ChangeNotifier {
   LoginRole get loginRole => _loginRole;
   String? get error => _error;
   String? get avatarPath => _avatarPath;
+  /// Local file or server data-URL — use for CircleAvatar.backgroundImage.
+  ImageProvider? get avatarImage {
+    if (_avatarPath != null && File(_avatarPath!).existsSync()) {
+      return FileImage(File(_avatarPath!));
+    }
+    final remote = _user?.profileImage;
+    if (remote == null || remote.isEmpty) return null;
+    if (remote.startsWith('data:image')) {
+      final comma = remote.indexOf(',');
+      final b64 = comma >= 0 ? remote.substring(comma + 1) : remote;
+      try {
+        return MemoryImage(Uint8List.fromList(base64Decode(b64)));
+      } catch (_) {
+        return null;
+      }
+    }
+    if (remote.startsWith('http')) return NetworkImage(remote);
+    return null;
+  }
+
   bool get isStaff => _user?.isStaff ?? false;
   bool get isIntern => _user?.isIntern ?? false;
   bool get isStudent => _user?.isStudent ?? false;
@@ -205,6 +227,27 @@ class AuthProvider extends ChangeNotifier {
     await AvatarService.savePath(_user!.id, path);
     _avatarPath = path;
     notifyListeners();
+
+    // Sync to server so admin dashboard shows the same photo.
+    try {
+      final bytes = await File(path).readAsBytes();
+      final dataUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      final data = await ApiClient.instance.patch(
+        '/users/me',
+        body: {'profileImage': dataUrl},
+      ) as Map<String, dynamic>;
+      final updated = AppUser.fromApi(data);
+      _user = updated;
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_kToken);
+      if (token != null) {
+        await _persist(token, updated.toJson());
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Avatar upload failed: $e');
+      rethrow;
+    }
   }
 
   /// Hard-delete on server, then wipe local session — email/password stop working.

@@ -218,7 +218,10 @@ export class UsersService {
           internshipEnd: u.internshipEnd?.toISOString().slice(0, 10) ?? null,
           roles: u.roles.map((r) => r.role.code),
           courses,
-          assignedCourses: courses.map((c) => c.title),
+          assignedCourses:
+            courses.length > 0
+              ? courses.map((c) => c.title)
+              : u.instructedCourses.map((c) => c.title),
           progressPercent,
           pendingEnrollmentRequests: u.enrollmentRequests.length,
           taughtCourses: u.instructedCourses.map((c) => ({
@@ -614,6 +617,31 @@ export class UsersService {
     }
 
     return { user: await this.getById(user.id), invitation: invitationMeta };
+  }
+
+  /** Mobile/self profile — photo + phone only. */
+  async updateSelf(
+    userId: string,
+    data: { profileImage?: string | null; phone?: string }
+  ) {
+    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) throw new NotFoundException("User not found");
+
+    let profileImage = data.profileImage;
+    if (typeof profileImage === "string" && profileImage.length > 2_500_000) {
+      throw new BadRequestException("Photo too large — use a smaller image");
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(profileImage !== undefined ? { profileImage } : {}),
+        ...(data.phone !== undefined
+          ? { phone: data.phone?.trim() || null }
+          : {}),
+      },
+    });
+    return this.getById(userId);
   }
 
   async update(id: string, dto: UpdateUserDto) {

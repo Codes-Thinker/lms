@@ -42,6 +42,7 @@ type StudentRow = {
   batchName?: string | null;
   status: string;
   progressPercent: number;
+  profileImage?: string | null;
   courses: CourseEnr[];
 };
 
@@ -320,9 +321,10 @@ function StudentsPageInner() {
               ) : null}
               {list.map((s) => {
                 const courseTitles =
-                  s.courses.map((c) => c.title).join(", ") || "—";
+                  s.courses.map((c) => c.title).join(", ") || "Not assigned";
                 const batchLabel =
-                  [s.batch, s.batchName].filter(Boolean).join(" · ") || "—";
+                  [s.batch, s.batchName].filter(Boolean).join(" · ") ||
+                  "Not set";
                 const enrolled = s.courses.length > 0;
                 const open = expandedId === s.id;
                 return (
@@ -341,6 +343,7 @@ function StudentsPageInner() {
                             name={s.name}
                             email={s.email}
                             accountType="STUDENT"
+                            src={s.profileImage}
                             size="sm"
                           />
                           <span className="font-semibold">{s.name}</span>
@@ -348,7 +351,9 @@ function StudentsPageInner() {
                       </td>
                       <td className="px-5 py-3.5">
                         <p className="text-xs text-slate-600">{s.email}</p>
-                        <p className="text-xs text-slate-500">{s.phone || "—"}</p>
+                        <p className="text-xs text-slate-500">
+                          {s.phone?.trim() || "No phone"}
+                        </p>
                       </td>
                       <td className="px-5 py-3.5 font-mono text-xs text-slate-600">
                         {shortId(s.id)}
@@ -369,7 +374,7 @@ function StudentsPageInner() {
                         {enrolled ? (
                           <Badge variant="success">Enrolled</Badge>
                         ) : (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-slate-400">None</span>
                         )}
                       </td>
                       <td className="px-5 py-3.5 font-medium">

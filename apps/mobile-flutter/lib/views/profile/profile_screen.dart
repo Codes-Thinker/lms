@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -28,12 +26,18 @@ class ProfileScreen extends StatelessWidget {
     try {
       final path = await AvatarService.pickAndCrop(source: source, context: context);
       if (path == null) return;
-      await auth.setAvatarPath(path);
-      if (!context.mounted) return;
-      ui.showSnack('Profile photo updated');
+      ui.showLoading();
+      try {
+        await auth.setAvatarPath(path);
+        if (!context.mounted) return;
+        ui.showSnack('Photo saved — visible on admin dashboard');
+      } finally {
+        ui.hideLoading();
+      }
     } catch (_) {
       if (!context.mounted) return;
-      ui.showSnack('Could not update photo', tone: AppSnackTone.error);
+      ui.showSnack('Could not save photo. Try a smaller image.',
+          tone: AppSnackTone.error);
     }
   }
 
@@ -207,18 +211,22 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
-    final avatar = auth.avatarPath;
+    final avatarImage = auth.avatarImage;
     final pad = AppResponsive.pagePad(context);
 
     final details = <(String, String)>[
       if (auth.isStudent) ...[
         ('Track', auth.trackLabel),
-        ('Batch', auth.user?.batch ?? '—'),
+        ('Batch', auth.user?.batch?.trim().isNotEmpty == true
+            ? auth.user!.batch!
+            : 'Not set'),
         ('Attendance', '${courses.overallAttendance.toStringAsFixed(0)}%'),
         ('Fees pending', 'Rs ${courses.totalFeeDue}'),
         ('Enrolled courses', '${courses.enrolledCourses.length}'),
       ] else ...[
-        ('Department', auth.user?.department ?? '—'),
+        ('Department', auth.user?.department?.trim().isNotEmpty == true
+            ? auth.user!.department!
+            : 'Not set'),
         ('Track', auth.trackLabel),
         ('Active batches', '${courses.courses.length}'),
       ],
@@ -245,9 +253,8 @@ class ProfileScreen extends StatelessWidget {
                       CircleAvatar(
                         radius: 44,
                         backgroundColor: AppColors.softBlue,
-                        backgroundImage:
-                            avatar != null ? FileImage(File(avatar)) : null,
-                        child: avatar == null
+                        backgroundImage: avatarImage,
+                        child: avatarImage == null
                             ? Text(
                                 auth.user?.firstName.substring(0, 1) ?? 'U',
                                 style: const TextStyle(

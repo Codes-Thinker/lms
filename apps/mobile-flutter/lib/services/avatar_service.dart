@@ -56,9 +56,9 @@ class AvatarService {
   }) async {
     final picked = await _picker.pickImage(
       source: source,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 92,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 72,
     );
     if (picked == null) return null;
 
@@ -83,7 +83,7 @@ class AvatarService {
         ),
       ],
       compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 90,
+      compressQuality: 72,
     );
     if (cropped == null) return null;
 

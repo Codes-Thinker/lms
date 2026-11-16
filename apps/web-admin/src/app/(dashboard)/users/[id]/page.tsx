@@ -27,6 +27,7 @@ type Report = {
     department?: string | null;
     batch?: string | null;
     phone?: string | null;
+    profileImage?: string | null;
     lastLoginAt?: string | null;
     createdAt?: string;
     internshipStart?: string | null;
@@ -93,6 +94,7 @@ type RawUser = {
   department?: { name?: string } | string | null;
   batch?: { code?: string } | string | null;
   phone?: string | null;
+  profileImage?: string | null;
   lastLoginAt?: string | null;
   createdAt?: string;
 };
@@ -116,6 +118,7 @@ function emptyReportFromUser(u: RawUser): Report {
       department: dept,
       batch,
       phone: u.phone,
+      profileImage: u.profileImage,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
     },
@@ -324,6 +327,7 @@ export default function UserProfilePage() {
             name={u.fullName}
             email={u.email}
             accountType={u.accountType}
+            src={u.profileImage}
             size="lg"
           />
           <div>

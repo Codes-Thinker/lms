@@ -9,6 +9,8 @@ class AppUser {
   final String? batch;
   final String? phone;
   final int attendancePercent;
+  /// Server-synced profile photo (data URL).
+  final String? profileImage;
 
   const AppUser({
     required this.id,
@@ -21,6 +23,7 @@ class AppUser {
     this.batch,
     this.phone,
     this.attendancePercent = 0,
+    this.profileImage,
   });
 
   bool get isStaff => role == 'STAFF' || role == 'SUPER_ADMIN';
@@ -32,7 +35,6 @@ class AppUser {
     switch (role) {
       case 'STAFF':
       case 'SUPER_ADMIN':
-        // Teacher can lecture students + handle development work.
         return 'Teacher / Staff';
       case 'INTERN':
         return 'Intern';
@@ -43,17 +45,52 @@ class AppUser {
     }
   }
 
+  AppUser copyWith({
+    String? name,
+    String? phone,
+    String? profileImage,
+  }) {
+    return AppUser(
+      id: id,
+      name: name ?? this.name,
+      email: email,
+      role: role,
+      track: track,
+      enrolledCourses: enrolledCourses,
+      department: department,
+      batch: batch,
+      phone: phone ?? this.phone,
+      attendancePercent: attendancePercent,
+      profileImage: profileImage ?? this.profileImage,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'fullName': name,
+        'name': name,
+        'email': email,
+        'role': role,
+        'track': track,
+        'department': department,
+        'batch': batch,
+        'phone': phone,
+        'attendancePercent': attendancePercent,
+        'profileImage': profileImage,
+      };
+
   factory AppUser.fromApi(Map<String, dynamic> json) {
     return AppUser(
       id: json['id'] as String,
       name: (json['fullName'] ?? json['name'] ?? 'User') as String,
       email: json['email'] as String,
-      role: json['role'] as String,
+      role: (json['role'] ?? json['accountType'] ?? 'STUDENT') as String,
       track: json['track'] as String?,
       department: json['department'] as String?,
       batch: json['batch'] as String?,
       phone: json['phone'] as String?,
       attendancePercent: (json['attendancePercent'] as num?)?.toInt() ?? 0,
+      profileImage: json['profileImage'] as String?,
     );
   }
 }
