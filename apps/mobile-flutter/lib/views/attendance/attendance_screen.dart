@@ -50,8 +50,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (mounted) setState(() => _locBusy = false);
   }
 
-  String _fmt(DateTime dt) =>
-      TimeUtils.formatTime(dt.toLocal(), withSeconds: true);
+  String _fmt(DateTime dt) => TimeUtils.formatTimePrecise(dt.toLocal());
 
   Future<void> _checkIn() async {
     final auth = context.read<AuthProvider>();

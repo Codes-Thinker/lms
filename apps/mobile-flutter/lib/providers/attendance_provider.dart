@@ -63,10 +63,12 @@ class AttendanceMark {
       personName: json['personName'] as String? ?? '',
       role: json['role'] as String? ?? '',
       status: json['status'] as String? ?? 'PRESENT',
-      checkInAt: DateTime.tryParse(json['checkInAt'] as String? ?? '') ??
-          DateTime.tryParse(json['markedAt'] as String? ?? '') ??
-          DateTime.now(),
-      checkOutAt: DateTime.tryParse(json['checkOutAt'] as String? ?? ''),
+      checkInAt: (DateTime.tryParse(json['checkInAt'] as String? ?? '') ??
+              DateTime.tryParse(json['markedAt'] as String? ?? '') ??
+              DateTime.now())
+          .toLocal(),
+      checkOutAt:
+          DateTime.tryParse(json['checkOutAt'] as String? ?? '')?.toLocal(),
       source: json['source'] as String? ?? 'APP',
       courseTitle: json['courseTitle'] as String?,
     );

@@ -9,7 +9,12 @@ class TimeUtils {
   }
 
   /// Phone local time in 12-hour form: `12:37 PM` (never `00:37`).
-  static String formatTime([DateTime? at], {bool withSeconds = false}) {
+  static String formatTime([DateTime? at]) => _clock(at, withSeconds: false);
+
+  static String formatTimePrecise([DateTime? at]) =>
+      _clock(at, withSeconds: true);
+
+  static String _clock(DateTime? at, {required bool withSeconds}) {
     final local = (at ?? DateTime.now()).toLocal();
     final hour24 = local.hour;
     final period = hour24 >= 12 ? 'PM' : 'AM';
