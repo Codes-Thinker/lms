@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_brand.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/notification_router.dart';
 import '../../providers/attendance_provider.dart';
