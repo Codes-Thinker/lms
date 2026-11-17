@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSnackbar } from "@/components/ui/snackbar";
@@ -69,11 +70,11 @@ export default function FeedbackPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card flex flex-wrap items-start justify-between gap-3 p-5">
+      <div className="glass-card glass-card-interactive flex flex-wrap items-start justify-between gap-3 p-5 animate-fade-up">
         <div>
           <h2 className="text-lg font-semibold">Feedback & support</h2>
           <p className="text-sm text-slate-500">
-            Reports, complains and surveys from the app, live every 5s
+            Reports, complains and surveys from the app
           </p>
         </div>
         <Badge variant={live ? "success" : "secondary"}>
@@ -87,8 +88,14 @@ export default function FeedbackPage() {
             No reports or complains yet
           </div>
         ) : (
-          tickets.map((t) => (
-            <div key={t.id} className="glass-card p-4">
+          tickets.map((t, i) => (
+            <div
+              key={t.id}
+              className={cn(
+                "glass-card glass-card-interactive p-4 animate-fade-up",
+                i < 6 ? `stagger-${i + 1}` : undefined
+              )}
+            >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-semibold">
                   {t.kind}: {t.title}

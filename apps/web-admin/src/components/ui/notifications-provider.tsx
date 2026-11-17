@@ -35,6 +35,9 @@ type NotificationsContextValue = {
   push: (input: NotifyInput) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  /** Mark unread notes for a sidebar section when admin opens/works that page. */
+  markSectionRead: (href: string) => void;
+  unreadForSection: (href: string) => number;
   refresh: () => Promise<void>;
 };
 
@@ -49,11 +52,30 @@ function mapType(raw: string, data?: Record<string, string> | null): AppNotifica
   if (t === "FEE" || kind === "FEE") return "fee";
   if (t === "ATTENDANCE") return "attendance";
   if (t === "TASK") return "task";
-  if (kind === "REPORT") return "report";
-  if (kind === "COMPLAIN") return "complain";
-  if (kind === "SURVEY") return "survey";
+  if (t === "CERTIFICATE" || t === "QUIZ") return "general";
+  if (kind === "REPORT" || t === "REPORT") return "report";
+  if (kind === "COMPLAIN" || t === "COMPLAIN") return "complain";
+  if (kind === "SURVEY" || t === "SURVEY") return "survey";
   if (t === "SYSTEM") return "system";
   return "general";
+}
+
+const SECTION_TYPES: Record<string, AppNotification["type"][]> = {
+  "/feedback": ["report", "complain", "survey", "general"],
+  "/fees": ["fee"],
+  "/inbox": ["chat"],
+  "/attendance": ["attendance"],
+  "/staff": ["task"],
+  "/interns": ["project"],
+};
+
+export function typesForSection(href: string): AppNotification["type"][] {
+  if (SECTION_TYPES[href]) return SECTION_TYPES[href];
+  // Nested routes: /fees/x → /fees
+  const base = Object.keys(SECTION_TYPES).find(
+    (k) => href === k || href.startsWith(`${k}/`)
+  );
+  return base ? SECTION_TYPES[base] : [];
 }
 
 function mapNote(n: ApiNote): AppNotification {
@@ -165,6 +187,38 @@ export function NotificationsProvider({
     void api("/notifications/read-all", { method: "POST" }).catch(() => {});
   }, []);
 
+  const unreadForSection = useCallback(
+    (href: string) => {
+      const types = typesForSection(href);
+      if (!types.length) return 0;
+      return notes.filter((n) => !n.read && types.includes(n.type)).length;
+    },
+    [notes]
+  );
+
+  const markSectionRead = useCallback(
+    (href: string) => {
+      const types = typesForSection(href);
+      if (!types.length) return;
+      const unread = notes.filter((n) => !n.read && types.includes(n.type));
+      if (!unread.length) return;
+      setNotes((prev) =>
+        prev.map((n) =>
+          types.includes(n.type) ? { ...n, read: true } : n
+        )
+      );
+      prevUnread.current = Math.max(0, prevUnread.current - unread.length);
+      for (const n of unread) {
+        if (!n.id.startsWith("local-")) {
+          void api(`/notifications/${n.id}/read`, { method: "POST" }).catch(
+            () => {}
+          );
+        }
+      }
+    },
+    [notes]
+  );
+
   const value = useMemo(
     () => ({
       notes,
@@ -172,9 +226,19 @@ export function NotificationsProvider({
       push,
       markRead,
       markAllRead,
+      markSectionRead,
+      unreadForSection,
       refresh,
     }),
-    [notes, push, markRead, markAllRead, refresh]
+    [
+      notes,
+      push,
+      markRead,
+      markAllRead,
+      markSectionRead,
+      unreadForSection,
+      refresh,
+    ]
   );
 
   return (

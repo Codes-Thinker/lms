@@ -9,5 +9,9 @@ export function PageEnter({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn("page-enter", className)}>{children}</div>;
+  return (
+    <div className={cn("page-enter will-change-transform", className)}>
+      {children}
+    </div>
+  );
 }

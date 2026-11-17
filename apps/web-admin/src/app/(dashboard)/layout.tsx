@@ -69,24 +69,19 @@ function NavLinks({
   onNavigate?: () => void;
 }) {
   const activity = useAdminActivity();
-  const { notes } = useNotifications();
-  const surveyUnread = notes.filter(
-    (n) => !n.read && n.type === "survey"
-  ).length;
-  const feeNoteUnread = notes.filter(
-    (n) => !n.read && n.type === "fee"
-  ).length;
+  const { unreadForSection } = useNotifications();
 
   const badgeFor = (href: string): number => {
-    if (href === "/inbox") return activity.chatUnread;
-    if (href === "/feedback") return activity.openTickets + surveyUnread;
+    const noteCount = unreadForSection(href);
+    if (href === "/inbox") return Math.max(activity.chatUnread, noteCount);
     if (href === "/fees")
-      return Math.max(activity.feesAwaitingReview, feeNoteUnread);
-    return 0;
+      return Math.max(activity.feesAwaitingReview, noteCount);
+    if (href === "/feedback") return noteCount;
+    return noteCount;
   };
 
   return (
-    <nav className="flex-1 space-y-1 overflow-y-auto">
+    <nav className="sidebar-scroll flex-1 space-y-1 pr-0.5">
       {nav.map((item) => {
         const active = isNavItemActive(pathname, item.href);
         const Icon = item.icon;
@@ -113,7 +108,7 @@ function NavLinks({
                 {count > 0 ? (
                   <span
                     className={cn(
-                      "rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                      "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
                       active ? "bg-white text-blue-700" : "bg-blue-600 text-white"
                     )}
                   >
@@ -122,13 +117,36 @@ function NavLinks({
                 ) : null}
               </>
             ) : count > 0 ? (
-              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white" />
+              <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white" />
             ) : null}
           </Link>
         );
       })}
     </nav>
   );
+}
+
+/** When admin opens a section, mark its notifications as read. */
+function SectionReadOnVisit() {
+  const pathname = usePathname();
+  const { markSectionRead } = useNotifications();
+
+  useEffect(() => {
+    const section =
+      [
+        "/feedback",
+        "/fees",
+        "/inbox",
+        "/attendance",
+        "/staff",
+        "/interns",
+      ].find((s) => pathname === s || pathname.startsWith(`${s}/`)) ?? null;
+    if (!section) return;
+    const t = window.setTimeout(() => markSectionRead(section), 400);
+    return () => window.clearTimeout(t);
+  }, [pathname, markSectionRead]);
+
+  return null;
 }
 
 function SidebarBody({
@@ -327,11 +345,12 @@ export default function DashboardLayout({
       <NotificationsProvider>
         <AdminActivityProvider>
           <RealtimeBridge />
+          <SectionReadOnVisit />
           <div className="dashboard-shell flex min-h-screen bg-[#F8FAFC]">
             {/* Desktop sidebar */}
             <aside
               className={cn(
-                "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-slate-200 bg-white px-3 py-4 transition-[width] duration-200 lg:flex",
+                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
                 sidebarCollapsed ? "w-[72px]" : "w-[250px]"
               )}
             >
@@ -379,7 +398,7 @@ export default function DashboardLayout({
                 sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[250px]"
               )}
             >
-              <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-slate-200 bg-white px-3 sm:h-16 sm:gap-3 sm:px-4 md:px-6">
+              <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/95 px-3 animate-fade-in sm:h-16 sm:gap-3 sm:px-4 md:px-6">
                 <button
                   type="button"
                   className="rounded-xl border border-slate-200 p-2 text-slate-700 lg:hidden"
