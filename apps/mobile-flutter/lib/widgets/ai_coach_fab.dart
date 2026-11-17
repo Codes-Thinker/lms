@@ -4,7 +4,7 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/app_motion.dart';
 import '../views/ai/ai_coach_screen.dart';
 
-/// HD robot chat FAB — soft circle + bottom-left tail toward navbar.
+/// Blue brand FAB — robot clear on solid blue bubble.
 class AiCoachFab extends StatelessWidget {
   const AiCoachFab({super.key});
 
@@ -26,16 +26,16 @@ class AiCoachFab extends StatelessWidget {
         height: _size + 12,
         child: CustomPaint(
           painter: const _TailBubblePainter(
-            fill: Color(0xFFE8F1FF),
-            border: Color(0xFFD4AF37),
+            fill: AppColors.blue,
+            border: AppColors.blueDark,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(6, 5, 6, 13),
+            padding: const EdgeInsets.fromLTRB(5, 4, 5, 12),
             child: ClipOval(
               child: ColoredBox(
-                color: const Color(0xFFE8F1FF),
+                color: AppColors.blue,
                 child: Padding(
-                  padding: const EdgeInsets.all(4),
+                  padding: const EdgeInsets.all(3),
                   child: Image.asset(
                     AppBrand.aiRobotBubbleAsset,
                     fit: BoxFit.contain,
@@ -47,7 +47,7 @@ class AiCoachFab extends StatelessWidget {
                     cacheHeight: px,
                     errorBuilder: (_, __, ___) => const Icon(
                       Icons.smart_toy_rounded,
-                      color: AppColors.blueDark,
+                      color: Colors.white,
                       size: 28,
                     ),
                   ),
@@ -92,7 +92,7 @@ class _TailBubblePainter extends CustomPainter {
     final borderPaint = Paint()
       ..color = border
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
+      ..strokeWidth = 1.6
       ..strokeJoin = StrokeJoin.round
       ..isAntiAlias = true;
 

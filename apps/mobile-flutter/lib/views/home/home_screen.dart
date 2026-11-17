@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -180,7 +182,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Continue learning — compact navy card
+            // Continue learning — brand blue + blurred CT logo watermark
             if (continueCourse != null)
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
@@ -198,101 +200,166 @@ class HomeScreen extends StatelessWidget {
                       },
                       borderRadius: BorderRadius.circular(18),
                       child: Ink(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: AppColors.line),
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [_navy, Color(0xFF252842)],
+                            colors: [
+                              Color(0xFFEFF6FF),
+                              Color(0xFFDBEAFE),
+                              Color(0xFFBFDBFE),
+                            ],
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'CONTINUE LEARNING',
-                              style: TextStyle(
-                                color: Color(0xFF9CA3AF),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.7,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        continueCourse.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          height: 1.2,
-                                          letterSpacing: -0.2,
-                                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(18),
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                right: -18,
+                                bottom: -22,
+                                child: Opacity(
+                                  opacity: 0.14,
+                                  child: ImageFiltered(
+                                    imageFilter: ImageFilter.blur(
+                                      sigmaX: 10,
+                                      sigmaY: 10,
+                                    ),
+                                    child: Image.asset(
+                                      AppBrand.markHdAsset,
+                                      width: 128,
+                                      height: 128,
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
+                                      errorBuilder: (_, __, ___) =>
+                                          Image.asset(
+                                        AppBrand.markAsset,
+                                        width: 128,
+                                        height: 128,
+                                        fit: BoxFit.contain,
                                       ),
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        nextTopic != null
-                                            ? 'Next: ${nextTopic.title}'
-                                            : '${continueCourse.progressPercent.toStringAsFixed(0)}% completed',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Color(0xFFCBD5E1),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    CupertinoIcons.play_fill,
-                                    color: _navy,
-                                    size: 16,
+                              ),
+                              Positioned(
+                                left: -28,
+                                top: -36,
+                                child: Opacity(
+                                  opacity: 0.08,
+                                  child: ImageFiltered(
+                                    imageFilter: ImageFilter.blur(
+                                      sigmaX: 14,
+                                      sigmaY: 14,
+                                    ),
+                                    child: Image.asset(
+                                      AppBrand.logoAsset,
+                                      width: 160,
+                                      height: 80,
+                                      fit: BoxFit.contain,
+                                      filterQuality: FilterQuality.high,
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(100),
-                              child: LinearProgressIndicator(
-                                value: (continueCourse.progressPercent / 100)
-                                    .clamp(0.0, 1.0),
-                                minHeight: 4,
-                                backgroundColor: Colors.white24,
-                                color: Colors.white,
                               ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              '${continueCourse.progressPercent.toStringAsFixed(0)}% Completed',
-                              style: const TextStyle(
-                                color: Color(0xFFE5E7EB),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                              Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'CONTINUE LEARNING',
+                                      style: TextStyle(
+                                        color: AppColors.blueDark,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.7,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                continueCourse.title,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: AppColors.ink,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w800,
+                                                  height: 1.2,
+                                                  letterSpacing: -0.2,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                nextTopic != null
+                                                    ? 'Next: ${nextTopic.title}'
+                                                    : '${continueCourse.progressPercent.toStringAsFixed(0)}% completed',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: AppColors.muted,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          width: 36,
+                                          height: 36,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.blue,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            CupertinoIcons.play_fill,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(100),
+                                      child: LinearProgressIndicator(
+                                        value: (continueCourse.progressPercent /
+                                                100)
+                                            .clamp(0.0, 1.0),
+                                        minHeight: 4,
+                                        backgroundColor: Colors.white
+                                            .withValues(alpha: 0.7),
+                                        color: AppColors.blueDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      '${continueCourse.progressPercent.toStringAsFixed(0)}% Completed',
+                                      style: const TextStyle(
+                                        color: AppColors.blueDark,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
