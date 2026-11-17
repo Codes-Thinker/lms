@@ -398,7 +398,7 @@ class ProfileScreen extends StatelessWidget {
                     iconColor: const Color(0xFFDC2626),
                     label: 'Fees pending',
                     value: 'Rs $feesDue',
-                    badge: feesDue > 0 ? 'Alert ⚠️' : null,
+                    badge: feesDue > 0 ? 'Alert' : null,
                     badgeBg: const Color(0xFFFFEEF0),
                     badgeFg: const Color(0xFFDC2626),
                   ),
@@ -409,7 +409,6 @@ class ProfileScreen extends StatelessWidget {
                     iconColor: AppColors.blueDark,
                     label: 'Enrolled courses',
                     value: '${courses.enrolledCourses.length}',
-                    showArrow: false,
                   ),
                 ] else ...[
                   _detailRow(
@@ -436,7 +435,6 @@ class ProfileScreen extends StatelessWidget {
                     iconColor: const Color(0xFF7C3AED),
                     label: 'Active batches',
                     value: '${courses.courses.length}',
-                    showArrow: false,
                   ),
                 ],
               ],
@@ -571,6 +569,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  /// Label + full value (wraps below — no ellipsis / no row-end clip).
   Widget _detailRow({
     required IconData icon,
     required Color iconBg,
@@ -580,11 +579,11 @@ class ProfileScreen extends StatelessWidget {
     String? badge,
     Color? badgeBg,
     Color? badgeFg,
-    bool showArrow = true,
   }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 36,
@@ -597,61 +596,58 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: Text(
-                    label,
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
+                    if (badge != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: badgeBg ?? AppColors.softBlue,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          badge,
+                          style: TextStyle(
+                            color: badgeFg ?? AppColors.blueDark,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  softWrap: true,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    height: 1.35,
                   ),
                 ),
-                if (showArrow) ...[
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: AppColors.muted,
-                  ),
-                ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.ink,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          if (badge != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: badgeBg ?? AppColors.softBlue,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                badge,
-                style: TextStyle(
-                  color: badgeFg ?? AppColors.blueDark,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
