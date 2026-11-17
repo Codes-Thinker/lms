@@ -13,6 +13,7 @@ import '../../providers/task_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
+import '../../widgets/live_clock.dart';
 import '../../widgets/live_countdown.dart';
 import '../course/course_detail_screen.dart';
 import '../course/all_courses_screen.dart';
@@ -77,6 +78,8 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    const LiveClock(),
+                    const SizedBox(width: 4),
                     IconButton(
                       tooltip: 'Messages',
                       onPressed: () {

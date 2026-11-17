@@ -16,11 +16,7 @@ import 'providers/ui_provider.dart';
 import 'providers/quiz_provider.dart';
 import 'providers/version_provider.dart';
 import 'services/push_notification_service.dart';
-import 'views/help/admin_chat_screen.dart';
-import 'views/shell/app_shell.dart';
 import 'views/splash/splash_screen.dart';
-import 'views/tasks/task_detail_screen.dart';
-import 'views/teacher/assignment_chat_screen.dart';
 import 'widgets/app_loader.dart';
 import 'widgets/app_snackbar.dart';
 import 'widgets/force_update_sheet.dart';
@@ -67,60 +63,29 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
       ui: _ui,
       currentUserId: () => _auth.user?.id,
       onOpenInApp: _openFromNotification,
+      onForegroundRefresh: () {
+        // Soft refresh inbox badge while user is in the app.
+      },
     );
   }
 
+  /// Soft open — never wipes AppShell (fixes loading + wrong screen on tap).
   void _openFromNotification(String type) {
-    final upper = type.toUpperCase();
-    final taskId = NotificationRouter.pendingTaskId;
-    final tab = NotificationRouter.tabForType(type);
-    _ui.setNavIndex(tab);
-
-    final nav = appNavigatorKey.currentState;
-    if (nav == null) return;
-
     if (!_auth.isAuthenticated) {
-      // Session not ready — splash/login will consume pending type.
+      // Splash / login will consume pending deep-link after session ready.
       return;
     }
 
-    // Jump to shell, then open chat / assignment when needed.
-    nav.pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AppShell()),
-      (route) => false,
-    );
+    final tab = NotificationRouter.tabForType(type);
+    _ui.setNavIndex(tab);
 
-    if (upper == 'CHAT') {
-      NotificationRouter.openAdminChat = true;
-      Future<void>.delayed(const Duration(milliseconds: 280), () {
-        final n = appNavigatorKey.currentState;
-        if (n == null) return;
-        n.push(
-          MaterialPageRoute(builder: (_) => const AdminChatScreen()),
-        );
-        NotificationRouter.takeOpenAdminChat();
-      });
-    } else if (upper == 'TASK' && taskId != null && taskId.isNotEmpty) {
-      Future<void>.delayed(const Duration(milliseconds: 280), () {
-        final n = appNavigatorKey.currentState;
-        if (n == null) return;
-        if (_auth.isStaff) {
-          n.push(
-            MaterialPageRoute(
-              builder: (_) => AssignmentChatScreen(taskId: taskId),
-            ),
-          );
-        } else {
-          n.push(
-            MaterialPageRoute(
-              builder: (_) => TaskDetailScreen(taskId: taskId),
-            ),
-          );
-        }
-      });
+    final handler = NotificationRouter.shellHandler;
+    if (handler != null) {
+      handler(type);
+      return;
     }
 
-    NotificationRouter.clear();
+    // Shell not mounted yet — keep pending for AppShell.consumePending().
   }
 
   @override

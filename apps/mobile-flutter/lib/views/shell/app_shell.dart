@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_motion.dart';
+import '../../core/notification_router.dart';
+import '../../core/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_liquid_nav_bar.dart';
+import '../ai/ai_coach_screen.dart';
 import '../home/home_screen.dart';
 import '../attendance/attendance_screen.dart';
 import '../fees/fees_screen.dart';
@@ -33,10 +38,17 @@ class _AppShellState extends State<AppShell> {
     final start = context.read<UiProvider>().navIndex;
     _index = ValueNotifier(start);
     _pageController = PageController(initialPage: start);
+    NotificationRouter.shellHandler = _onNotificationOpen;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _consumePendingNotification();
+    });
   }
 
   @override
   void dispose() {
+    if (NotificationRouter.shellHandler == _onNotificationOpen) {
+      NotificationRouter.shellHandler = null;
+    }
     _pageController.dispose();
     _index.dispose();
     super.dispose();
@@ -44,13 +56,42 @@ class _AppShellState extends State<AppShell> {
 
   void _goTo(int index) {
     final ui = context.read<UiProvider>();
-    if (_index.value == index) return;
-    _index.value = index;
-    ui.setNavIndex(index);
-    // Direct jump to ANY tab (Home → Profile OK) — no one-by-one flash.
-    if (_pageController.hasClients) {
-      _pageController.jumpToPage(index);
+    if (_index.value != index) {
+      _index.value = index;
+      ui.setNavIndex(index);
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(index);
+      }
+    } else {
+      ui.setNavIndex(index);
     }
+  }
+
+  void _onNotificationOpen(String type) {
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final noteId = NotificationRouter.pendingNotificationId;
+    if (noteId != null && noteId.isNotEmpty) {
+      context.read<NotificationProvider>().markRead(noteId);
+    }
+    NotificationRouter.openDeepLink(
+      context,
+      type: type,
+      taskId: NotificationRouter.pendingTaskId,
+      feeCaseId: NotificationRouter.pendingFeeCaseId,
+      isStaff: auth.isStaff,
+      goToTab: _goTo,
+    ).whenComplete(NotificationRouter.clear);
+  }
+
+  void _consumePendingNotification() {
+    if (!mounted) return;
+    if (!NotificationRouter.hasPendingDeepLink &&
+        NotificationRouter.pendingType == null) {
+      return;
+    }
+    final type = NotificationRouter.pendingType ?? 'GENERAL';
+    _onNotificationOpen(type);
   }
 
   void _onBack() {
@@ -138,6 +179,36 @@ class _AppShellState extends State<AppShell> {
                     onTap: _goTo,
                   );
                 },
+              ),
+            ),
+            // Floating AI coach — above navbar only; rest of UI unchanged.
+            Positioned(
+              right: 14,
+              bottom: AppResponsive.shellBottom(context) - 10,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      AppMotion.fadeSlide(const AiCoachScreen()),
+                    );
+                  },
+                  customBorder: const CircleBorder(),
+                  child: Ink(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.blue,
+                      border: Border.all(color: Colors.white, width: 2.5),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

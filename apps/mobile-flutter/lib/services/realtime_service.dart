@@ -109,6 +109,8 @@ class RealtimeService {
         ? Map<String, dynamic>.from(payload)
         : <String, dynamic>{};
     final taskId = dataMap['taskId']?.toString();
+    final feeCaseId =
+        dataMap['feeCaseId']?.toString() ?? dataMap['caseId']?.toString();
 
     final notes = _notes;
     if (notes != null) unawaited(notes.load());
@@ -124,15 +126,21 @@ class RealtimeService {
     }
 
     final text = body.trim().isEmpty ? title : body.trim();
+    final displayTitle = type == 'CHAT'
+        ? title
+        : (title.trim().isEmpty
+            ? NotificationRouter.labelForType(type)
+            : title);
     _ui?.showSnack(
       text,
-      title: title,
+      title: displayTitle,
       tone: AppSnackTone.info,
-      duration: const Duration(seconds: 4),
+      duration: const Duration(seconds: 5),
       onTap: () {
         NotificationRouter.setPending(
           type: type,
           taskId: taskId,
+          feeCaseId: feeCaseId,
           notificationId: map['id']?.toString(),
         );
         _onOpen?.call(type, taskId: taskId);

@@ -1,6 +1,29 @@
 class TimeUtils {
+  /// Always device-local clock (phone timezone).
+  static DateTime get nowLocal => DateTime.now().toLocal();
+
+  static DateTime parseLocal(String? raw) {
+    final parsed = DateTime.tryParse(raw ?? '');
+    if (parsed == null) return nowLocal;
+    return parsed.toLocal();
+  }
+
+  static String formatTime([DateTime? at]) {
+    final local = (at ?? DateTime.now()).toLocal();
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  static String formatDateTime([DateTime? at]) {
+    final local = (at ?? DateTime.now()).toLocal();
+    final d = local.day.toString().padLeft(2, '0');
+    final mo = local.month.toString().padLeft(2, '0');
+    return '$d/$mo/${local.year}, ${formatTime(local)}';
+  }
+
   static String greeting([DateTime? now]) {
-    final hour = (now ?? DateTime.now()).hour;
+    final hour = (now ?? DateTime.now()).toLocal().hour;
     if (hour < 12) return 'Good Morning!';
     if (hour < 17) return 'Good Afternoon!';
     return 'Good Evening!';

@@ -248,13 +248,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   String _timeLabel(DateTime at) {
     final local = at.toLocal();
-    final now = DateTime.now();
+    final now = DateTime.now().toLocal();
     final sameDay = local.year == now.year &&
         local.month == now.month &&
         local.day == now.day;
     final hm =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     if (sameDay) return hm;
-    return '${local.day}/${local.month}/${local.year}, $hm';
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}, $hm';
   }
 }

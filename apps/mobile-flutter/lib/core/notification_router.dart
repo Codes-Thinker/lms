@@ -1,23 +1,44 @@
-/// Pending deep-link from a notification tap (cold start / background).
+import 'package:flutter/material.dart';
+
+import '../views/attendance/attendance_screen.dart';
+import '../views/certificates/certificates_screen.dart';
+import '../views/fees/fee_chat_screen.dart';
+import '../views/fees/fees_screen.dart';
+import '../views/help/admin_chat_screen.dart';
+import '../views/quizzes/quizzes_screen.dart';
+import '../views/tasks/task_detail_screen.dart';
+import '../views/tasks/tasks_screen.dart';
+import '../views/teacher/assignment_chat_screen.dart';
+import 'constants/app_motion.dart';
+
+/// Pending deep-link from a notification tap (cold start / background / in-app).
 class NotificationRouter {
   NotificationRouter._();
 
   static String? pendingType;
   static String? pendingNotificationId;
   static String? pendingTaskId;
+  static String? pendingFeeCaseId;
   static bool launchedFromNotification = false;
   static bool openAdminChat = false;
+
+  /// Registered by [AppShell] so opens never wipe the navigation stack.
+  static void Function(String type)? shellHandler;
 
   static void setPending({
     required String? type,
     String? notificationId,
     String? taskId,
+    String? feeCaseId,
     bool fromLaunch = false,
   }) {
     pendingType = type;
     pendingNotificationId = notificationId;
     if (taskId != null && taskId.isNotEmpty) {
       pendingTaskId = taskId;
+    }
+    if (feeCaseId != null && feeCaseId.isNotEmpty) {
+      pendingFeeCaseId = feeCaseId;
     }
     if ((type ?? '').toUpperCase() == 'CHAT') {
       openAdminChat = true;
@@ -29,8 +50,9 @@ class NotificationRouter {
     pendingType = null;
     pendingNotificationId = null;
     pendingTaskId = null;
+    pendingFeeCaseId = null;
     launchedFromNotification = false;
-    // openAdminChat cleared after HelpHub consumes it
+    // openAdminChat cleared via takeOpenAdminChat after consume
   }
 
   static bool takeOpenAdminChat() {
@@ -45,7 +67,19 @@ class NotificationRouter {
     return id;
   }
 
-  /// Shell tab for notification type (same for all roles).
+  static String? takePendingFeeCaseId() {
+    final id = pendingFeeCaseId;
+    pendingFeeCaseId = null;
+    return id;
+  }
+
+  static bool get hasPendingDeepLink =>
+      openAdminChat ||
+      (pendingTaskId != null && pendingTaskId!.isNotEmpty) ||
+      (pendingFeeCaseId != null && pendingFeeCaseId!.isNotEmpty) ||
+      (pendingType != null && pendingType!.isNotEmpty);
+
+  /// Shell tab for notification type.
   /// 0 Home · 1 Tasks · 2 Attend · 3 Fees/Help · 4 Profile
   static int tabForType(String? type) {
     switch ((type ?? '').toUpperCase()) {
@@ -54,10 +88,11 @@ class NotificationRouter {
       case 'ATTENDANCE':
         return 2;
       case 'FEE':
-        return 3;
       case 'CHAT':
-        // Staff/intern Help tab; students open Help from Profile.
         return 3;
+      case 'QUIZ':
+      case 'CERTIFICATE':
+        return 0;
       default:
         return 0;
     }
@@ -73,10 +108,84 @@ class NotificationRouter {
         return 'Attendance';
       case 'CHAT':
         return 'Chat';
+      case 'QUIZ':
+        return 'Quiz';
+      case 'CERTIFICATE':
+        return 'Certificate';
       case 'SYSTEM':
         return 'System';
       default:
         return 'Alert';
+    }
+  }
+
+  /// Open the right screen for a notification type without resetting the app.
+  static Future<void> openDeepLink(
+    BuildContext context, {
+    required String? type,
+    String? taskId,
+    String? feeCaseId,
+    required bool isStaff,
+    required void Function(int tab) goToTab,
+  }) async {
+    final upper = (type ?? '').toUpperCase();
+    goToTab(tabForType(upper));
+
+    final nav = Navigator.of(context, rootNavigator: true);
+    final chat = takeOpenAdminChat() || upper == 'CHAT';
+    final resolvedTask = taskId ?? takePendingTaskId();
+    final resolvedFee = feeCaseId ?? takePendingFeeCaseId();
+
+    // Let the tab settle, then push detail on top of shell.
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!context.mounted) return;
+
+    if (chat) {
+      await nav.push(AppMotion.fadeSlide(const AdminChatScreen()));
+      return;
+    }
+
+    if (upper == 'TASK') {
+      if (resolvedTask != null && resolvedTask.isNotEmpty) {
+        if (isStaff) {
+          await nav.push(
+            AppMotion.fadeSlide(AssignmentChatScreen(taskId: resolvedTask)),
+          );
+        } else {
+          await nav.push(
+            AppMotion.fadeSlide(TaskDetailScreen(taskId: resolvedTask)),
+          );
+        }
+      } else {
+        await nav.push(AppMotion.fadeSlide(const TasksScreen()));
+      }
+      return;
+    }
+
+    if (upper == 'FEE') {
+      if (resolvedFee != null && resolvedFee.isNotEmpty) {
+        await nav.push(
+          AppMotion.fadeSlide(FeeChatScreen(caseId: resolvedFee)),
+        );
+      } else {
+        await nav.push(AppMotion.fadeSlide(const FeesScreen()));
+      }
+      return;
+    }
+
+    if (upper == 'ATTENDANCE') {
+      await nav.push(AppMotion.fadeSlide(const AttendanceScreen()));
+      return;
+    }
+
+    if (upper == 'QUIZ') {
+      await nav.push(AppMotion.fadeSlide(const QuizzesScreen()));
+      return;
+    }
+
+    if (upper == 'CERTIFICATE') {
+      await nav.push(AppMotion.fadeSlide(const CertificatesScreen()));
+      return;
     }
   }
 }

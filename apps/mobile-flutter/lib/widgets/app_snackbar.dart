@@ -17,12 +17,13 @@ class AppSnackHost extends StatelessWidget {
     final pad = AppResponsive.pagePad(context);
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         child,
         Positioned(
           left: pad,
           right: pad,
-          bottom: AppResponsive.shellBottom(context) + 4,
+          bottom: AppResponsive.shellBottom(context) + 8,
           child: IgnorePointer(
             ignoring: snack == null,
             child: AnimatedSlide(
@@ -34,7 +35,11 @@ class AppSnackHost extends StatelessWidget {
                 opacity: snack == null ? 0 : 1,
                 child: snack == null
                     ? const SizedBox.shrink()
-                    : _SnackBanner(snack: snack),
+                    : Material(
+                        type: MaterialType.transparency,
+                        elevation: 12,
+                        child: _SnackBanner(snack: snack),
+                      ),
               ),
             ),
           ),

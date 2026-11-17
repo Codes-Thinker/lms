@@ -8,6 +8,7 @@ import '../providers/task_provider.dart';
 import '../providers/teaching_provider.dart';
 import '../providers/ui_provider.dart';
 import '../services/api_client.dart';
+import '../services/push_notification_service.dart';
 import '../services/realtime_service.dart';
 
 /// Keeps Socket.IO joined to the signed-in user for live notifications.
@@ -34,14 +35,18 @@ class _RealtimeBootstrapState extends State<RealtimeBootstrap> {
     final auth = context.watch<AuthProvider>();
     final userId = auth.user?.id;
 
+    final notes = context.read<NotificationProvider>();
     RealtimeService.instance.bind(
       ui: context.read<UiProvider>(),
-      notes: context.read<NotificationProvider>(),
+      notes: notes,
       support: context.read<SupportProvider>(),
       tasks: context.read<TaskProvider>(),
       teaching: context.read<TeachingProvider>(),
       onOpen: widget.onOpen,
     );
+    PushNotificationService.instance.setOnForegroundRefresh(() {
+      notes.load();
+    });
 
     if (userId == null || userId.isEmpty) {
       if (_boundUserId != null) {

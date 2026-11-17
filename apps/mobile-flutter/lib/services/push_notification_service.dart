@@ -36,6 +36,7 @@ class PushNotificationService {
   UiProvider? _ui;
   CurrentUserIdGetter? _currentUserId;
   void Function(String type)? _onOpenInApp;
+  void Function()? _onForegroundRefresh;
 
   static const _androidChannel = AndroidNotificationChannel(
     'lms_default',
@@ -51,10 +52,16 @@ class PushNotificationService {
     required UiProvider ui,
     required CurrentUserIdGetter currentUserId,
     required void Function(String type) onOpenInApp,
+    void Function()? onForegroundRefresh,
   }) {
     _ui = ui;
     _currentUserId = currentUserId;
     _onOpenInApp = onOpenInApp;
+    _onForegroundRefresh = onForegroundRefresh;
+  }
+
+  void setOnForegroundRefresh(void Function()? cb) {
+    _onForegroundRefresh = cb;
   }
 
   Future<void> init() async {
@@ -147,12 +154,22 @@ class PushNotificationService {
     return rawTitle;
   }
 
-  /// Foreground: in-app message strip ONLY — no system tray / alert duplicate.
+  Map<String, String?> _extractMeta(Map<String, dynamic> data) {
+    return {
+      'type': (data['type'] ?? 'GENERAL').toString(),
+      'taskId': data['taskId']?.toString(),
+      'feeCaseId':
+          data['feeCaseId']?.toString() ?? data['caseId']?.toString(),
+      'notificationId': data['notificationId']?.toString(),
+    };
+  }
+
+  /// Foreground: in-app tip strip ONLY — no system tray duplicate.
   Future<void> _onForeground(RemoteMessage message) async {
     if (!_isForMe(message.data)) return;
 
-    final type = (message.data['type'] ?? 'GENERAL').toString();
-    final taskId = message.data['taskId']?.toString();
+    final meta = _extractMeta(message.data);
+    final type = meta['type']!;
     final rawTitle = message.notification?.title ??
         message.data['title']?.toString() ??
         '';
@@ -163,16 +180,26 @@ class PushNotificationService {
     final text = body.trim().isNotEmpty
         ? body.trim()
         : (rawTitle.trim().isNotEmpty ? rawTitle.trim() : 'New update');
-    _ui?.showSnack(
+
+    _onForegroundRefresh?.call();
+
+    final ui = _ui;
+    if (ui == null) {
+      debugPrint('FCM foreground: UI not bound yet');
+      return;
+    }
+
+    ui.showSnack(
       text,
-      title: title.isNotEmpty ? title : null,
+      title: title.isNotEmpty ? title : NotificationRouter.labelForType(type),
       tone: AppSnackTone.info,
-      duration: const Duration(seconds: 3, milliseconds: 500),
+      duration: const Duration(seconds: 5),
       onTap: () {
         NotificationRouter.setPending(
           type: type,
-          taskId: taskId,
-          notificationId: message.data['notificationId']?.toString(),
+          taskId: meta['taskId'],
+          feeCaseId: meta['feeCaseId'],
+          notificationId: meta['notificationId'],
         );
         _onOpenInApp?.call(type);
       },
@@ -181,14 +208,17 @@ class PushNotificationService {
 
   void _openFromMessage(RemoteMessage message, {required bool fromLaunch}) {
     if (!_isForMe(message.data)) return;
-    final type = message.data['type']?.toString() ?? 'GENERAL';
+    final meta = _extractMeta(message.data);
     NotificationRouter.setPending(
-      type: type,
-      notificationId: message.data['notificationId']?.toString(),
-      taskId: message.data['taskId']?.toString(),
+      type: meta['type'],
+      notificationId: meta['notificationId'],
+      taskId: meta['taskId'],
+      feeCaseId: meta['feeCaseId'],
       fromLaunch: fromLaunch,
     );
-    _onOpenInApp?.call(type);
+    // Cold start: Splash/AppShell consumes pending — don't navigate yet.
+    if (fromLaunch) return;
+    _onOpenInApp?.call(meta['type']!);
   }
 
   void _handlePayload(String? payload, {required bool fromTap}) {
@@ -196,14 +226,15 @@ class PushNotificationService {
     try {
       final map = jsonDecode(payload) as Map<String, dynamic>;
       if (!_isForMe(map)) return;
-      final type = map['type']?.toString() ?? 'GENERAL';
+      final meta = _extractMeta(map);
       NotificationRouter.setPending(
-        type: type,
-        notificationId: map['notificationId']?.toString(),
-        taskId: map['taskId']?.toString(),
+        type: meta['type'],
+        notificationId: meta['notificationId'],
+        taskId: meta['taskId'],
+        feeCaseId: meta['feeCaseId'],
         fromLaunch: false,
       );
-      if (fromTap) _onOpenInApp?.call(type);
+      if (fromTap) _onOpenInApp?.call(meta['type']!);
     } catch (e) {
       debugPrint('Payload parse: $e');
     }

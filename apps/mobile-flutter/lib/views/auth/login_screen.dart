@@ -71,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ? NotificationRouter.tabForType(pendingType)
             : 0,
       );
-      NotificationRouter.clear();
+      // Keep pending deep-link for AppShell (chat / task / fee).
       ui.showSnack('Welcome ${auth.user?.firstName ?? ''}, ${auth.user?.roleLabel}');
       Navigator.of(context).pushReplacement(AppMotion.fadeSlide(const AppShell()));
     } finally {

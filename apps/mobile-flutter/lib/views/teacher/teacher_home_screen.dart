@@ -14,6 +14,7 @@ import '../../providers/fee_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/live_clock.dart';
 import '../attendance/attendance_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../help/help_hub_screen.dart';
@@ -104,6 +105,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                             ),
                           ),
                         ),
+                        const LiveClock(),
+                        const SizedBox(width: 4),
                         IconButton(
                           tooltip: 'Messages',
                           onPressed: () {

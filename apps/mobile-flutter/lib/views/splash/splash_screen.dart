@@ -64,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     if (auth.isAuthenticated) {
-      // Apply deep-link tab before opening shell.
+      // Prefill tab; AppShell consumes chat/task deep-link after mount.
       final type = NotificationRouter.pendingType;
       if (type != null) {
         context.read<UiProvider>().setNavIndex(
@@ -89,10 +89,10 @@ class _SplashScreenState extends State<SplashScreen> {
       // Fire-and-forget: geofence stream + once/day arrival reminder.
       unawaited(OfficeLocationService.instance.start());
       if (!mounted) return;
+      // Keep NotificationRouter pending — AppShell opens chat/task, then clears.
       Navigator.of(context).pushReplacement(
         AppMotion.fadeSlide(const AppShell()),
       );
-      NotificationRouter.clear();
       return;
     }
 

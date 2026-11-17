@@ -30,8 +30,11 @@ class AppNotificationItem {
       body: json['body'] as String? ?? '',
       type: json['type'] as String? ?? 'GENERAL',
       read: json['read'] as bool? ?? false,
-      createdAt:
-          DateTime.tryParse(json['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt: () {
+        final parsed =
+            DateTime.tryParse(json['createdAt'] as String? ?? '');
+        return parsed?.toLocal() ?? DateTime.now().toLocal();
+      }(),
       targetUserId: json['userId'] as String?,
       data: json['data'] is Map
           ? Map<String, dynamic>.from(json['data'] as Map)

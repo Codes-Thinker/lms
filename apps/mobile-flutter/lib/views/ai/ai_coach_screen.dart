@@ -262,39 +262,73 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                 SafeArea(
                   top: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _input,
                             minLines: 1,
-                            maxLines: 4,
+                            maxLines: 5,
                             textInputAction: TextInputAction.send,
                             onSubmitted: (_) => _send(),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              height: 1.35,
+                              color: AppColors.ink,
+                            ),
+                            cursorColor: AppColors.blue,
                             decoration: InputDecoration(
                               hintText: 'Ask a study question…',
+                              hintStyle: TextStyle(
+                                color: AppColors.muted.withValues(alpha: 0.85),
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w400,
+                              ),
                               filled: true,
                               fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              prefixIcon: const Icon(
+                                Icons.auto_awesome_rounded,
+                                size: 20,
+                                color: AppColors.blue,
+                              ),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(22),
                                 borderSide: const BorderSide(color: AppColors.line),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(22),
                                 borderSide: const BorderSide(color: AppColors.line),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: const BorderSide(
+                                  color: AppColors.blue,
+                                  width: 1.4,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: _sending ? null : _send,
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.blue,
-                            foregroundColor: Colors.white,
+                        const SizedBox(width: 10),
+                        SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: IconButton.filled(
+                            onPressed: _sending ? null : _send,
+                            style: IconButton.styleFrom(
+                              backgroundColor: AppColors.blue,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  AppColors.blue.withValues(alpha: 0.45),
+                            ),
+                            icon: const Icon(Icons.send_rounded, size: 22),
                           ),
-                          icon: const Icon(Icons.send_rounded),
                         ),
                       ],
                     ),

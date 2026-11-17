@@ -18,8 +18,23 @@ export class AiService {
     private readonly config: ConfigService
   ) {}
 
+  private readApiKey(): string {
+    let key = (this.config.get<string>("AI_API_KEY") ?? "").trim();
+    // Render paste quirks: wrapping quotes or KEY=value.
+    if (key.startsWith("AI_API_KEY=")) {
+      key = key.slice("AI_API_KEY=".length).trim();
+    }
+    if (
+      (key.startsWith('"') && key.endsWith('"')) ||
+      (key.startsWith("'") && key.endsWith("'"))
+    ) {
+      key = key.slice(1, -1).trim();
+    }
+    return key;
+  }
+
   status() {
-    const configured = Boolean(this.config.get<string>("AI_API_KEY")?.trim());
+    const configured = Boolean(this.readApiKey());
     return {
       enabled: true,
       providerConfigured: configured,
@@ -131,7 +146,7 @@ export class AiService {
       },
     });
 
-    const apiKey = this.config.get<string>("AI_API_KEY")?.trim();
+    const apiKey = this.readApiKey();
     let reply: string;
     let provider = "local";
     let model: string | null = null;
@@ -206,9 +221,33 @@ export class AiService {
         reply,
         mode: "local-fallback",
         remainingToday: Math.max(0, this.dailyLimit() - usedToday - 1),
-        warning: "Cloud AI unavailable; used local study coach.",
+        warning: this.friendlyCloudWarning(err),
       };
     }
+  }
+
+  /** Short, actionable reason when OpenAI/cloud call fails. */
+  private friendlyCloudWarning(err: string): string {
+    const lower = err.toLowerCase();
+    if (
+      lower.includes("insufficient_quota") ||
+      lower.includes("billing") ||
+      lower.includes("exceeded") ||
+      lower.includes("credit")
+    ) {
+      return "OpenAI credits/billing missing — add credits at platform.openai.com, then retry.";
+    }
+    if (
+      lower.includes("invalid_api_key") ||
+      lower.includes("incorrect api key") ||
+      lower.includes("(401)")
+    ) {
+      return "AI_API_KEY invalid on Render — paste a fresh secret key (no quotes) and redeploy.";
+    }
+    if (lower.includes("model") && lower.includes("404")) {
+      return "AI_MODEL not available — set AI_MODEL=gpt-4o-mini on Render.";
+    }
+    return "Cloud AI unavailable; used local study coach.";
   }
 
   private async buildLearnerContext(userId: string, courseId?: string) {
