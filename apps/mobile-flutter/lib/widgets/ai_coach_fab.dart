@@ -4,16 +4,17 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/app_motion.dart';
 import '../views/ai/ai_coach_screen.dart';
 
-/// Blue brand FAB — robot clear on solid blue bubble.
+/// Blue brand FAB — white plate + full-res robot so the emoji stays HD/clear.
 class AiCoachFab extends StatelessWidget {
   const AiCoachFab({super.key});
 
-  static const double _size = 58;
+  static const double _size = 62;
 
   @override
   Widget build(BuildContext context) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final px = (_size * dpr * 1.5).round().clamp(180, 640);
+    // Decode near source (1280) so downscale stays sharp on retina.
+    final px = (_size * dpr * 3).round().clamp(360, 1280);
 
     return GestureDetector(
       onTap: () {
@@ -30,25 +31,32 @@ class AiCoachFab extends StatelessWidget {
             border: AppColors.blueDark,
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(5, 4, 5, 12),
-            child: ClipOval(
-              child: ColoredBox(
-                color: AppColors.blue,
+            padding: const EdgeInsets.fromLTRB(4, 3, 4, 11),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: ClipOval(
                 child: Padding(
-                  padding: const EdgeInsets.all(3),
+                  // Tight inset — robot fills the plate, stays sharp.
+                  padding: const EdgeInsets.all(2),
                   child: Image.asset(
                     AppBrand.aiRobotBubbleAsset,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.center,
+                    fit: BoxFit.cover,
+                    alignment: const Alignment(0, -0.05),
                     filterQuality: FilterQuality.high,
                     isAntiAlias: true,
                     gaplessPlayback: true,
                     cacheWidth: px,
                     cacheHeight: px,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.smart_toy_rounded,
+                    errorBuilder: (_, __, ___) => const ColoredBox(
                       color: Colors.white,
-                      size: 28,
+                      child: Icon(
+                        Icons.smart_toy_rounded,
+                        color: AppColors.blueDark,
+                        size: 30,
+                      ),
                     ),
                   ),
                 ),
