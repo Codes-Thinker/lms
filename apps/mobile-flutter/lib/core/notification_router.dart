@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../views/attendance/attendance_screen.dart';
 import '../views/certificates/certificates_screen.dart';
 import '../views/fees/fee_chat_screen.dart';
-import '../views/fees/fees_screen.dart';
 import '../views/help/admin_chat_screen.dart';
 import '../views/quizzes/quizzes_screen.dart';
 import '../views/tasks/task_detail_screen.dart';
-import '../views/tasks/tasks_screen.dart';
 import '../views/teacher/assignment_chat_screen.dart';
 import 'constants/app_motion.dart';
 
