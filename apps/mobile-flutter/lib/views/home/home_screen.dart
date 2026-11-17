@@ -41,6 +41,14 @@ class HomeScreen extends StatelessWidget {
     final continueCourse = courses.continueCourse;
     final nextTopic = continueCourse?.nextTopic;
     final filtered = courses.filteredCourses;
+    // Home shows 3 course tiles when the catalog has them.
+    final homeCourses = () {
+      if (filtered.length >= 3) return filtered.take(3).toList();
+      if (filtered.isEmpty) return courses.courses.take(3).toList();
+      final ids = filtered.map((c) => c.id).toSet();
+      final extras = courses.courses.where((c) => !ids.contains(c.id));
+      return [...filtered, ...extras].take(3).toList();
+    }();
     final displayName = auth.user?.name.trim().isNotEmpty == true
         ? auth.user!.name.trim()
         : 'Student';
@@ -128,68 +136,54 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Welcome + name + batch
+            // Name + batch (tighter under top bar)
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, 8, pad, 0),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    const Text(
-                      'Welcome back 👋',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.muted,
+                    Expanded(
+                      child: Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
-                              letterSpacing: -0.6,
-                              height: 1.1,
-                            ),
+                    if (batch.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF1F6),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          batch,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted,
                           ),
                         ),
-                        if (batch.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEEF1F6),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              batch,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
             ),
 
-            // Continue learning — navy premium card
+            // Continue learning — compact navy card
             if (continueCourse != null)
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
+                padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
                 sliver: SliverToBoxAdapter(
                   child: Material(
                     color: Colors.transparent,
@@ -202,11 +196,11 @@ class HomeScreen extends StatelessWidget {
                           ),
                         );
                       },
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(18),
                       child: Ink(
-                        padding: const EdgeInsets.fromLTRB(18, 18, 14, 18),
+                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(18),
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -220,14 +214,14 @@ class HomeScreen extends StatelessWidget {
                               'CONTINUE LEARNING',
                               style: TextStyle(
                                 color: Color(0xFF9CA3AF),
-                                fontSize: 11,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
+                                letterSpacing: 0.7,
                               ),
                             ),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 6),
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 Expanded(
                                   child: Column(
@@ -236,17 +230,17 @@ class HomeScreen extends StatelessWidget {
                                     children: [
                                       Text(
                                         continueCourse.title,
-                                        maxLines: 2,
+                                        maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: Colors.white,
-                                          fontSize: 18,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.w800,
-                                          height: 1.25,
-                                          letterSpacing: -0.3,
+                                          height: 1.2,
+                                          letterSpacing: -0.2,
                                         ),
                                       ),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: 3),
                                       Text(
                                         nextTopic != null
                                             ? 'Next: ${nextTopic.title}'
@@ -255,46 +249,46 @@ class HomeScreen extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: Color(0xFFCBD5E1),
-                                          fontSize: 13,
+                                          fontSize: 12,
                                           fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 10),
+                                const SizedBox(width: 8),
                                 Container(
-                                  width: 44,
-                                  height: 44,
+                                  width: 36,
+                                  height: 36,
                                   decoration: const BoxDecoration(
                                     color: Colors.white,
                                     shape: BoxShape.circle,
                                   ),
                                   child: const Icon(
-                                    Icons.play_arrow_rounded,
+                                    CupertinoIcons.play_fill,
                                     color: _navy,
-                                    size: 28,
+                                    size: 16,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 10),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(100),
                               child: LinearProgressIndicator(
                                 value: (continueCourse.progressPercent / 100)
                                     .clamp(0.0, 1.0),
-                                minHeight: 6,
+                                minHeight: 4,
                                 backgroundColor: Colors.white24,
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 5),
                             Text(
                               '${continueCourse.progressPercent.toStringAsFixed(0)}% Completed',
                               style: const TextStyle(
                                 color: Color(0xFFE5E7EB),
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -306,14 +300,15 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            // Soft pastel stats
+            // Soft pastel stats — iOS icons
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 16, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Row(
                   children: [
                     Expanded(
                       child: _pastelStat(
+                        icon: CupertinoIcons.book_fill,
                         label: 'Courses',
                         value: '${courses.enrolledCourses.length}',
                         bg: AppColors.softBlue,
@@ -323,6 +318,7 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _pastelStat(
+                        icon: CupertinoIcons.chart_pie_fill,
                         label: 'Attendance',
                         value:
                             '${courses.overallAttendance.toStringAsFixed(0)}%',
@@ -339,6 +335,7 @@ class HomeScreen extends StatelessWidget {
                           );
                         },
                         child: _pastelStat(
+                          icon: CupertinoIcons.creditcard_fill,
                           label: 'Due Fee',
                           value: 'Rs ${courses.totalFeeDue}',
                           bg: _softRose,
@@ -353,7 +350,7 @@ class HomeScreen extends StatelessWidget {
 
             // All courses header + chips
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 26, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,7 +433,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            if (filtered.isEmpty)
+            if (homeCourses.isEmpty)
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
                 sliver: const SliverToBoxAdapter(
@@ -452,15 +449,15 @@ class HomeScreen extends StatelessWidget {
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final course = filtered[index];
+                      final course = homeCourses[index];
                       return Padding(
                         padding: EdgeInsets.only(
-                          bottom: index == filtered.length - 1 ? 0 : 10,
+                          bottom: index == homeCourses.length - 1 ? 0 : 10,
                         ),
                         child: _courseCard(context, course, courses),
                       );
                     },
-                    childCount: filtered.length,
+                    childCount: homeCourses.length,
                   ),
                 ),
               ),
@@ -585,6 +582,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _pastelStat({
+    required IconData icon,
     required String label,
     required String value,
     required Color bg,
@@ -592,7 +590,7 @@ class HomeScreen extends StatelessWidget {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
@@ -600,15 +598,8 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: accent.withValues(alpha: 0.85),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
+          Icon(icon, size: 16, color: accent),
+          const SizedBox(height: 8),
           Text(
             value,
             maxLines: 1,
@@ -617,6 +608,15 @@ class HomeScreen extends StatelessWidget {
               color: accent,
               fontWeight: FontWeight.w800,
               fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: accent.withValues(alpha: 0.85),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
