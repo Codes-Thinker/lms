@@ -181,33 +181,41 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ),
-            // Floating AI coach — bottom-right corner above navbar.
+            // Floating AI coach — character only, gold ring, no square plate.
             Positioned(
-              right: 8,
-              bottom: AppResponsive.shellBottom(context) - 4,
+              right: 10,
+              bottom: AppResponsive.shellBottom(context) - 2,
               child: GestureDetector(
                 onTap: () {
                   Navigator.of(context).push(
                     AppMotion.fadeSlide(const AiCoachScreen()),
                   );
                 },
-                child: Image.asset(
-                  'assets/brand/ai_robot_bubble.png',
-                  width: 76,
-                  height: 76,
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 64,
-                    height: 64,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFB8E000),
-                      shape: BoxShape.circle,
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37),
+                      width: 2.5,
                     ),
-                    child: const Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
-                      size: 32,
+                    color: Colors.transparent,
+                  ),
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/brand/ai_robot_bubble.png',
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.high,
+                      errorBuilder: (_, __, ___) => const ColoredBox(
+                        color: AppColors.blue,
+                        child: Icon(
+                          Icons.smart_toy_rounded,
+                          color: Colors.white,
+                          size: 36,
+                        ),
+                      ),
                     ),
                   ),
                 ),
