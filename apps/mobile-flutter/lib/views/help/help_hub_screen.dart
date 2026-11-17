@@ -6,6 +6,7 @@ import '../../core/constants/app_motion.dart';
 import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../ai/ai_coach_screen.dart';
 import '../certificates/certificates_screen.dart';
 import '../fees/fees_screen.dart';
 import '../quizzes/quizzes_screen.dart';
@@ -51,6 +52,14 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
             AppMotion.fadeSlide(const FeesScreen()),
           ),
         ),
+      _HelpTile(
+        title: 'AI Study Coach',
+        subtitle: 'Study plans, explanations, quiz prep',
+        icon: CupertinoIcons.sparkles,
+        onTap: () => Navigator.of(context).push(
+          AppMotion.fadeSlide(const AiCoachScreen()),
+        ),
+      ),
       _HelpTile(
         title: 'Quizzes',
         subtitle: 'Take course MCQ exams',

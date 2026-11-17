@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { AiModule } from "./ai/ai.module";
 import { AssessmentsModule } from "./assessments/assessments.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { AuthModule } from "./auth/auth.module";
@@ -42,6 +43,7 @@ import { UsersModule } from "./users/users.module";
     SystemModule,
     OpsModule,
     AssessmentsModule,
+    AiModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -22,6 +22,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeft,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavItemActive } from "@/lib/nav-active";
@@ -50,6 +51,7 @@ const nav = [
   { href: "/courses/requests", label: "Enrollments", icon: UsersRound },
   { href: "/quizzes", label: "Quizzes", icon: ClipboardList },
   { href: "/certificates", label: "Certificates", icon: GraduationCap },
+  { href: "/ai", label: "AI coach", icon: Sparkles },
   { href: "/inbox", label: "Chat inbox", icon: MessageSquare },
   { href: "/feedback", label: "Feedback", icon: ClipboardList },
   { href: "/system", label: "System", icon: Settings2 },

@@ -54,6 +54,14 @@ Mobile release APK (after `flutter build apk --release`):
 - Mobile Help hub: Quizzes + Certificates
 - Passing a published quiz (enrolled students) can auto-issue a course certificate
 
+## AI Study Coach
+
+- Mobile Help → **AI Study Coach**
+- Admin → **AI coach** (usage)
+- API: `POST /ai/chat`, `GET /ai/history`, `GET /ai/usage`
+- Without `AI_API_KEY`: local LMS-aware coach still works
+- With `AI_API_KEY`: OpenAI-compatible cloud model (`AI_MODEL`, `AI_BASE_URL`)
+
 ## Roles
 
 Student, Intern, Teacher / Staff, Super Admin

@@ -38,3 +38,11 @@ services:
         value: "12h"
       - key: REFRESH_TOKEN_DAYS
         value: "14"
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_BASE_URL
+        value: "https://api.openai.com/v1"
+      - key: AI_MODEL
+        value: "gpt-4o-mini"
+      - key: AI_DAILY_LIMIT_PER_USER
+        value: "40"
