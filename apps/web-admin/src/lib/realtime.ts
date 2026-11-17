@@ -1,7 +1,7 @@
 "use client";
 
 import { io, Socket } from "socket.io-client";
-import { getAdminUser } from "@/lib/api";
+import { getAdminUser, getToken } from "@/lib/api";
 
 let socket: Socket | null = null;
 
@@ -22,6 +22,9 @@ export function connectAdminRealtime(opts: {
   const origin = apiOrigin();
   if (!origin) return () => {};
 
+  const token = getToken();
+  if (!token) return () => {};
+
   if (socket) {
     socket.disconnect();
     socket = null;
@@ -31,9 +34,11 @@ export function connectAdminRealtime(opts: {
     path: "/realtime",
     transports: ["websocket", "polling"],
     withCredentials: true,
+    auth: { token },
   });
 
   socket.on("connect", () => {
+    // Server binds room from JWT; join is optional confirmation.
     const user = getAdminUser();
     if (user?.id) socket?.emit("join", { userId: user.id });
     socket?.emit("joinAdmins");

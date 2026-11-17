@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { ChatKind, NotificationType, TicketKind, TicketStatus } from "@prisma/client";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -300,7 +304,8 @@ export class SupportService {
       text?: string;
       imageData?: string;
       imageName?: string;
-    }
+    },
+    actor?: { userId: string; isAdmin: boolean }
   ) {
     const text = (input.text ?? "").trim();
     const imageData = input.imageData?.trim() || null;
@@ -313,6 +318,13 @@ export class SupportService {
       include: { user: true },
     });
     if (!thread) throw new NotFoundException("Thread not found");
+
+    if (actor) {
+      const ownsThread = thread.userId === actor.userId;
+      if (!actor.isAdmin && !ownsThread) {
+        throw new ForbiddenException("You cannot post to this chat");
+      }
+    }
 
     await this.prisma.chatMessage.create({
       data: {

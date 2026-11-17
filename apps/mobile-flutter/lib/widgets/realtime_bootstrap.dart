@@ -7,6 +7,7 @@ import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/teaching_provider.dart';
 import '../providers/ui_provider.dart';
+import '../services/api_client.dart';
 import '../services/realtime_service.dart';
 
 /// Keeps Socket.IO joined to the signed-in user for live notifications.
@@ -52,7 +53,10 @@ class _RealtimeBootstrapState extends State<RealtimeBootstrap> {
 
     if (_boundUserId != userId) {
       _boundUserId = userId;
-      RealtimeService.instance.connect(userId);
+      RealtimeService.instance.connect(
+        userId,
+        accessToken: ApiClient.instance.token,
+      );
     }
   }
 

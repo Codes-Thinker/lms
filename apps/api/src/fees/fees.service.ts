@@ -218,6 +218,39 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     return this.map(row);
   }
 
+  /** Staff/admin or the owning student may access a fee case. */
+  assertFeeAccess(
+    fee: { studentId: string },
+    actor: { sub: string; accountType?: string; roles?: string[] }
+  ) {
+    if (this.isStaffOrAdmin(actor)) return;
+    if (fee.studentId !== actor.sub) {
+      throw new ForbiddenException("You cannot access this fee case");
+    }
+  }
+
+  isStaffOrAdmin(actor: {
+    accountType?: string;
+    roles?: string[];
+  }) {
+    const roles = actor.roles ?? [];
+    return (
+      actor.accountType === "SUPER_ADMIN" ||
+      actor.accountType === "STAFF" ||
+      roles.includes("SUPER_ADMIN") ||
+      roles.includes("STAFF")
+    );
+  }
+
+  async getForActor(
+    id: string,
+    actor: { sub: string; accountType?: string; roles?: string[] }
+  ) {
+    const fee = await this.get(id);
+    this.assertFeeAccess(fee, actor);
+    return fee;
+  }
+
   async addMessage(
     id: string,
     input: {
@@ -226,8 +259,14 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       senderRole: string;
       text: string;
       hasScreenshot?: boolean;
-    }
+    },
+    actor?: { sub: string; accountType?: string; roles?: string[] }
   ) {
+    if (actor) {
+      const fee = await this.prisma.feeCase.findUnique({ where: { id } });
+      if (!fee) throw new NotFoundException("Fee case not found");
+      this.assertFeeAccess(fee, actor);
+    }
     await this.prisma.feeMessage.create({
       data: {
         feeCaseId: id,
@@ -710,7 +749,17 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Get submissions for a specific fee case. */
-  async submissionsForFee(feeCaseId: string) {
+  async submissionsForFee(
+    feeCaseId: string,
+    actor?: { sub: string; accountType?: string; roles?: string[] }
+  ) {
+    if (actor) {
+      const fee = await this.prisma.feeCase.findUnique({
+        where: { id: feeCaseId },
+      });
+      if (!fee) throw new NotFoundException("Fee case not found");
+      this.assertFeeAccess(fee, actor);
+    }
     return this.prisma.paymentSubmission.findMany({
       where: { feeCaseId },
       orderBy: { createdAt: "desc" },

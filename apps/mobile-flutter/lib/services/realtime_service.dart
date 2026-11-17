@@ -10,6 +10,7 @@ import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/teaching_provider.dart';
 import '../providers/ui_provider.dart';
+import 'api_client.dart';
 
 typedef RealtimeOpenHandler = void Function(String type, {String? taskId});
 
@@ -46,9 +47,14 @@ class RealtimeService {
 
   bool get isConnected => _socket?.connected == true;
 
-  void connect(String userId) {
+  void connect(String userId, {String? accessToken}) {
     final id = userId.trim();
     if (id.isEmpty) return;
+    final token = (accessToken ?? ApiClient.instance.token ?? '').trim();
+    if (token.isEmpty) {
+      debugPrint('Realtime skipped: missing access token');
+      return;
+    }
     if (_socket != null && _userId == id && _socket!.connected) return;
 
     disconnect();
@@ -60,6 +66,7 @@ class RealtimeService {
       io.OptionBuilder()
           .setPath('/realtime')
           .setTransports(['websocket', 'polling'])
+          .setAuth({'token': token})
           .enableForceNew()
           .enableAutoConnect()
           .enableReconnection()
@@ -71,6 +78,7 @@ class RealtimeService {
     _socket!
       ..onConnect((_) {
         debugPrint('Realtime connected');
+        // Server ignores client userId and joins JWT sub; emit for compatibility.
         _socket?.emit('join', {'userId': id});
       })
       ..onDisconnect((_) => debugPrint('Realtime disconnected'))

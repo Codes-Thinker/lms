@@ -1,30 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+/**
+ * Legacy Next `/api/*` mock routes are retired (410).
+ * Admin UI talks only to the Nest LMS API.
+ */
 export function middleware(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
-  if (request.method === "OPTIONS") {
-    return new NextResponse(null, {
-      status: 204,
-      headers: corsHeaders(),
-    });
-  }
-
-  const response = NextResponse.next();
-  const headers = corsHeaders();
-  headers.forEach((value, key) => response.headers.set(key, value));
-  return response;
-}
-
-function corsHeaders() {
-  return new Headers({
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  });
+  return NextResponse.json(
+    {
+      error: "Gone",
+      message: "Legacy Next API disabled. Use the Nest LMS API.",
+    },
+    { status: 410 }
+  );
 }
 
 export const config = {

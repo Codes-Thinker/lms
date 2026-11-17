@@ -130,13 +130,17 @@ export class SupportController {
       dbUser?.email ||
       (isAdmin ? "Admin" : "User");
 
-    return this.support.postMessage(id, {
-      senderId: user.sub,
-      senderName,
-      senderRole: isAdmin ? "ADMIN" : "USER",
-      text: body.text ?? "",
-      imageData: body.imageData,
-      imageName: body.imageName,
-    });
+    return this.support.postMessage(
+      id,
+      {
+        senderId: user.sub,
+        senderName,
+        senderRole: isAdmin ? "ADMIN" : "USER",
+        text: body.text ?? "",
+        imageData: body.imageData,
+        imageName: body.imageName,
+      },
+      { userId: user.sub, isAdmin }
+    );
   }
 }

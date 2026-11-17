@@ -75,14 +75,14 @@ export class FeesController {
   }
 
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.fees.get(id);
+  get(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.fees.getForActor(id, user);
   }
 
   /** Get payment submissions for a fee case. */
   @Get(":id/submissions")
-  feeSubmissions(@Param("id") id: string) {
-    return this.fees.submissionsForFee(id);
+  feeSubmissions(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.fees.submissionsForFee(id, user);
   }
 
   @Patch(":id/status")
@@ -120,13 +120,17 @@ export class FeesController {
   ) {
     const isAdmin =
       user.accountType === "SUPER_ADMIN" || user.roles?.includes("SUPER_ADMIN");
-    return this.fees.addMessage(id, {
-      senderId: user.sub,
-      senderName: user.email,
-      senderRole: isAdmin ? "ADMIN" : user.accountType,
-      text: body.text,
-      hasScreenshot: body.hasScreenshot,
-    });
+    return this.fees.addMessage(
+      id,
+      {
+        senderId: user.sub,
+        senderName: user.email,
+        senderRole: isAdmin ? "ADMIN" : user.accountType,
+        text: body.text,
+        hasScreenshot: body.hasScreenshot,
+      },
+      user
+    );
   }
 
   @Post(":id/remind")
