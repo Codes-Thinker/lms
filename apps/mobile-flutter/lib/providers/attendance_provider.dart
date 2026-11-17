@@ -197,24 +197,45 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   /// Verify geofence location — calls backend to check distance.
-  Future<void> verifyLocation(double lat, double lng) async {
-    _checkingLocation = true;
-    notifyListeners();
+  /// [silent] skips loading flicker + skips notify when nothing changed
+  /// (used by GPS stream so Attend tab does not blink).
+  Future<void> verifyLocation(
+    double lat,
+    double lng, {
+    bool silent = false,
+  }) async {
+    if (!silent) {
+      _checkingLocation = true;
+      notifyListeners();
+    }
     try {
       final data = await ApiClient.instance.post('/attendance/verify-location',
           body: {'lat': lat, 'lng': lng}) as Map<String, dynamic>;
-      _insideGeofence = data['inside'] as bool? ?? false;
-      _distanceFromOffice = (data['distance'] as num?)?.toInt() ?? -1;
-      _officeLat = (data['officeLat'] as num?)?.toDouble();
-      _officeLng = (data['officeLng'] as num?)?.toDouble();
-      _geofenceRadius = (data['radius'] as num?)?.toInt() ?? 50;
+      final inside = data['inside'] as bool? ?? false;
+      final dist = (data['distance'] as num?)?.toInt() ?? -1;
+      final officeLat = (data['officeLat'] as num?)?.toDouble();
+      final officeLng = (data['officeLng'] as num?)?.toDouble();
+      final radius = (data['radius'] as num?)?.toInt() ?? 50;
+      final changed = inside != _insideGeofence ||
+          dist != _distanceFromOffice ||
+          radius != _geofenceRadius ||
+          officeLat != _officeLat ||
+          officeLng != _officeLng;
+      _insideGeofence = inside;
+      _distanceFromOffice = dist;
+      _officeLat = officeLat;
+      _officeLng = officeLng;
+      _geofenceRadius = radius;
+      if (!silent) _checkingLocation = false;
+      if (changed || !silent) notifyListeners();
     } catch (e) {
       debugPrint('Location verify failed: $e');
+      final changed = _insideGeofence || _distanceFromOffice != -1;
       _insideGeofence = false;
       _distanceFromOffice = -1;
+      if (!silent) _checkingLocation = false;
+      if (changed || !silent) notifyListeners();
     }
-    _checkingLocation = false;
-    notifyListeners();
   }
 
   /// Process arrival reminder — sends at most one per day.

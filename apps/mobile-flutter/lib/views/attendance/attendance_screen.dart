@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/app_space.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/time_utils.dart';
 import '../../core/responsive.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/office_location_service.dart';
+import '../../widgets/live_clock.dart';
 
 class AttendanceScreen extends StatefulWidget {
   const AttendanceScreen({super.key});
@@ -48,12 +50,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (mounted) setState(() => _locBusy = false);
   }
 
-  String _fmt(DateTime dt) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    final s = dt.second.toString().padLeft(2, '0');
-    return '$h:$m:$s';
-  }
+  String _fmt(DateTime dt) =>
+      TimeUtils.formatTime(dt.toLocal(), withSeconds: true);
 
   Future<void> _checkIn() async {
     final auth = context.read<AuthProvider>();
@@ -109,7 +107,6 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final attendance = context.watch<AttendanceProvider>();
-    final now = DateTime.now();
     final user = auth.user;
     final mine = user == null ? null : attendance.todayFor(user.id);
     final pad = AppResponsive.pagePad(context);
@@ -135,7 +132,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ? null
                 : () async {
                     setState(() => _locBusy = true);
-                    await OfficeLocationService.instance.refreshNow();
+                    await OfficeLocationService.instance
+                        .refreshNow(silent: false);
                     if (mounted) setState(() => _locBusy = false);
                   },
             icon: const Icon(Icons.my_location_rounded, size: 20),
@@ -210,16 +208,15 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ),
           const SizedBox(height: 12),
-          Row(
+          const Row(
             children: [
-              const Text(
+              Text(
                 'Device time',
                 style: TextStyle(color: AppColors.muted, fontSize: 14),
               ),
-              const Spacer(),
-              Text(
-                _fmt(now),
-                style: const TextStyle(
+              Spacer(),
+              LiveClock(
+                style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 22,
                   color: AppColors.ink,

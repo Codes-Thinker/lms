@@ -56,12 +56,12 @@ class OfficeLocationService {
     }
   }
 
-  Future<void> refreshNow() async {
+  Future<void> refreshNow({bool silent = true}) async {
     final att = _attendance;
     if (att == null) return;
     final pos = await currentPosition();
     if (pos == null) return;
-    await att.verifyLocation(pos.latitude, pos.longitude);
+    await att.verifyLocation(pos.latitude, pos.longitude, silent: silent);
     if (att.insideGeofence) {
       await att.processArrivalReminder(pos.latitude, pos.longitude);
       _wasInside = true;
@@ -82,12 +82,16 @@ class OfficeLocationService {
       _sub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 15,
+          distanceFilter: 25,
         ),
       ).listen((pos) async {
         final att = _attendance;
         if (att == null) return;
-        await att.verifyLocation(pos.latitude, pos.longitude);
+        await att.verifyLocation(
+          pos.latitude,
+          pos.longitude,
+          silent: true,
+        );
         final inside = att.insideGeofence;
         // Enter event only (outside → inside). API enforces once/day.
         if (inside && !_wasInside) {
