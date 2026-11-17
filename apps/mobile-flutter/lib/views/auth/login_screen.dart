@@ -13,6 +13,7 @@ import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/ct_mark.dart';
@@ -73,12 +74,16 @@ class _LoginScreenState extends State<LoginScreen> {
       final fees = context.read<FeeProvider>();
       final attendance = context.read<AttendanceProvider>();
       final notes = context.read<NotificationProvider>();
-      await courses.fetchEnrolledCourses();
-      await tasks.load();
-      await fees.load();
-      await attendance.loadMine();
+      final teaching = context.read<TeachingProvider>();
+      await Future.wait([
+        courses.fetchAll(),
+        tasks.load(),
+        fees.load(),
+        attendance.loadMine(),
+        notes.load(),
+        if (auth.isStaff) teaching.load(),
+      ]);
       await PushNotificationService.instance.registerWithBackend();
-      await notes.load();
       if (!context.mounted) return;
       final pendingType = NotificationRouter.pendingType;
       ui.setNavIndex(

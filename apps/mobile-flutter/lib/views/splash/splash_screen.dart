@@ -13,6 +13,7 @@ import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
@@ -134,12 +135,14 @@ class _SplashScreenState extends State<SplashScreen>
       final fees = context.read<FeeProvider>();
       final attendance = context.read<AttendanceProvider>();
       final notes = context.read<NotificationProvider>();
+      final teaching = context.read<TeachingProvider>();
       await Future.wait([
         courses.fetchAll(),
         tasks.load(),
         fees.load(),
         attendance.loadMine(),
         notes.load(),
+        if (auth.isStaff) teaching.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
       OfficeLocationService.instance.bind(attendance);

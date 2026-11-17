@@ -4,6 +4,7 @@ import 'dart:io' show Platform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../core/constants/app_brand.dart';
 import '../core/notification_router.dart';
@@ -15,6 +16,7 @@ import 'notify_tone.dart';
 typedef CurrentUserIdGetter = String? Function();
 
 /// Background isolate handler — must be top-level.
+/// OS already shows FCM `notification` payloads; this covers data-only pushes.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (Firebase.apps.isEmpty) {
@@ -23,6 +25,55 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint(
     'BG FCM type=${message.data['type']} id=${message.data['notificationId']} '
     'toUser=${message.data['userId']}',
+  );
+
+  // Data-only message: surface a tray notification so background still alerts.
+  if (message.notification != null) return;
+
+  final title = (message.data['title'] ?? "Code's Thinker").toString();
+  final body = (message.data['body'] ?? 'New update').toString();
+  final type = (message.data['type'] ?? 'GENERAL').toString();
+  final plugin = FlutterLocalNotificationsPlugin();
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  await plugin.initialize(
+    settings: const InitializationSettings(android: androidInit),
+  );
+  const channel = AndroidNotificationChannel(
+    'lms_ct_notify',
+    "Code's Thinker Alerts",
+    description: 'Chat, fees, attendance and system messages',
+    importance: Importance.high,
+  );
+  await plugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
+
+  final payload = jsonEncode({
+    'type': type,
+    'notificationId': message.data['notificationId']?.toString(),
+    'taskId': message.data['taskId']?.toString(),
+    'feeCaseId': message.data['feeCaseId']?.toString() ??
+        message.data['caseId']?.toString(),
+    'userId': message.data['userId']?.toString(),
+  });
+
+  await plugin.show(
+    id: message.hashCode,
+    title: title,
+    body: body,
+    notificationDetails: NotificationDetails(
+      android: AndroidNotificationDetails(
+        channel.id,
+        channel.name,
+        channelDescription: channel.description,
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+        color: const Color(0xFF2563EB),
+      ),
+    ),
+    payload: payload,
   );
 }
 

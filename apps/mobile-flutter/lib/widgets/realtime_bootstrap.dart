@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -44,8 +46,13 @@ class _RealtimeBootstrapState extends State<RealtimeBootstrap> {
       teaching: context.read<TeachingProvider>(),
       onOpen: widget.onOpen,
     );
+    final tasks = context.read<TaskProvider>();
+    final teaching = context.read<TeachingProvider>();
     PushNotificationService.instance.setOnForegroundRefresh(() {
-      notes.load();
+      // Keep inbox + teacher/staff dashboards live while app is open.
+      unawaited(notes.load());
+      unawaited(tasks.load(silent: true));
+      unawaited(teaching.load(silent: true));
     });
 
     if (userId == null || userId.isEmpty) {

@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/app_loader.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
@@ -37,8 +40,27 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<TeachingProvider>().load();
+      unawaited(_hydrate(silent: false));
     });
+  }
+
+  /// Pull every teacher dashboard source from the live API.
+  Future<void> _hydrate({bool silent = true}) async {
+    if (!mounted) return;
+    final courses = context.read<CourseProvider>();
+    final teaching = context.read<TeachingProvider>();
+    final tasks = context.read<TaskProvider>();
+    final fees = context.read<FeeProvider>();
+    final attendance = context.read<AttendanceProvider>();
+    final notes = context.read<NotificationProvider>();
+    await Future.wait([
+      courses.fetchAll(),
+      teaching.load(silent: silent),
+      tasks.load(silent: silent),
+      fees.load(),
+      attendance.loadMine(),
+      notes.load(),
+    ]);
   }
 
   @override
@@ -47,7 +69,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     final courses = context.watch<CourseProvider>();
     final teaching = context.watch<TeachingProvider>();
     final tasks = context.watch<TaskProvider>();
-    final fees = context.watch<FeeProvider>();
     final attendance = context.watch<AttendanceProvider>();
     final notes = context.watch<NotificationProvider>();
     final pad = AppResponsive.pagePad(context);
@@ -61,9 +82,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         teaching.courses.isNotEmpty ? teaching.courses.length : batches.length;
     final staffId = auth.user?.id ?? '';
     final myTasks = tasks.tasksForUser(staffId);
-    final openTasks = myTasks.where((t) => t.status != 'DONE').toList();
-    final feePending = fees.pendingAmount;
+    // Student fee dues across batches this teacher instructs (backend course totals).
+    final feeDueAcrossBatches = batches.fold<int>(0, (sum, c) {
+      final due = (c.totalFee - c.paidAmount).clamp(0, c.totalFee);
+      return sum + due;
+    });
     final checkedIn = attendance.today.where((m) => m.isCheckedIn).length;
+    final sessions = batches.take(5).toList();
     final name = auth.user?.name.trim().isNotEmpty == true
         ? auth.user!.name.trim()
         : 'Teacher';
@@ -72,11 +97,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     final avatar = auth.avatarImage;
     final unread = notes.unreadCount;
 
+    if (teaching.loading && teaching.courses.isEmpty && batches.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppColors.bg,
+        body: Center(child: AppLoader()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          color: AppColors.blue,
+          onRefresh: () => _hydrate(silent: true),
+          child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: [
             // Top bar — matches student home
             SliverPadding(
@@ -238,8 +275,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         Expanded(
                           child: _stat(
                             icon: CupertinoIcons.doc_text_fill,
-                            label: 'Open tasks',
-                            value: '${openTasks.length}',
+                            label: 'Assigned',
+                            value: '${teaching.assigned.length}',
                           ),
                         ),
                       ],
@@ -259,8 +296,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                           child: _stat(
                             icon: CupertinoIcons.creditcard_fill,
                             label: 'Fee due',
-                            value: 'Rs $feePending',
-                            danger: feePending > 0,
+                            value: 'Rs $feeDueAcrossBatches',
+                            danger: feeDueAcrossBatches > 0,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -316,6 +353,56 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         ),
                       ],
                     ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Upcoming classes from live catalog
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _Section('UPCOMING CLASSES'),
+                    const SizedBox(height: 4),
+                    if (sessions.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No live courses yet. Publish from admin.',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                            height: 1.35,
+                          ),
+                        ),
+                      )
+                    else
+                      ...List.generate(sessions.length, (i) {
+                        final c = sessions[i];
+                        final batchLabel =
+                            c.batch.isEmpty ? c.category : c.batch;
+                        return Column(
+                          children: [
+                            _listRow(
+                              icon: CupertinoIcons.time,
+                              title: c.title,
+                              subtitle: '$batchLabel · Live catalog',
+                              trailing: 'Open',
+                              onTap: () {
+                                courses.selectCourse(c);
+                                _push(
+                                  context,
+                                  CourseDetailScreen(courseId: c.id),
+                                );
+                              },
+                            ),
+                            if (i < sessions.length - 1) const _Line(),
+                          ],
+                        );
+                      }),
                   ],
                 ),
               ),
@@ -642,6 +729,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -744,6 +832,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     required IconData icon,
     required String title,
     required String subtitle,
+    String? trailing,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -791,11 +880,21 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                 ],
               ),
             ),
-            const Icon(
-              CupertinoIcons.chevron_forward,
-              color: AppColors.muted,
-              size: 16,
-            ),
+            if (trailing != null)
+              Text(
+                trailing,
+                style: const TextStyle(
+                  color: AppColors.blueDark,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              )
+            else
+              const Icon(
+                CupertinoIcons.chevron_forward,
+                color: AppColors.muted,
+                size: 16,
+              ),
           ],
         ),
       ),
