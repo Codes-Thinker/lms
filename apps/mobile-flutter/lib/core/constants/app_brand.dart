@@ -14,4 +14,5 @@ class AppBrand {
   static const String markAsset = 'assets/brand/ct_mark.png';
   static const String markHdAsset = 'assets/brand/ct_mark_hd.png';
   static const String appIconAsset = 'assets/brand/app_icon.png';
+  static const String aiRobotBubbleAsset = 'assets/brand/ai_robot_bubble.png';
 }

@@ -181,31 +181,33 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ),
-            // Floating AI coach — above navbar only; rest of UI unchanged.
+            // Floating AI coach — bottom-right corner above navbar.
             Positioned(
-              right: 14,
-              bottom: AppResponsive.shellBottom(context) - 10,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      AppMotion.fadeSlide(const AiCoachScreen()),
-                    );
-                  },
-                  customBorder: const CircleBorder(),
-                  child: Ink(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
+              right: 8,
+              bottom: AppResponsive.shellBottom(context) - 4,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    AppMotion.fadeSlide(const AiCoachScreen()),
+                  );
+                },
+                child: Image.asset(
+                  'assets/brand/ai_robot_bubble.png',
+                  width: 76,
+                  height: 76,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFB8E000),
                       shape: BoxShape.circle,
-                      color: AppColors.blue,
-                      border: Border.all(color: Colors.white, width: 2.5),
                     ),
                     child: const Icon(
-                      Icons.auto_awesome_rounded,
+                      Icons.smart_toy_rounded,
                       color: Colors.white,
-                      size: 26,
+                      size: 32,
                     ),
                   ),
                 ),
