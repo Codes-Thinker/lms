@@ -1,6 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../core/app_space.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
@@ -24,17 +25,31 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-/// Controllers + ValueNotifier only — no setState.
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _obscure = ValueNotifier<bool>(true);
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
     _obscure.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -45,6 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final tasks = context.read<TaskProvider>();
 
     if (ui.globalLoading) return;
+    FocusScope.of(context).unfocus();
     ui.showLoading();
     try {
       final ok = await auth.login(email: _email.text, password: _password.text);
@@ -54,7 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Full catalog + tasks + fees + attendance for every role.
       final fees = context.read<FeeProvider>();
       final attendance = context.read<AttendanceProvider>();
       final notes = context.read<NotificationProvider>();
@@ -67,271 +82,298 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!context.mounted) return;
       final pendingType = NotificationRouter.pendingType;
       ui.setNavIndex(
-        pendingType != null
-            ? NotificationRouter.tabForType(pendingType)
-            : 0,
+        pendingType != null ? NotificationRouter.tabForType(pendingType) : 0,
       );
-      // Keep pending deep-link for AppShell (chat / task / fee).
-      ui.showSnack('Welcome ${auth.user?.firstName ?? ''}, ${auth.user?.roleLabel}');
-      Navigator.of(context).pushReplacement(AppMotion.fadeSlide(const AppShell()));
+      ui.showSnack(
+        'Welcome ${auth.user?.firstName ?? ''}, ${auth.user?.roleLabel}',
+      );
+      Navigator.of(context).pushReplacement(
+        AppMotion.fadeSlide(const AppShell()),
+      );
     } finally {
       ui.hideLoading();
     }
   }
 
+  Future<void> _forgot(BuildContext context) async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      context.read<UiProvider>().showSnack(
+            'Enter your email first',
+            tone: AppSnackTone.warning,
+          );
+      return;
+    }
+    final msg = await context.read<AuthProvider>().requestPasswordReset(email);
+    if (!context.mounted) return;
+    context.read<UiProvider>().showSnack(
+          msg ?? 'Check your email for a reset link',
+          tone: AppSnackTone.info,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final pad = AppResponsive.pagePad(context) + AppSpace.sm;
+    final busy = context.watch<UiProvider>().globalLoading;
+    final pad = AppResponsive.pagePad(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
     return PopScope(
       canPop: false,
       child: Scaffold(
         backgroundColor: AppColors.bg,
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(horizontal: pad, vertical: AppSpace.xxl),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 400),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const CtMark(size: 68),
-                          AppSpace.gapXl,
-                          const Text(
-                            AppBrand.name,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          AppSpace.gapSm,
-                          const Text(
-                            AppBrand.tagline,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                          AppSpace.gapXxl,
-                          Row(
-                            children: [
-                              _roleChip(
-                                label: 'Student',
-                                icon: Icons.school_rounded,
-                                selected: auth.loginRole == LoginRole.student,
-                                onTap: () => auth.selectLoginRole(LoginRole.student),
-                              ),
-                              AppSpace.wSm,
-                              _roleChip(
-                                label: 'Intern',
-                                icon: Icons.workspace_premium_rounded,
-                                selected: auth.loginRole == LoginRole.intern,
-                                onTap: () => auth.selectLoginRole(LoginRole.intern),
-                              ),
-                              AppSpace.wSm,
-                              _roleChip(
-                                label: 'Teacher / Staff',
-                                icon: Icons.badge_rounded,
-                                selected: auth.loginRole == LoginRole.staff,
-                                onTap: () => auth.selectLoginRole(LoginRole.staff),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpace.xxl - 4),
-                          _field(
-                            controller: _email,
-                            label: 'Email',
-                            hint: 'you@gmail.com',
-                            keyboard: TextInputType.emailAddress,
-                            icon: Icons.mail_outline_rounded,
-                          ),
-                          AppSpace.gapXl,
-                          ValueListenableBuilder<bool>(
-                            valueListenable: _obscure,
-                            builder: (_, obscure, __) {
-                              return _field(
-                                controller: _password,
-                                label: 'Password',
-                                hint: 'Your password',
-                                obscure: obscure,
-                                icon: Icons.lock_outline_rounded,
-                                suffix: IconButton(
-                                  onPressed: () => _obscure.value = !obscure,
-                                  icon: Icon(
-                                    obscure
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    color: AppColors.muted,
-                                    size: 20,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () async {
-                                final email = _email.text.trim();
-                                if (email.isEmpty) {
-                                  context.read<UiProvider>().showSnack(
-                                        'Enter your email first',
-                                        tone: AppSnackTone.warning,
-                                      );
-                                  return;
-                                }
-                                final msg = await context
-                                    .read<AuthProvider>()
-                                    .requestPasswordReset(email);
-                                if (!context.mounted) return;
-                                context.read<UiProvider>().showSnack(
-                                      msg ?? 'Check your email for a reset link',
-                                      tone: AppSnackTone.info,
-                                    );
-                              },
-                              child: const Text(
-                                'Forgot password?',
+        body: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                bottom: false,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 24),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Brand — left aligned, product header
+                        Row(
+                          children: [
+                            const CtMark(size: 40),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                AppBrand.shortName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.blue,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 36),
+                        const Text(
+                          'Sign in',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                            letterSpacing: -0.8,
+                            height: 1.1,
                           ),
-                          AppSpace.gapXl,
-                          Builder(
-                            builder: (context) {
-                              final busy = context.watch<UiProvider>().globalLoading;
-                              return SizedBox(
-                                width: double.infinity,
-                                height: 52,
-                                child: ElevatedButton(
-                                  onPressed: busy ? null : () => _submit(context),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.blue,
-                                    foregroundColor: Colors.white,
-                                    disabledBackgroundColor:
-                                        AppColors.blue.withValues(alpha: 0.7),
-                                    disabledForegroundColor: Colors.white,
-                                    elevation: 0,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(AppSpace.rPill),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Sign in',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Use your Code\'s Thinker account to continue.',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
+                        ),
+
+                        const SizedBox(height: 28),
+                        const Text(
+                          'CONTINUE AS',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.7,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        _RoleSegment(
+                          role: auth.loginRole,
+                          onChanged: auth.selectLoginRole,
+                        ),
+
+                        const SizedBox(height: 24),
+                        _LabeledField(
+                          label: 'Email',
+                          child: TextField(
+                            controller: _email,
+                            focusNode: _emailFocus,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            onSubmitted: (_) => _passwordFocus.requestFocus(),
+                            cursorColor: AppColors.blue,
+                            style: const TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.ink,
+                            ),
+                            decoration: _inputDecoration(
+                              hint: 'you@gmail.com',
+                              prefix: CupertinoIcons.mail,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: _obscure,
+                          builder: (_, obscure, __) {
+                            return _LabeledField(
+                              label: 'Password',
+                              child: TextField(
+                                controller: _password,
+                                focusNode: _passwordFocus,
+                                obscureText: obscure,
+                                textInputAction: TextInputAction.done,
+                                onSubmitted: (_) => _submit(context),
+                                cursorColor: AppColors.blue,
+                                style: const TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.ink,
+                                ),
+                                decoration: _inputDecoration(
+                                  hint: 'Your password',
+                                  prefix: CupertinoIcons.lock,
+                                  suffix: IconButton(
+                                    onPressed: () =>
+                                        _obscure.value = !obscure,
+                                    splashRadius: 20,
+                                    icon: Icon(
+                                      obscure
+                                          ? CupertinoIcons.eye
+                                          : CupertinoIcons.eye_slash,
+                                      color: AppColors.muted,
+                                      size: 20,
                                     ),
                                   ),
                                 ),
-                              );
-                            },
+                              ),
+                            );
+                          },
+                        ),
+
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: busy ? null : () => _forgot(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Forgot password?',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.blueDark,
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton(
+                            onPressed: busy ? null : () => _submit(context),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.blue,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  AppColors.blue.withValues(alpha: 0.55),
+                              disabledForegroundColor: Colors.white,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Sign in',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(bottom: bottom > 0 ? AppSpace.sm : AppSpace.lg),
-                child: const Text(
-                  AppBrand.footer,
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom > 0 ? 8 : 16),
+                child: Text(
+                  AppBrand.tagline,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    letterSpacing: 0.2,
+                    color: AppColors.muted.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _roleChip({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
-          decoration: BoxDecoration(
-            color: selected ? AppColors.blue : AppColors.softBlue,
-            borderRadius: BorderRadius.circular(AppSpace.rPill),
-            border: Border.all(
-              color: selected ? AppColors.blue : Colors.transparent,
-              width: 1.5,
             ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: selected ? Colors.white : AppColors.blue, size: 20),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? Colors.white : AppColors.blue,
-                  fontWeight: FontWeight.w700,
-                  fontSize: label.contains('/') ? 10 : 12,
-                  height: 1.15,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
-  static const _fieldRadius = 16.0;
-
-  OutlineInputBorder _fieldBorder({
-    Color color = AppColors.line,
-    double width = 1,
-  }) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(_fieldRadius),
-      borderSide: BorderSide(color: color, width: width),
-    );
-  }
-
-  Widget _field({
-    required TextEditingController controller,
-    required String label,
+  InputDecoration _inputDecoration({
     required String hint,
-    required IconData icon,
-    TextInputType? keyboard,
-    bool obscure = false,
+    required IconData prefix,
     Widget? suffix,
   }) {
+    const radius = 12.0;
+    OutlineInputBorder border(Color color, [double width = 1]) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(radius),
+        borderSide: BorderSide(color: color, width: width),
+      );
+    }
+
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        color: AppColors.muted,
+        fontWeight: FontWeight.w400,
+        fontSize: 15,
+      ),
+      prefixIcon: Icon(prefix, color: AppColors.muted, size: 18),
+      suffixIcon: suffix,
+      filled: true,
+      fillColor: AppColors.card,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      border: border(AppColors.line),
+      enabledBorder: border(AppColors.line),
+      focusedBorder: border(AppColors.blue, 1.5),
+      errorBorder: border(AppColors.danger),
+      focusedErrorBorder: border(AppColors.danger, 1.5),
+    );
+  }
+}
+
+class _LabeledField extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _LabeledField({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,41 +385,64 @@ class _LoginScreenState extends State<LoginScreen> {
             color: AppColors.ink,
           ),
         ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: controller,
-          keyboardType: keyboard,
-          obscureText: obscure,
-          cursorColor: AppColors.blue,
-          style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 15,
-            color: AppColors.ink,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w400,
-            ),
-            prefixIcon: Icon(icon, color: AppColors.muted, size: 20),
-            suffixIcon: suffix,
-            filled: true,
-            fillColor: AppColors.card,
-            // Clean solid border only — no blur / shadow / glow.
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-            border: _fieldBorder(),
-            enabledBorder: _fieldBorder(),
-            focusedBorder: _fieldBorder(color: AppColors.blue, width: 1.5),
-            errorBorder: _fieldBorder(color: AppColors.danger),
-            focusedErrorBorder: _fieldBorder(color: AppColors.danger, width: 1.5),
-          ),
-        ),
+        const SizedBox(height: 8),
+        child,
       ],
     );
   }
 }
 
+/// Compact segmented role control — not three tall vibe cards.
+class _RoleSegment extends StatelessWidget {
+  final LoginRole role;
+  final ValueChanged<LoginRole> onChanged;
+
+  const _RoleSegment({required this.role, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          _seg('Student', LoginRole.student),
+          _seg('Intern', LoginRole.intern),
+          _seg('Staff', LoginRole.staff),
+        ],
+      ),
+    );
+  }
+
+  Widget _seg(String label, LoginRole value) {
+    final selected = role == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(value),
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: AppMotion.fast,
+          curve: AppMotion.curve,
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.blue : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : AppColors.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
