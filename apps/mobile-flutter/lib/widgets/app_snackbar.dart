@@ -51,22 +51,23 @@ class _AnimatedBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final current = snack;
     return IgnorePointer(
-      ignoring: snack == null,
+      ignoring: current == null,
       child: AnimatedSlide(
         duration: AppMotion.fast,
         curve: Curves.easeOutCubic,
-        offset: snack == null
+        offset: current == null
             ? Offset(0, fromTop ? -0.35 : 0.35)
             : Offset.zero,
         child: AnimatedOpacity(
           duration: AppMotion.fast,
-          opacity: snack == null ? 0 : 1,
-          child: snack == null
+          opacity: current == null ? 0 : 1,
+          child: current == null
               ? const SizedBox.shrink()
               : Material(
                   type: MaterialType.transparency,
-                  child: _SnackBanner(snack: snack),
+                  child: _SnackBanner(snack: current),
                 ),
         ),
       ),
