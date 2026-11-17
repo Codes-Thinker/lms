@@ -8,11 +8,15 @@ class TimeUtils {
     return parsed.toLocal();
   }
 
+  /// Phone local time in 12-hour form: `12:37 PM` (never `00:37`).
   static String formatTime([DateTime? at]) {
     final local = (at ?? DateTime.now()).toLocal();
-    final h = local.hour.toString().padLeft(2, '0');
+    final hour24 = local.hour;
+    final period = hour24 >= 12 ? 'PM' : 'AM';
+    var hour12 = hour24 % 12;
+    if (hour12 == 0) hour12 = 12;
     final m = local.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    return '$hour12:$m $period';
   }
 
   static String formatDateTime([DateTime? at]) {
