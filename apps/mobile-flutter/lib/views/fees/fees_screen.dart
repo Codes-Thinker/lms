@@ -71,7 +71,7 @@ class FeesScreen extends StatelessWidget {
           _copyRow(context, 'JazzCash', fees.jazzCash),
           _copyRow(context, 'EasyPaisa', fees.easyPaisa),
           _copyRow(context, 'Phone', fees.adminPhone),
-          _copyRow(context, 'Bank', '${fees.bankTitle} · ${fees.bankAccount}'),
+          _copyRow(context, 'Bank', '${fees.bankTitle}, ${fees.bankAccount}'),
 
           const SizedBox(height: 28),
           const Text(
@@ -87,10 +87,10 @@ class FeesScreen extends StatelessWidget {
           ...List.generate(fees.cases.length, (i) {
             final c = fees.cases[i];
             final label = c.status == 'APPROVED'
-                ? 'Paid · Done'
+                ? 'Paid, Done'
                 : c.status == 'SENT'
-                    ? 'Screenshot sent · waiting approve'
-                    : 'Due · pay now';
+                    ? 'Screenshot sent, waiting approve'
+                    : 'Due, pay now';
             return Column(
               children: [
                 InkWell(
@@ -129,7 +129,7 @@ class FeesScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${c.month} · Rs ${c.amount}',
+                                '${c.month}, Rs ${c.amount}',
                                 style: const TextStyle(
                                   color: AppColors.muted,
                                   fontSize: 13,

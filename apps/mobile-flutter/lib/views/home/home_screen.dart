@@ -252,7 +252,7 @@ class HomeScreen extends StatelessWidget {
                           icon: Icons.schedule_rounded,
                           title: 'Next class',
                           subtitle:
-                              '${continueCourse!.title} · ${nextTopic?.title ?? 'Continue'}',
+                              '${continueCourse!.title}, ${nextTopic?.title ?? 'Continue'}',
                           target: continueCourse.nextClassAt!,
                           onTap: () {
                             courses.selectCourse(continueCourse);
@@ -274,7 +274,7 @@ class HomeScreen extends StatelessWidget {
                       if (continueCourse?.feeDueAt != null)
                         _timerRow(
                           icon: Icons.payments_outlined,
-                          title: 'Fee due · Rs ${continueCourse!.monthlyFee}',
+                          title: 'Fee due, Rs ${continueCourse!.monthlyFee}',
                           subtitle: TimeUtils.dueLabel(
                             continueCourse.feeDueAt!,
                             now,
@@ -481,7 +481,7 @@ class HomeScreen extends StatelessWidget {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${task.status} · ${(task.spentSeconds / 60).floor()}m worked',
+                                            '${task.status}, ${(task.spentSeconds / 60).floor()}m worked',
                                             style: const TextStyle(
                                               color: AppColors.muted,
                                               fontSize: 12,
@@ -647,7 +647,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'Rs ${course.monthlyFee}/mo · ${course.installmentCount}× Rs ${course.installmentFee}',
+                    'Rs ${course.monthlyFee}/mo, ${course.installmentCount}× Rs ${course.installmentFee}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -669,7 +669,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${course.progressPercent.toStringAsFixed(0)}% · Attendance ${course.attendancePercent.toStringAsFixed(0)}%',
+                      '${course.progressPercent.toStringAsFixed(0)}%, Attendance ${course.attendancePercent.toStringAsFixed(0)}%',
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontSize: 11,

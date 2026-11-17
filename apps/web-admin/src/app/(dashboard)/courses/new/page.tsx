@@ -26,7 +26,7 @@ export default function NewCoursePage() {
         </p>
         <h2 className="mt-1 text-lg font-semibold">Add course tile</h2>
         <p className="text-sm text-slate-500">
-          Set fees, cover, details and roadmap — publish to show on the student
+          Set fees, cover, details and roadmap. Publish to show on the student
           app immediately.
         </p>
       </div>
@@ -44,7 +44,7 @@ export default function NewCoursePage() {
               method: "POST",
               body: JSON.stringify(editorValueToPayload(value)),
             });
-            show("Course created — live for students if published");
+            show("Course created. Live for students if published.");
             router.push(`/courses/${created.id}`);
           } catch (e) {
             show(e instanceof Error ? e.message : "Could not create course", "error");

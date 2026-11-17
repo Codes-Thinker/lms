@@ -43,7 +43,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
       if (auth.isStudent)
         _HelpTile(
           title: 'Fees & payments',
-          subtitle: 'Pay online · screenshot · admin approve',
+          subtitle: 'Pay online, screenshot, admin approve',
           icon: CupertinoIcons.creditcard,
           onTap: () => Navigator.of(context).push(
             AppMotion.fadeSlide(const FeesScreen()),
@@ -67,7 +67,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
       ),
       _HelpTile(
         title: 'Survey',
-        subtitle: 'Complete admin survey · quick fill',
+        subtitle: 'Complete admin survey, quick fill',
         icon: CupertinoIcons.doc_checkmark,
         onTap: () => Navigator.of(context).push(
           AppMotion.fadeSlide(const SurveyScreen()),
@@ -75,7 +75,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
       ),
       _HelpTile(
         title: "Chat with Code's Thinker",
-        subtitle: 'Direct support · real-time replies',
+        subtitle: 'Direct support, real-time replies',
         icon: CupertinoIcons.chat_bubble_2,
         onTap: () => Navigator.of(context).push(
           AppMotion.fadeSlide(const AdminChatScreen()),
@@ -83,7 +83,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
       ),
       _HelpTile(
         title: 'My progress report',
-        subtitle: 'Attendance · fees · course stats',
+        subtitle: 'Attendance, fees, course stats',
         icon: CupertinoIcons.chart_bar,
         onTap: () => Navigator.of(context).push(
           AppMotion.fadeSlide(const ReportScreen()),
@@ -108,7 +108,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
         ),
         children: [
           const Text(
-            'Report, complain, survey aur admin chat — sab yahan.',
+            'Report, complain, survey aur admin chat sab yahan.',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 13,

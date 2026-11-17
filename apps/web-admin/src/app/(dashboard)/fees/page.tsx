@@ -62,7 +62,7 @@ function tabLabel(c: CourseTab) {
 }
 
 function money(n: number | null | undefined) {
-  if (n == null || Number.isNaN(Number(n))) return "—";
+  if (n == null || Number.isNaN(Number(n))) return "-";
   return `Rs ${Number(n).toLocaleString()}`;
 }
 
@@ -247,7 +247,7 @@ function FeesPageInner() {
         <div>
           <h2 className="text-lg font-semibold">Student fees</h2>
           <p className="text-sm text-slate-500">
-            Balances and payment approvals — no horizontal scroll
+            Balances and payment approvals, no horizontal scroll
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -357,7 +357,7 @@ function FeesPageInner() {
                     {r.courseTitle}
                   </td>
                   <td className="truncate px-3 py-3 text-slate-600">
-                    {r.batch || "—"}
+                    {r.batch || "-"}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
                     {money(r.monthlyFee)}
@@ -369,7 +369,7 @@ function FeesPageInner() {
                     {money(r.remainingBalance)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-600">
-                    {r.nextPaymentDate || r.dueDate || "—"}
+                    {r.nextPaymentDate || r.dueDate || "-"}
                   </td>
                   <td className="px-3 py-3">
                     <FeeStatusBadge status={r.status} />
@@ -458,7 +458,7 @@ function FeesPageInner() {
               </div>
               <p className="text-sm text-slate-600">
                 {r.courseTitle}
-                {r.batch ? ` · ${r.batch}` : ""}
+                {r.batch ? `, ${r.batch}` : ""}
               </p>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
@@ -476,7 +476,7 @@ function FeesPageInner() {
                 <div>
                   <p className="text-xs text-slate-400">Next</p>
                   <p className="font-medium">
-                    {r.nextPaymentDate || r.dueDate || "—"}
+                    {r.nextPaymentDate || r.dueDate || "-"}
                   </p>
                 </div>
               </div>
@@ -536,7 +536,7 @@ function FeesPageInner() {
                   Review payment
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  {reviewFee.studentName} · {reviewFee.courseTitle}
+                  {reviewFee.studentName}, {reviewFee.courseTitle}
                 </p>
               </div>
               <button

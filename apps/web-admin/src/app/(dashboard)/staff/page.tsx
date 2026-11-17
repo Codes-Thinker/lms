@@ -58,10 +58,10 @@ function taskDetailLine(t: TaskRow) {
   const parts: string[] = [];
   if (t.assignedBy?.trim()) parts.push(`from ${t.assignedBy}`);
   if (t.assignedToName?.trim()) parts.push(`→ ${t.assignedToName}`);
-  if (t.courseTitle?.trim()) parts.push(`· ${t.courseTitle}`);
-  if (typeof t.spentMinutes === "number") parts.push(`· ${t.spentMinutes}m worked`);
-  if (t.chat && t.chat.length > 0) parts.push(`· ${t.chat.length} chat`);
-  if (t.dueAt) parts.push(`· due ${t.dueAt.slice(0, 10)}`);
+  if (t.courseTitle?.trim()) parts.push(`, ${t.courseTitle}`);
+  if (typeof t.spentMinutes === "number") parts.push(`, ${t.spentMinutes}m worked`);
+  if (t.chat && t.chat.length > 0) parts.push(`, ${t.chat.length} chat`);
+  if (t.dueAt) parts.push(`, due ${t.dueAt.slice(0, 10)}`);
   return parts.join(" ");
 }
 
@@ -323,7 +323,7 @@ function StaffPageInner() {
                       .join(", ")
                   : "Not assigned";
               const trackLine =
-                [s.track, s.designation].filter(Boolean).join(" · ") || "Not set";
+                [s.track, s.designation].filter(Boolean).join(", ") || "Not set";
               return (
                 <tr key={s.id} className="border-t border-slate-100">
                   <td className="px-5 py-3.5">
@@ -371,7 +371,7 @@ function StaffPageInner() {
       <div className="glass-card p-5">
         <h3 className="mb-1 font-semibold">Student assignments</h3>
         <p className="mb-3 text-xs text-slate-500">
-          Live from teacher app · edit or delete here too · refreshes every 15s
+          Live from teacher app. Edit or delete here too. Refreshes every 15s.
         </p>
         <ul className="space-y-2 text-sm">
           {studentAssignments.map((t) => (
@@ -485,7 +485,7 @@ function StaffPageInner() {
             <p className="mt-1 text-sm text-slate-500">
               {chatTask.assignedToName || "Student"}
               {typeof chatTask.spentMinutes === "number"
-                ? ` · ${chatTask.spentMinutes}m worked`
+                ? `, ${chatTask.spentMinutes}m worked`
                 : ""}
             </p>
             <div className="mt-3 flex-1 space-y-2 overflow-y-auto rounded-xl bg-slate-50 p-3 text-sm">
@@ -502,7 +502,7 @@ function StaffPageInner() {
                     }`}
                   >
                     <div className="text-[11px] opacity-70">
-                      {m.senderName} · {m.sentAt.slice(11, 16) || m.sentAt}
+                      {m.senderName}, {m.sentAt.slice(11, 16) || m.sentAt}
                     </div>
                     <div>{m.text}</div>
                   </div>

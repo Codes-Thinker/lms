@@ -82,7 +82,7 @@ class MockData {
         monthlyFee: 12000,
         totalFee: 48000,
         installmentFee: 6000,
-        description: 'Full Flutter track · synced from admin dashboard',
+        description: 'Full Flutter track, synced from admin dashboard',
         published: true,
         paidAmount: 24000,
         feeStatus: 'PARTIAL',
@@ -95,7 +95,7 @@ class MockData {
         outline: [
           OutlineSection(
             id: 's1',
-            title: 'Month 1 — Foundations',
+            title: 'Month 1: Foundations',
             topics: [
               Topic(id: 't1', title: 'Dart & project setup', completed: true),
               Topic(id: 't2', title: 'Widgets & layout', completed: true),
@@ -105,7 +105,7 @@ class MockData {
           ),
           OutlineSection(
             id: 's2',
-            title: 'Month 2 — State Management',
+            title: 'Month 2: State Management',
             topics: [
               Topic(id: 't5', title: 'Provider ChangeNotifier', completed: true),
               Topic(id: 't6', title: 'MultiProvider', completed: true),
@@ -115,7 +115,7 @@ class MockData {
           ),
           OutlineSection(
             id: 's3',
-            title: 'Month 3 — Features',
+            title: 'Month 3: Features',
             topics: [
               Topic(id: 't9', title: 'Navigation & deep links', completed: false),
               Topic(id: 't10', title: 'Forms & validation', completed: false),
@@ -134,7 +134,7 @@ class MockData {
         monthlyFee: 15000,
         totalFee: 45000,
         installmentFee: 7500,
-        description: 'MERN professional track · from admin courses',
+        description: 'MERN professional track, from admin courses',
         published: true,
         paidAmount: 15000,
         feeStatus: 'DUE',
@@ -147,7 +147,7 @@ class MockData {
         outline: [
           OutlineSection(
             id: 'ns1',
-            title: 'Month 1 — Node & Express',
+            title: 'Month 1: Node & Express',
             topics: [
               Topic(id: 'nt1', title: 'Express REST APIs', completed: true),
               Topic(id: 'nt2', title: 'MongoDB models', completed: false),
@@ -178,7 +178,7 @@ class MockData {
         outline: [
           OutlineSection(
             id: 'ws1',
-            title: 'Month 1 — App Router',
+            title: 'Month 1: App Router',
             topics: [
               Topic(id: 'wt1', title: 'Routing & layouts'),
               Topic(id: 'wt2', title: 'Server vs client components'),

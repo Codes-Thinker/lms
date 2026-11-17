@@ -188,7 +188,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$fromLabel · ${msg.sentAt}',
+                                '$fromLabel, ${msg.sentAt}',
                                 style: TextStyle(
                                   color:
                                       mine ? Colors.white70 : AppColors.muted,

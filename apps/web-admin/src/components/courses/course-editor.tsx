@@ -63,7 +63,7 @@ export function emptyCourseValue(): CourseEditorValue {
     outline: [
       {
         key: uid("sec"),
-        title: "Month 1 — Foundations",
+        title: "Month 1: Foundations",
         topics: [
           { key: uid("lec"), title: "Orientation", minutes: 45 },
           { key: uid("lec"), title: "Environment setup", minutes: 60 },
@@ -390,7 +390,7 @@ export function CourseEditor({
             value={value.instructorId}
             onChange={(e) => set("instructorId", e.target.value)}
           >
-            <option value="">— No instructor assigned —</option>
+            <option value="">No instructor assigned</option>
             {instructors.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.fullName || u.name || u.email}
@@ -404,7 +404,7 @@ export function CourseEditor({
         <div>
           <h3 className="font-semibold">Cover image</h3>
           <p className="text-sm text-slate-500">
-            Upload a photo or paste an image URL — shown on admin tiles and in the
+            Upload a photo or paste an image URL. Shown on admin tiles and in the
             student app.
           </p>
         </div>
@@ -471,7 +471,7 @@ export function CourseEditor({
         <div>
           <h3 className="font-semibold">Details & roadmap</h3>
           <p className="text-sm text-slate-500">
-            Course summary plus modules and lectures — edit freely anytime.
+            Course summary plus modules and lectures. Edit freely anytime.
           </p>
         </div>
         <div className="space-y-2">
@@ -500,7 +500,7 @@ export function CourseEditor({
                     onChange={(e) =>
                       updateSection(section.key, { title: e.target.value })
                     }
-                    placeholder="e.g. Month 2 — Widgets & state"
+                    placeholder="e.g. Month 2: Widgets and state"
                   />
                 </div>
                 <Button

@@ -63,8 +63,8 @@ function taskDetailLine(t: TaskRow) {
   const parts: string[] = [];
   if (t.assignedBy?.trim()) parts.push(`from ${t.assignedBy}`);
   if (t.assignedToName?.trim()) parts.push(`→ ${t.assignedToName}`);
-  if (t.courseTitle?.trim()) parts.push(`· ${t.courseTitle}`);
-  if (t.dueAt) parts.push(`· due ${t.dueAt.slice(0, 10)}`);
+  if (t.courseTitle?.trim()) parts.push(`, ${t.courseTitle}`);
+  if (t.dueAt) parts.push(`, due ${t.dueAt.slice(0, 10)}`);
   return parts.join(" ");
 }
 
@@ -106,7 +106,7 @@ function mapIntern(u: Record<string, unknown>): InternRow {
     track: (u.track as string) || null,
     batch: typeof u.batch === "string" ? u.batch : null,
     batchName: (u.batchName as string) || null,
-    status: String(u.status || "—"),
+    status: String(u.status || "-"),
     internshipStart: (u.internshipStart as string) || null,
     internshipEnd: (u.internshipEnd as string) || null,
     projects,
@@ -114,9 +114,9 @@ function mapIntern(u: Record<string, unknown>): InternRow {
 }
 
 function internshipRange(start?: string | null, end?: string | null) {
-  if (!start && !end) return "—";
+  if (!start && !end) return "-";
   if (start && end) return `${start} → ${end}`;
-  return start || end || "—";
+  return start || end || "-";
 }
 
 export default function InternsPage() {
@@ -241,7 +241,7 @@ export default function InternsPage() {
         <div>
           <h2 className="text-lg font-semibold">Interns</h2>
           <p className="text-sm text-slate-500">
-            Roster · internship window · projects & intern-facing tasks
+            Roster, internship window, projects and intern-facing tasks
           </p>
         </div>
         <Button
@@ -289,7 +289,7 @@ export default function InternsPage() {
               {interns.map((i) => {
                 const { count, avg } = projectSummaryFor(i.id);
                 const batch =
-                  [i.batch, i.batchName].filter(Boolean).join(" · ") || "—";
+                  [i.batch, i.batchName].filter(Boolean).join(", ") || "-";
                 return (
                   <tr key={i.id} className="border-t border-slate-100">
                     <td className="px-5 py-3.5">
@@ -308,10 +308,10 @@ export default function InternsPage() {
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs">{i.email}</p>
-                      <p className="text-xs text-slate-500">{i.phone || "—"}</p>
+                      <p className="text-xs text-slate-500">{i.phone || "-"}</p>
                     </td>
-                    <td className="px-5 py-3.5">{i.department || "—"}</td>
-                    <td className="px-5 py-3.5">{i.track || "—"}</td>
+                    <td className="px-5 py-3.5">{i.department || "-"}</td>
+                    <td className="px-5 py-3.5">{i.track || "-"}</td>
                     <td className="px-5 py-3.5">{batch}</td>
                     <td className="px-5 py-3.5 text-xs">
                       {internshipRange(i.internshipStart, i.internshipEnd)}
@@ -320,10 +320,10 @@ export default function InternsPage() {
                     <td className="px-5 py-3.5">
                       {count ? (
                         <span>
-                          {count} · avg {avg}%
+                          {count}, avg {avg}%
                         </span>
                       ) : (
-                        "—"
+                        "-"
                       )}
                     </td>
                   </tr>
@@ -430,10 +430,10 @@ export default function InternsPage() {
               <Link href={`/users/${p.internId}`} className="hover:text-blue-700">
                 {p.internName}
               </Link>
-              {p.techStack ? ` · ${p.techStack}` : ""}
+              {p.techStack ? `, ${p.techStack}` : ""}
             </p>
             <p className="mt-3 text-sm">
-              {p.progressPercent}% · due {p.deadline || "—"}
+              {p.progressPercent}%, due {p.deadline || "-"}
             </p>
           </div>
         ))}

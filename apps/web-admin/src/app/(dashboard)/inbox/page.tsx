@@ -235,7 +235,7 @@ export default function InboxPage() {
           <div className="shrink-0 border-b border-slate-100 px-4 py-3">
             <h2 className="text-base font-semibold">Chat inbox</h2>
             <p className="text-xs text-slate-500">
-              Tap a chat · photos open full size
+              Tap a chat. Photos open full size.
             </p>
             {error ? (
               <p className="mt-2 text-xs text-red-600">{error}</p>
@@ -265,7 +265,7 @@ export default function InboxPage() {
                           activeRow ? "text-blue-100" : "text-slate-400"
                         )}
                       >
-                        · {t.userRole}
+                        , {t.userRole}
                       </span>
                     </p>
                     <p
@@ -309,10 +309,10 @@ export default function InboxPage() {
             <>
               <div className="shrink-0 border-b border-slate-200 px-4 py-3">
                 <p className="font-semibold">
-                  {active.userName} · {active.userRole}
+                  {active.userName}, {active.userRole}
                 </p>
                 <p className="text-xs text-slate-500">
-                  Fee screenshots & photos — click image to enlarge
+                  Fee screenshots and photos. Click image to enlarge.
                 </p>
               </div>
 

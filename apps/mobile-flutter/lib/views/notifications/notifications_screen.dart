@@ -255,6 +255,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final hm =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     if (sameDay) return hm;
-    return '${local.day}/${local.month}/${local.year} · $hm';
+    return '${local.day}/${local.month}/${local.year}, $hm';
   }
 }

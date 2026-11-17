@@ -88,7 +88,7 @@ class _EnrolledContent extends StatelessWidget {
           ),
         const SizedBox(height: 12),
         Text(
-          '${course.topicsDone}/${course.topicsTotal} lectures · ${course.topicsRemaining} remaining',
+          '${course.topicsDone}/${course.topicsTotal} lectures, ${course.topicsRemaining} remaining',
           style: const TextStyle(color: AppColors.muted),
         ),
         const SizedBox(height: 8),

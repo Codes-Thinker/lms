@@ -143,7 +143,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                     ),
                     const SizedBox(height: 2),
                     const Text(
-                      'Lecture students · mentor development · office attendance',
+                      'Lecture students, mentor development, office attendance',
                       style: TextStyle(color: AppColors.muted, fontSize: 12),
                     ),
                     const SizedBox(height: 18),
@@ -249,7 +249,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       const Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
-                          'No live courses yet — publish from admin.',
+                          'No live courses yet. Publish from admin.',
                           style: TextStyle(color: AppColors.muted, fontSize: 13),
                         ),
                       )
@@ -262,11 +262,11 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                             _row(
                               icon: CupertinoIcons.time,
                               title: s.courseTitle,
-                              subtitle: '${s.batch} · Live catalog',
+                              subtitle: '${s.batch}, Live catalog',
                               trailing: 'Open',
                               onTap: () {
                                 if (course == null) {
-                                  ui.showSnack('${s.courseTitle} · ${s.batch}');
+                                  ui.showSnack('${s.courseTitle}, ${s.batch}');
                                   return;
                                 }
                                 courses.selectCourse(course);
@@ -354,7 +354,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            '${c.batch} · ${c.category}',
+                                            '${c.batch}, ${c.category}',
                                             style: const TextStyle(
                                               color: AppColors.muted,
                                               fontSize: 12,
@@ -374,7 +374,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Progress ${c.progressPercent.toStringAsFixed(0)}% · Attend ${c.attendancePercent.toStringAsFixed(0)}% · Fee due Rs $due',
+                                            'Progress ${c.progressPercent.toStringAsFixed(0)}%, Attend ${c.attendancePercent.toStringAsFixed(0)}%, Fee due Rs $due',
                                             style: const TextStyle(
                                               color: AppColors.muted,
                                               fontSize: 11,
@@ -443,7 +443,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                               icon: CupertinoIcons.checkmark_seal,
                               title: t.title,
                               subtitle:
-                                  '${t.status} · ${(t.spentSeconds / 60).floor()}m worked · ${t.courseTitle}',
+                                  '${t.status}, ${(t.spentSeconds / 60).floor()}m worked, ${t.courseTitle}',
                               onTap: () => _push(
                                 context,
                                 TaskDetailScreen(taskId: t.id),
@@ -487,7 +487,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No students yet — admin must set you as course instructor.',
+                          'No students yet. Admin must set you as course instructor.',
                           style: TextStyle(color: AppColors.muted, height: 1.35),
                         ),
                       )
@@ -510,7 +510,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                                 icon: CupertinoIcons.person,
                                 title: s.name,
                                 subtitle:
-                                    '${s.accountType} · ${row.$3} · ${row.$2}',
+                                    '${s.accountType}, ${row.$3}, ${row.$2}',
                                 onTap: () =>
                                     _push(context, const TeacherClassScreen()),
                               ),
@@ -533,7 +533,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   children: [
                     Row(
                       children: [
-                        const Expanded(child: _Section('TODAY · OFFICE')),
+                        const Expanded(child: _Section('TODAY, OFFICE')),
                         GestureDetector(
                           onTap: () => _push(context, const AttendanceScreen()),
                           child: const Text(
@@ -552,7 +552,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Text(
-                          'No office check-ins yet — open Attendance to mark.',
+                          'No office check-ins yet. Open Attendance to mark.',
                           style: TextStyle(color: AppColors.muted, height: 1.35),
                         ),
                       )
@@ -566,7 +566,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                               icon: CupertinoIcons.person_crop_circle,
                               title: m.personName,
                               subtitle:
-                                  '${m.role} · ${m.status}${out == null ? ' · still in' : ' · OUT'}',
+                                  '${m.role}, ${m.status}${out == null ? ', still in' : ', OUT'}',
                               onTap: () =>
                                   _push(context, const AttendanceScreen()),
                             ),

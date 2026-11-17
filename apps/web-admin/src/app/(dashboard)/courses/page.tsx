@@ -85,7 +85,7 @@ export default function CoursesPage() {
         <div>
           <h2 className="text-lg font-semibold">Courses</h2>
           <p className="text-sm text-slate-500">
-            Edit, publish, or delete tiles — student app syncs when published
+            Edit, publish, or delete tiles. Student app syncs when published.
           </p>
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
         </div>
@@ -178,7 +178,7 @@ export default function CoursesPage() {
                       {c.title}
                     </h3>
                     <p className="text-sm text-slate-500">
-                      {c.category} · {c.batch || "—"} · {c.durationMonths} mo
+                      {c.category}, {c.batch || "-"}, {c.durationMonths} mo
                     </p>
                   </Link>
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -202,7 +202,7 @@ export default function CoursesPage() {
                     </div>
                   </div>
                   <p className="text-xs text-slate-500">
-                    {c.outline?.length ?? 0} modules · {lectures} lectures ·{" "}
+                    {c.outline?.length ?? 0} modules, {lectures} lectures,{" "}
                     {c.enrolledCount ?? 0} enrolled
                   </p>
                   <div className="flex items-center justify-between gap-2 pt-1">

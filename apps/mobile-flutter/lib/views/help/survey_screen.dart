@@ -26,8 +26,8 @@ class SurveyScreen extends StatelessWidget {
             ),
             child: Text(
               support.surveyDone
-                  ? 'Survey complete — admin Feedback mein aapka naam dikhega.'
-                  : 'November training feedback · 2 minute · admin sab responses dekhega.',
+                  ? 'Survey complete. Admin Feedback mein aapka naam dikhega.'
+                  : 'November training feedback, 2 minute, admin sab responses dekhega.',
               style: const TextStyle(fontWeight: FontWeight.w600, height: 1.4),
             ),
           ),
@@ -63,7 +63,7 @@ class SurveyScreen extends StatelessWidget {
                     : () async {
                         await context.read<SupportProvider>().submitSurvey();
                         if (!context.mounted) return;
-                        context.read<UiProvider>().showSnack('Survey submitted · admin can view', tone: AppSnackTone.success);
+                        context.read<UiProvider>().showSnack('Survey submitted, admin can view', tone: AppSnackTone.success);
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,

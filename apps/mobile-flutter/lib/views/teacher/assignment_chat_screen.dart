@@ -106,7 +106,7 @@ class _AssignmentChatScreenState extends State<AssignmentChatScreen> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
             Text(
-              '${task?.assignedToName ?? 'Student'} · ${task?.spentMinutes ?? 0}m worked',
+              '${task?.assignedToName ?? 'Student'}, ${task?.spentMinutes ?? 0}m worked',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.muted,
@@ -155,7 +155,7 @@ class _AssignmentChatScreenState extends State<AssignmentChatScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${msg.senderName} · ${msg.sentAt}',
+                                  '${msg.senderName}, ${msg.sentAt}',
                                   style: TextStyle(
                                     color: mine
                                         ? Colors.white70

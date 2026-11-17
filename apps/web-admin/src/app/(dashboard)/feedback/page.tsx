@@ -73,7 +73,7 @@ export default function FeedbackPage() {
         <div>
           <h2 className="text-lg font-semibold">Feedback & support</h2>
           <p className="text-sm text-slate-500">
-            Reports, complains & surveys from the app — live every 5s
+            Reports, complains and surveys from the app, live every 5s
           </p>
         </div>
         <Badge variant={live ? "success" : "secondary"}>
@@ -102,7 +102,7 @@ export default function FeedbackPage() {
                 >
                   {t.userName}
                 </Link>{" "}
-                · {new Date(t.createdAt).toLocaleString()}
+                , {new Date(t.createdAt).toLocaleString()}
               </p>
               <p className="mt-2 text-sm whitespace-pre-wrap">{t.body}</p>
               {t.status !== "RESOLVED" && t.status !== "CLOSED" ? (
@@ -147,7 +147,7 @@ export default function FeedbackPage() {
                     ) : (
                       s.userName
                     )}{" "}
-                    · {s.surveyTitle}
+                    , {s.surveyTitle}
                   </span>
                   <span className="text-slate-500">
                     {new Date(s.submittedAt).toLocaleString()}

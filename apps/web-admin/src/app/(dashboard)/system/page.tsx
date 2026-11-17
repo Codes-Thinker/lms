@@ -104,8 +104,8 @@ export default function SystemPage() {
       <div className="glass-card max-w-xl space-y-3 p-5">
         <h3 className="font-semibold">Course categories (student tabs)</h3>
         <p className="text-xs text-slate-500">
-          These names appear under All courses on the student home — All,
-          Flutter, Frontend, Dot Net, …
+          These names appear under All courses on the student home: All,
+          Flutter, Frontend, Dot Net, and more.
         </p>
         <div className="flex gap-2">
           <Input
@@ -191,7 +191,7 @@ export default function SystemPage() {
       <div className="glass-card max-w-xl space-y-3 p-5">
         <h3 className="font-semibold">Office attendance (Port Singer)</h3>
         <p className="text-xs text-slate-500">
-          Static pin · check-in only inside radius · once/day arrival reminder ·
+          Static pin, check-in only inside radius, once/day arrival reminder,
           auto check-out at shift end
         </p>
         <div className="grid grid-cols-2 gap-3">

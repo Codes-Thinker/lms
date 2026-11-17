@@ -77,7 +77,7 @@ class _ReportView extends StatelessWidget {
                     title: course.title,
                     progress: course.progressPercent / 100,
                     subtitle:
-                        '${course.topicsDone}/${course.topicsTotal} topics · $remaining remaining',
+                        '${course.topicsDone}/${course.topicsTotal} topics, $remaining remaining',
                     next: isTeacher
                         ? null
                         : (course.nextTopic ?? 'Course complete'),
@@ -90,7 +90,7 @@ class _ReportView extends StatelessWidget {
                     title: course.title,
                     progress: course.progressPercent / 100,
                     subtitle:
-                        '${course.topicsDone}/${course.topicsTotal} topics · $remaining remaining · Attend ${course.attendancePercent.toStringAsFixed(0)}%',
+                        '${course.topicsDone}/${course.topicsTotal} topics, $remaining remaining, Attend ${course.attendancePercent.toStringAsFixed(0)}%',
                     next: isTeacher
                         ? null
                         : (course.nextTopic?.title ?? 'Course complete'),

@@ -1,15 +1,20 @@
-# Optional Blueprint — or create a Web Service manually in Render dashboard.
+# Render Blueprint for Code's Thinker LMS API
+# https://render.com/docs/blueprint-spec
 services:
   - type: web
     name: codes-thinker-lms-api
     runtime: node
     rootDir: apps/api
+    plan: starter
+    region: oregon
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && node dist/main.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: "20"
+      - key: NODE_ENV
+        value: production
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -23,4 +28,6 @@ services:
       - key: APP_URL
         sync: false
       - key: API_URL
+        sync: false
+      - key: CORS_ORIGIN
         sync: false

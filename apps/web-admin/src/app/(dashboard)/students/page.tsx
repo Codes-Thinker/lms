@@ -87,7 +87,7 @@ function mapStudent(u: Record<string, unknown>): StudentRow {
         ? u.batch
         : ((u.batch as { code?: string } | null)?.code ?? null),
     batchName: (u.batchName as string) || null,
-    status: String(u.status || "—"),
+    status: String(u.status || "-"),
     progressPercent: Number(u.progressPercent ?? 0),
     courses,
   };
@@ -287,7 +287,7 @@ function StudentsPageInner() {
           <h3 className="font-semibold">Student roster</h3>
           <p className="text-xs text-slate-500">
             {loading ? "Loading…" : `${total} student${total === 1 ? "" : "s"}`}
-            {qFromUrl ? ` · matching “${qFromUrl}”` : null}
+            {qFromUrl ? `, matching "${qFromUrl}"` : null}
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -323,7 +323,7 @@ function StudentsPageInner() {
                 const courseTitles =
                   s.courses.map((c) => c.title).join(", ") || "Not assigned";
                 const batchLabel =
-                  [s.batch, s.batchName].filter(Boolean).join(" · ") ||
+                  [s.batch, s.batchName].filter(Boolean).join(", ") ||
                   "Not set";
                 const enrolled = s.courses.length > 0;
                 const open = expandedId === s.id;
@@ -401,10 +401,10 @@ function StudentsPageInner() {
                                     >
                                       <span>
                                         {c.title}
-                                        {c.batch ? ` · ${c.batch}` : ""} —{" "}
+                                        {c.batch ? `, ${c.batch}` : ""},{" "}
                                         {c.progressPercent ?? 0}%
                                         {c.enrolledAt
-                                          ? ` · from ${c.enrolledAt}`
+                                          ? `, from ${c.enrolledAt}`
                                           : ""}
                                       </span>
                                       {c.feeStatus ? (

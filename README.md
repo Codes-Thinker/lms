@@ -1,22 +1,48 @@
 # Code's Thinker LMS
 
-Learning Management System monorepo:
+Monorepo:
 
-- `apps/mobile-flutter` — Student / Intern / Teacher–Staff mobile app
-- `apps/web-admin` — Admin dashboard (Next.js)
-- `apps/api` — NestJS + Prisma API
+- `apps/mobile-flutter`: Student / Intern / Teacher mobile app
+- `apps/web-admin`: Admin dashboard (Next.js)
+- `apps/api`: NestJS + Prisma API
 
 ## Stack
 
-Flutter (Provider) · Next.js · NestJS · Prisma · Postgres (Supabase) · Firebase Cloud Messaging
+Flutter (Provider), Next.js, NestJS, Prisma, Postgres, Firebase Cloud Messaging
 
-## Local setup (high level)
+## Local setup
 
-1. API: set `DATABASE_URL`, run Prisma migrate, start Nest
-2. Web admin: `npm install` + `npm run dev`
-3. Mobile: `flutter pub get` + configure Firebase (`flutterfire configure`)
+1. **API**: set `DATABASE_URL` in `apps/api/.env`, then:
+   ```bash
+   cd apps/api && npm install && npx prisma migrate deploy && npm run start:dev
+   ```
+2. **Web admin**
+   ```bash
+   cd apps/web-admin && npm install && npm run dev
+   ```
+3. **Mobile**
+   ```bash
+   cd apps/mobile-flutter && flutter pub get && flutter run
+   ```
+   Optional local API: `--dart-define=API_BASE=http://YOUR_LAN_IP:4000`
+
+## Production (Render)
+
+Blueprint: `apps/api/render.yaml`
+
+Required env on Render:
+
+- `DATABASE_URL`
+- `JWT_SECRET` (auto if using Blueprint)
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `APP_URL` / `API_URL` / `CORS_ORIGIN` as needed
+
+Health check: `GET /health`
+
+Mobile release APK (after `flutter build apk --release`):
+
+`apps/mobile-flutter/build/app/outputs/flutter-apk/app-release.apk`
 
 ## Roles
 
-Student · Intern · Teacher / Staff · Super Admin
-# lms
+Student, Intern, Teacher / Staff, Super Admin

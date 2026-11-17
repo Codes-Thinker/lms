@@ -142,7 +142,7 @@ export let courses: Course[] = [
     outline: [
       {
         id: "s1",
-        title: "Month 1 — Foundations",
+        title: "Month 1: Foundations",
         order: 1,
         topics: [
           { id: "t1", title: "Dart & setup", completed: true, order: 1 },
@@ -153,7 +153,7 @@ export let courses: Course[] = [
       },
       {
         id: "s2",
-        title: "Month 2 — Provider",
+        title: "Month 2: Provider",
         order: 2,
         topics: [
           { id: "t5", title: "ChangeNotifier", completed: true, order: 1 },
@@ -551,7 +551,7 @@ export const employmentRows = people
     employeeName: p.name,
     role: p.role,
     department: p.department,
-    courseTitle: p.track ?? "—",
+    courseTitle: p.track ?? "-",
     attendancePercent: p.attendancePercent,
     topicsDone: 0,
     topicsTotal: 0,

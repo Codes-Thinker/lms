@@ -146,7 +146,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
         padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom),
         children: [
           Text(
-            '${user?.roleLabel ?? 'User'} · Port Singer geofence',
+            '${user?.roleLabel ?? 'User'}, Port Singer geofence',
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -196,7 +196,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       const SizedBox(height: 2),
                       Text(
                         attendance.distanceFromOffice >= 0
-                            ? '${attendance.distanceFromOffice}m away · ${attendance.geofenceRadius}m radius'
+                            ? '${attendance.distanceFromOffice}m away, ${attendance.geofenceRadius}m radius'
                             : 'Enable GPS to unlock check-in',
                         style: const TextStyle(
                           color: AppColors.muted,
@@ -230,7 +230,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Check-in only inside 50m. Arrival reminder once per day. Check-out anytime — shift end pe auto checkout.',
+            'Check-in only inside 50m. Arrival reminder once per day. Check-out anytime. Shift end pe auto checkout.',
             style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 20),
@@ -238,13 +238,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             AppBtn(
               loading: attendance.loading || _locBusy || user == null,
               label: canCheckIn
-                  ? 'Check in · mark attendance'
+                  ? 'Check in, mark attendance'
                   : 'Go inside office zone to check in',
               onPressed: canCheckIn ? _checkIn : null,
             )
           else if (mine.isCheckedIn) ...[
             Text(
-              'In office · ${mine.status}',
+              'In office, ${mine.status}',
               style: const TextStyle(
                 color: AppColors.blue,
                 fontWeight: FontWeight.w700,
@@ -253,13 +253,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              'In ${_fmt(mine.checkInAt)} · duration ${mine.durationLabel}',
+              'In ${_fmt(mine.checkInAt)}, duration ${mine.durationLabel}',
               style: const TextStyle(color: AppColors.muted, fontSize: 13),
             ),
             const SizedBox(height: 14),
             AppBtn(
               loading: attendance.loading,
-              label: 'Check out · leave office',
+              label: 'Check out, leave office',
               tone: AppBtnTone.secondary,
               onPressed: () async {
                 final mark =
@@ -272,7 +272,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
           ] else ...[
             const Text(
-              'Day complete · checked out',
+              'Day complete, checked out',
               style: TextStyle(
                 color: AppColors.blue,
                 fontWeight: FontWeight.w700,
@@ -281,7 +281,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              'In ${_fmt(mine.checkInAt)} → Out ${_fmt(mine.checkOutAt!)} · ${mine.durationLabel}',
+              'In ${_fmt(mine.checkInAt)} → Out ${_fmt(mine.checkOutAt!)}, ${mine.durationLabel}',
               style: const TextStyle(color: AppColors.muted, fontSize: 13),
             ),
           ],
@@ -300,7 +300,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'Office zone mein aao — check-in enable hoga. Pehli entry pe din mein ek reminder milega.',
+                'Office zone mein aao. Check-in enable hoga. Pehli entry pe din mein ek reminder milega.',
                 style: TextStyle(color: AppColors.muted, height: 1.4),
               ),
             )
@@ -333,8 +333,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '${row.role} · In ${_fmt(row.checkInAt)}'
-                                '${out != null ? ' · Out ${_fmt(out)}' : ' · still in'}',
+                                '${row.role}, In ${_fmt(row.checkInAt)}'
+                                '${out != null ? ', Out ${_fmt(out)}' : ', still in'}',
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(

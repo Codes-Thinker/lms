@@ -96,7 +96,7 @@ export default function EnrollmentRequestsPage() {
       <div className="glass-card p-5">
         <h2 className="text-lg font-semibold">Enrollment requests</h2>
         <p className="text-sm text-slate-500">
-          Students ask to join courses — approve or reject pending requests
+          Students ask to join courses. Approve or reject pending requests.
         </p>
         {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       </div>
@@ -188,7 +188,7 @@ export default function EnrollmentRequestsPage() {
                         </Button>
                       </div>
                     ) : (
-                      <span className="text-xs text-slate-400">—</span>
+                      <span className="text-xs text-slate-400">-</span>
                     )}
                   </td>
                 </tr>

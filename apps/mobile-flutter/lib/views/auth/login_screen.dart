@@ -72,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
             : 0,
       );
       NotificationRouter.clear();
-      ui.showSnack('Welcome ${auth.user?.firstName ?? ''} · ${auth.user?.roleLabel}');
+      ui.showSnack('Welcome ${auth.user?.firstName ?? ''}, ${auth.user?.roleLabel}');
       Navigator.of(context).pushReplacement(AppMotion.fadeSlide(const AppShell()));
     } finally {
       ui.hideLoading();

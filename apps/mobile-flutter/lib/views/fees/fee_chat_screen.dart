@@ -82,7 +82,7 @@ class _FeeChatScreenState extends State<FeeChatScreen> {
       );
       if (!mounted) return;
       ui.showSnack(
-        'Screenshot sent — waiting for admin approval',
+        'Screenshot sent, waiting for admin approval',
         tone: AppSnackTone.success,
       );
     } catch (e) {
@@ -136,7 +136,7 @@ class _FeeChatScreenState extends State<FeeChatScreen> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
             Text(
-              '${feeCase.month} · Rs ${feeCase.amount}',
+              '${feeCase.month}, Rs ${feeCase.amount}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -229,7 +229,7 @@ class _FeeChatScreenState extends State<FeeChatScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${msg.senderName} · ${msg.sentAt}',
+                            '${msg.senderName}, ${msg.sentAt}',
                             style: TextStyle(
                               color: mine ? Colors.white70 : AppColors.muted,
                               fontSize: 11,

@@ -31,10 +31,10 @@ class TasksScreen extends StatelessWidget {
             : 'My Tasks';
 
     final subtitle = auth.isStaff
-        ? '${tasks.openCountFor(userId)} open · lecture batches + development work'
+        ? '${tasks.openCountFor(userId)} open, lecture batches + development work'
         : auth.isIntern
-            ? '${tasks.openCountFor(userId)} open · internship projects'
-            : '${tasks.openCountFor(userId)} open · assigned by admin';
+            ? '${tasks.openCountFor(userId)} open, internship projects'
+            : '${tasks.openCountFor(userId)} open, assigned by admin';
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -118,7 +118,7 @@ class TasksScreen extends StatelessWidget {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${task.courseTitle} · by ${task.assignedBy}',
+                                        '${task.courseTitle}, by ${task.assignedBy}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -138,7 +138,7 @@ class TasksScreen extends StatelessWidget {
                                       ],
                                       const SizedBox(height: 6),
                                       Text(
-                                        '${task.status} · ${(task.spentSeconds / 60).floor()}m worked · ${task.chat.length} chat',
+                                        '${task.status}, ${(task.spentSeconds / 60).floor()}m worked, ${task.chat.length} chat',
                                         style: const TextStyle(
                                           color: AppColors.muted,
                                           fontSize: 12,

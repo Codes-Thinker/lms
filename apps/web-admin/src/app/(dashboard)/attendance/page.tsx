@@ -46,7 +46,7 @@ type Board = {
 };
 
 function fmtTime(iso?: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -137,7 +137,7 @@ function AttendancePageInner() {
         <div>
           <h2 className="text-lg font-semibold">Attendance</h2>
           <p className="text-sm text-slate-500">
-            App check-in / out · course tabs · office time (hours &amp; minutes)
+            App check-in / out, course tabs, office time (hours &amp; minutes)
           </p>
           {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
         </div>
@@ -195,7 +195,7 @@ function AttendancePageInner() {
                   )}
                 >
                   {t.enrolledCount}
-                  {t.published === false ? " · draft" : ""}
+                  {t.published === false ? ", draft" : ""}
                 </span>
               ) : null}
             </button>
@@ -238,7 +238,7 @@ function AttendancePageInner() {
               const courseLabel =
                 r.courseTitle ||
                 r.courses?.map((c) => c.title).join(", ") ||
-                "—";
+                "-";
               const pct =
                 r.attendancePercent != null && !Number.isNaN(r.attendancePercent)
                   ? r.attendancePercent
@@ -271,12 +271,12 @@ function AttendancePageInner() {
                     ) : null}
                   </td>
                   <td className="px-4 py-3.5 text-slate-600">
-                    {r.batch?.trim() ? r.batch : "—"}
+                    {r.batch?.trim() ? r.batch : "-"}
                   </td>
                   <td className="px-4 py-3.5">
                     <Badge variant={statusVariant(r.status)}>
                       {r.status}
-                      {r.autoCheckout ? " · auto" : ""}
+                      {r.autoCheckout ? ", auto" : ""}
                     </Badge>
                   </td>
                   <td className="px-4 py-3.5 whitespace-nowrap text-slate-600">
@@ -291,14 +291,14 @@ function AttendancePageInner() {
                         {r.durationLabel}
                       </span>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-slate-400">-</span>
                     )}
                     {r.stillInOffice ? (
                       <span className="ml-1 text-[11px] text-blue-600">live</span>
                     ) : null}
                   </td>
                   <td className="px-4 py-3.5 text-xs text-slate-500">
-                    {r.note || "—"}
+                    {r.note || "-"}
                   </td>
                 </tr>
               );

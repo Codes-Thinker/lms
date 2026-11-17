@@ -226,7 +226,7 @@ export default function DashboardPage() {
               Welcome, {name}
             </h2>
             <p className="mt-1.5 max-w-xl text-sm text-slate-500">
-              People, attendance, ratings, and live support — at a glance.
+              People, attendance, ratings, and live support at a glance.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -256,7 +256,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-slate-500">All users</p>
                 <p className="mt-0.5 text-4xl font-semibold tracking-tight text-slate-900">
-                  {overview ? allUsers : "—"}
+                  {overview ? allUsers : "-"}
                 </p>
                 <p className="mt-1 text-xs text-slate-400">
                   Students + teachers + interns
@@ -308,7 +308,7 @@ export default function DashboardPage() {
                     <Icon className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-blue-600" />
                   </div>
                   <p className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
-                    {overview ? b.count : "—"}
+                    {overview ? b.count : "-"}
                   </p>
                 </Link>
               );
@@ -321,7 +321,7 @@ export default function DashboardPage() {
             <div>
               <h3 className="font-semibold text-slate-900">Pulse</h3>
               <p className="text-sm text-slate-500">
-                Rings for today · {monthLabel()}
+                Rings for today, {monthLabel()}
               </p>
             </div>
             <Link
@@ -342,11 +342,11 @@ export default function DashboardPage() {
             <StatRing
               value={rating}
               max={5}
-              display={overview ? rating.toFixed(1) : "—"}
+              display={overview ? rating.toFixed(1) : "-"}
               label="Rating"
               sublabel={
                 overview
-                  ? `${overview.coursesCount} courses · ★`
+                  ? `${overview.coursesCount} courses`
                   : "Courses"
               }
               tone="emerald"
@@ -355,7 +355,7 @@ export default function DashboardPage() {
             <StatRing
               value={newStudents}
               max={Math.max(10, newStudents)}
-              display={overview ? String(newStudents) : "—"}
+              display={overview ? String(newStudents) : "-"}
               label="New students"
               sublabel="This month"
               tone="sky"
@@ -389,7 +389,7 @@ export default function DashboardPage() {
           <div>
             <h3 className="font-semibold">Help &amp; support</h3>
             <p className="text-sm text-slate-500">
-              Live queue from the app — fees, reports, chat, surveys
+              Live queue from the app: fees, reports, chat, surveys
             </p>
           </div>
           <Link
@@ -430,14 +430,14 @@ export default function DashboardPage() {
                 >
                   <span className="min-w-0 truncate">
                     <span className="font-medium text-slate-800">{t.kind}</span>
-                    {" · "}
+                    {", "}
                     <Link
                       href={`/users/${t.userId}`}
                       className="text-blue-700 hover:underline"
                     >
                       {t.userName}
                     </Link>
-                    {" — "}
+                    {": "}
                     {t.title}
                   </span>
                   <Badge variant="secondary">{t.status}</Badge>
@@ -465,7 +465,7 @@ export default function DashboardPage() {
                     >
                       {s.userName}
                     </Link>
-                    {" · "}
+                    {", "}
                     {s.surveyTitle}
                   </span>
                   <span className="shrink-0 text-xs text-slate-400">
@@ -487,7 +487,7 @@ export default function DashboardPage() {
           <div>
             <h3 className="font-semibold">People</h3>
             <p className="text-sm text-slate-500">
-              Students · Interns · Teachers — with profile
+              Students, Interns, Teachers with profile
             </p>
           </div>
           <Link
@@ -518,7 +518,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="truncate text-xs text-slate-500">
                     {roleLabel(p.accountType)}
-                    {p.track ? ` · ${p.track}` : ""}
+                    {p.track ? `, ${p.track}` : ""}
                   </p>
                 </div>
               </Link>
@@ -526,7 +526,7 @@ export default function DashboardPage() {
           })}
           {people.length === 0 ? (
             <p className="text-sm text-slate-500">
-              No users yet — add from Users
+              No users yet. Add from Users
             </p>
           ) : null}
         </div>
@@ -563,7 +563,7 @@ export default function DashboardPage() {
                   <span>{f.studentName}</span>
                 )}
                 <span className="text-slate-600">
-                  {f.status} · {f.courseTitle} · Rs{" "}
+                  {f.status}, {f.courseTitle}, Rs{" "}
                   {f.amount.toLocaleString()}
                 </span>
               </li>
@@ -580,7 +580,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold">Today attendance</h3>
           </div>
           <p className="mb-3 text-sm text-slate-500">
-            Teacher tasks {overview?.openStaffTasks ?? 0} · Intern projects{" "}
+            Teacher tasks {overview?.openStaffTasks ?? 0}, Intern projects{" "}
             {overview?.openInternProjects ?? 0}
           </p>
           <ul className="space-y-2 text-sm">
@@ -590,7 +590,7 @@ export default function DashboardPage() {
                 className="flex justify-between border-t border-slate-100 pt-2"
               >
                 <span>
-                  {a.personName} · {a.role}
+                  {a.personName}, {a.role}
                 </span>
                 <span className="font-medium">{a.status}</span>
               </li>

@@ -89,7 +89,7 @@ class _ForceUpdateGateState extends State<ForceUpdateGate> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Your version ${VersionProvider.appVersion}  ·  Required ${info.minimumVersion}+',
+                  'Your version ${VersionProvider.appVersion} ,  Required ${info.minimumVersion}+',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,

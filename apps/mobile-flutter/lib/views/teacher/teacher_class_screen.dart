@@ -390,7 +390,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
             const SizedBox(height: 4),
             Text(
               course.batch?.isNotEmpty == true
-                  ? '${course.title} · ${course.batch}'
+                  ? '${course.title}, ${course.batch}'
                   : course.title,
               style: const TextStyle(color: AppColors.muted, fontSize: 13),
             ),
@@ -405,7 +405,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
               controller: _descCtrl,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: _fieldDec('Instructions — what should they do?'),
+              decoration: _fieldDec('Instructions: what should they do?'),
             ),
             const SizedBox(height: 10),
             TextField(
@@ -461,7 +461,7 @@ class _AssignTaskSheetState extends State<_AssignTaskSheet> {
                     [s.batch, s.accountType]
                         .whereType<String>()
                         .where((e) => e.isNotEmpty)
-                        .join(' · '),
+                        .join(', '),
                     style: const TextStyle(fontSize: 12),
                   ),
                   onChanged: (v) => setState(() {
@@ -658,7 +658,7 @@ class _StudentsTab extends StatelessWidget {
                         [
                           s.batch,
                           s.accountType,
-                        ].whereType<String>().where((e) => e.isNotEmpty).join(' · '),
+                        ].whereType<String>().where((e) => e.isNotEmpty).join(', '),
                         style: const TextStyle(
                             color: AppColors.muted, fontSize: 12),
                       ),
@@ -719,7 +719,7 @@ class _AssignmentsTab extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Text(
-              'No assignments yet — tap New assignment',
+              'No assignments yet. Tap New assignment.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.muted),
             ),
@@ -759,8 +759,8 @@ class _AssignmentsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${t.assignedToName ?? 'Student'} · ${t.spentMinutes}m worked'
-                  '${t.chat.isEmpty ? '' : ' · ${t.chat.length} chat'}',
+                  '${t.assignedToName ?? 'Student'}, ${t.spentMinutes}m worked'
+                  '${t.chat.isEmpty ? '' : ', ${t.chat.length} chat'}',
                   style:
                       const TextStyle(color: AppColors.muted, fontSize: 13),
                 ),

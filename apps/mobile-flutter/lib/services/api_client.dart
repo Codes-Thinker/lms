@@ -148,7 +148,7 @@ class ApiClient {
       // Only clear saved session when an authenticated API call fails.
       if (hadToken && !isAuthRoute) {
         onUnauthorized?.call();
-        throw ApiException(401, 'Session expired — please sign in again');
+        throw ApiException(401, 'Session expired. Please sign in again');
       }
       throw ApiException(401, messageFromBody());
     }

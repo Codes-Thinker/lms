@@ -347,7 +347,7 @@ function UsersPageInner() {
           <div>
             <h2 className="text-lg font-semibold">Users</h2>
             <p className="text-sm text-slate-500">
-              Add Student · Intern · Teacher — tap a name for full profile
+              Add Student, Intern, or Teacher. Tap a name for full profile.
             </p>
           </div>
           <form
@@ -373,7 +373,7 @@ function UsersPageInner() {
             {error}
             {error.toLowerCase().includes("unauthorized") ||
             error.toLowerCase().includes("session")
-              ? " — sign in again from /login."
+              ? " Sign in again from /login."
               : null}
           </p>
         ) : null}
@@ -390,7 +390,7 @@ function UsersPageInner() {
           <div>
             <h3 className="font-semibold">Add new user</h3>
             <p className="text-sm text-slate-500">
-              Empty form — enter the new person&apos;s details only
+              Empty form: enter the new person&apos;s details only
             </p>
           </div>
           <Button
@@ -498,7 +498,7 @@ function UsersPageInner() {
               </Button>
             </div>
             <p className="text-xs text-slate-500">
-              Blank password = invitation email · set password for instant login
+              Blank password = invitation email. Set password for instant login.
             </p>
           </div>
           <div className="space-y-1.5">
@@ -535,7 +535,7 @@ function UsersPageInner() {
             <div className="space-y-1">
               <h4 className="font-semibold text-slate-800">Enrollment &amp; fees</h4>
               <p className="text-xs text-slate-500">
-                Optional — configure course access and payment plan at signup
+                Optional: configure course access and payment plan at signup
               </p>
             </div>
             <div className="space-y-2">
@@ -712,7 +712,7 @@ function UsersPageInner() {
           <div>
             <h3 className="font-semibold">Browse by category</h3>
             <p className="text-xs text-slate-500">
-              Filter role, then course — students by enrollment, teachers by
+              Filter role, then course: students by enrollment, teachers by
               courses they teach
             </p>
           </div>
@@ -762,7 +762,7 @@ function UsersPageInner() {
                   t.id === "all" || t.id === "unassigned"
                     ? t.title
                     : t.batch
-                      ? `${t.title} · ${t.batch}`
+                      ? `${t.title}, ${t.batch}`
                       : t.title;
                 return (
                   <button

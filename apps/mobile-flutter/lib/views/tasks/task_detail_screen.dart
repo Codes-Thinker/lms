@@ -73,7 +73,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         fontSize: 22, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
                 Text(
-                  '${task.courseTitle} · assigned by ${task.assignedBy}',
+                  '${task.courseTitle}, assigned by ${task.assignedBy}',
                   style: const TextStyle(color: AppColors.muted),
                 ),
                 const SizedBox(height: 12),
@@ -118,10 +118,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                       const SizedBox(height: 4),
                       Text(
                         task.isComplete
-                            ? 'Saved · ${(task.elapsedSeconds / 60).ceil()} min worked'
+                            ? 'Saved, ${(task.elapsedSeconds / 60).ceil()} min worked'
                             : task.timerMinutes > 0
-                                ? 'Counting up · goal ${task.timerMinutes} min'
-                                : 'Counting up · saved to teacher on pause',
+                                ? 'Counting up, goal ${task.timerMinutes} min'
+                                : 'Counting up, saved to teacher on pause',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.muted),
                       ),
@@ -226,7 +226,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 8),
                     child: Text(
-                      'No messages yet — ask a question or send an update.',
+                      'No messages yet. Ask a question or send an update.',
                       style: TextStyle(color: AppColors.muted),
                     ),
                   ),
@@ -247,7 +247,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '${msg.senderName} · ${msg.sentAt}',
+                            '${msg.senderName}, ${msg.sentAt}',
                             style: TextStyle(
                               color: mine ? Colors.white70 : AppColors.muted,
                               fontSize: 11,

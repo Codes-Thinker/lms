@@ -104,7 +104,7 @@ export function NotificationsBell() {
                     </p>
                   ) : null}
                   <p className="mt-1 text-[11px] text-slate-400">
-                    {TYPE_LABEL[n.type] ?? n.type} ·{" "}
+                    {TYPE_LABEL[n.type] ?? n.type},{" "}
                     {new Date(n.createdAt).toLocaleString()}
                   </p>
                 </button>

@@ -109,7 +109,7 @@ export default function EditCoursePage() {
           </p>
           <h2 className="mt-1 text-lg font-semibold">Edit course</h2>
           <p className="text-sm text-slate-500">
-            Update fees, cover, modules or lectures — student app picks this up on
+            Update fees, cover, modules or lectures. Student app picks this up on
             next refresh.
           </p>
         </div>
@@ -159,19 +159,19 @@ export default function EditCoursePage() {
             <div>
               <dt className="text-xs text-slate-500">Fees</dt>
               <dd className="font-medium">
-                Rs {courseMeta.monthlyFee.toLocaleString()}/mo · Rs{" "}
+                Rs {courseMeta.monthlyFee.toLocaleString()}/mo, Rs{" "}
                 {courseMeta.totalFee.toLocaleString()} total
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Instructor</dt>
               <dd className="font-medium">
-                {courseMeta.instructorName || "—"}
+                {courseMeta.instructorName || "-"}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Batch</dt>
-              <dd className="font-medium">{courseMeta.batch || "—"}</dd>
+              <dd className="font-medium">{courseMeta.batch || "-"}</dd>
             </div>
             <div>
               <dt className="text-xs text-slate-500">Enrolled</dt>
@@ -185,7 +185,7 @@ export default function EditCoursePage() {
             <div>
               <dt className="text-xs text-slate-500">Active students</dt>
               <dd className="font-medium">
-                {enrollment?.activeStudents ?? "—"}
+                {enrollment?.activeStudents ?? "-"}
               </dd>
             </div>
             <div>
@@ -238,7 +238,7 @@ export default function EditCoursePage() {
                       <td className="px-4 py-3 text-xs text-slate-600">
                         {s.email}
                       </td>
-                      <td className="px-4 py-3">{s.batch || "—"}</td>
+                      <td className="px-4 py-3">{s.batch || "-"}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {s.enrolledAt}
                       </td>
@@ -246,7 +246,7 @@ export default function EditCoursePage() {
                         {s.feeStatus ? (
                           <Badge variant="outline">{s.feeStatus}</Badge>
                         ) : (
-                          "—"
+                          "-"
                         )}
                       </td>
                       <td className="px-4 py-3 font-medium">
@@ -254,7 +254,7 @@ export default function EditCoursePage() {
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {s.enrollmentStatus}
-                        {s.accountStatus ? ` · ${s.accountStatus}` : ""}
+                        {s.accountStatus ? `, ${s.accountStatus}` : ""}
                       </td>
                     </tr>
                   ))}
@@ -289,7 +289,7 @@ export default function EditCoursePage() {
               method: "PATCH",
               body: JSON.stringify(editorValueToPayload(value)),
             });
-            show("Course updated — synced for students");
+            show("Course updated and synced for students");
             const [fresh, students] = await Promise.all([
               api<CourseDto>(`/courses/${params.id}`),
               api<StudentsPayload>(`/courses/${params.id}/students`).catch(

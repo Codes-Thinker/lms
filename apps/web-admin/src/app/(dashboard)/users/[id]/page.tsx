@@ -270,7 +270,7 @@ export default function UserProfilePage() {
     setDeleting(true);
     try {
       await api(`/users/${params.id}`, { method: "DELETE" });
-      show(`${name} deleted — all data removed`);
+      show(`${name} deleted. All data removed.`);
       router.replace(backHref);
     } catch (e) {
       show(e instanceof Error ? e.message : "Delete failed", "error");
@@ -568,8 +568,8 @@ export default function UserProfilePage() {
         ) : (
           <>
             <Stat label="Open / tasks" value={String(report.tasks?.length ?? 0)} />
-            <Stat label="Department" value={u.department || "—"} />
-            <Stat label="Phone" value={u.phone || "—"} />
+            <Stat label="Department" value={u.department || "-"} />
+            <Stat label="Phone" value={u.phone || "-"} />
           </>
         )}
       </div>
@@ -580,18 +580,18 @@ export default function UserProfilePage() {
           <dl className="space-y-2 text-sm">
             <Row label="Role" value={roleLabel(u.accountType)} />
             <Row label="Email" value={u.email} />
-            <Row label="Phone" value={u.phone || "—"} />
-            <Row label="Track" value={u.track || "—"} />
-            <Row label="Designation" value={u.designation || "—"} />
-            <Row label="Department" value={u.department || "—"} />
-            <Row label="Batch" value={u.batch || "—"} />
+            <Row label="Phone" value={u.phone || "-"} />
+            <Row label="Track" value={u.track || "-"} />
+            <Row label="Designation" value={u.designation || "-"} />
+            <Row label="Department" value={u.department || "-"} />
+            <Row label="Batch" value={u.batch || "-"} />
             {isIntern ? (
               <Row
                 label="Internship"
                 value={
                   u.internshipStart || u.internshipEnd
                     ? `${u.internshipStart || "?"} → ${u.internshipEnd || "?"}`
-                    : "—"
+                    : "-"
                 }
               />
             ) : null}
@@ -606,7 +606,7 @@ export default function UserProfilePage() {
             <Row
               label="Joined"
               value={
-                u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"
+                u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-"
               }
             />
           </dl>
@@ -673,7 +673,7 @@ export default function UserProfilePage() {
                 >
                   <span>
                     {a.date}
-                    {a.courseTitle ? ` · ${a.courseTitle}` : ""}
+                    {a.courseTitle ? `, ${a.courseTitle}` : ""}
                   </span>
                   <span className="font-medium">{a.status}</span>
                 </li>
@@ -698,10 +698,10 @@ export default function UserProfilePage() {
                 >
                   <span>
                     {c.title}
-                    {c.batch ? ` · ${c.batch}` : ""}
+                    {c.batch ? `, ${c.batch}` : ""}
                   </span>
                   <span className="font-medium">
-                    {c.progressPercent}% · {c.feeStatus || "—"}
+                    {c.progressPercent}%, {c.feeStatus || "-"}
                   </span>
                 </li>
               ))}
@@ -724,10 +724,10 @@ export default function UserProfilePage() {
                   className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
                 >
                   <span>
-                    {f.courseTitle} · {f.month}
+                    {f.courseTitle}, {f.month}
                   </span>
                   <span className="font-medium">
-                    Rs {f.amount.toLocaleString()} · {f.status}
+                    Rs {f.amount.toLocaleString()}, {f.status}
                   </span>
                 </li>
               ))}
@@ -750,7 +750,7 @@ export default function UserProfilePage() {
                   >
                     <span>
                       {c.title}
-                      {c.batch ? ` · ${c.batch}` : ""}
+                      {c.batch ? `, ${c.batch}` : ""}
                     </span>
                     <span className="font-medium">
                       {c.enrolledCount} students
@@ -759,7 +759,7 @@ export default function UserProfilePage() {
                 ))}
                 {(report.taughtCourses || []).length === 0 ? (
                   <li className="text-slate-500">
-                    No courses assigned — set Instructor on a course
+                    No courses assigned. Set Instructor on a course.
                   </li>
                 ) : null}
               </ul>
@@ -776,10 +776,10 @@ export default function UserProfilePage() {
                   >
                     <span>
                       {p.title}
-                      {p.techStack ? ` · ${p.techStack}` : ""}
+                      {p.techStack ? `, ${p.techStack}` : ""}
                     </span>
                     <span className="font-medium">
-                      {p.progressPercent}% · {p.status}
+                      {p.progressPercent}%, {p.status}
                     </span>
                   </li>
                 ))}
@@ -802,12 +802,12 @@ export default function UserProfilePage() {
                   <span>
                     <span className="font-medium text-slate-900">{t.title}</span>
                     {t.audience ? (
-                      <span className="text-slate-500"> · {t.audience}</span>
+                      <span className="text-slate-500">, {t.audience}</span>
                     ) : null}
                     {t.dueAt ? (
                       <span className="text-slate-500">
                         {" "}
-                        · due {t.dueAt.slice(0, 10)}
+                       , due {t.dueAt.slice(0, 10)}
                       </span>
                     ) : null}
                     <span className="mt-0.5 block text-xs text-slate-500">

@@ -265,7 +265,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${course.category} · ${course.durationMonths} months',
+                    '${course.category}, ${course.durationMonths} months',
                     style: const TextStyle(color: AppColors.muted, fontSize: 12),
                   ),
                   const SizedBox(height: 4),
