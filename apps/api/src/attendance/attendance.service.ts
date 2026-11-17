@@ -4,6 +4,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { AttendanceStatus } from "@prisma/client";
+import { canOfficeCheckIn } from "../common/production-guards";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SystemService } from "../system/system.service";
@@ -257,8 +258,10 @@ export class AttendanceService implements OnModuleInit {
     const existing = await this.prisma.attendanceRecord.findFirst({
       where: { userId, date },
     });
-    if (existing?.checkInAt && !existing.checkOutAt) {
-      throw new BadRequestException("Already checked in");
+    // One office day = one check-in. Do not clear checkout / re-open the day.
+    const dayGate = canOfficeCheckIn(existing);
+    if (!dayGate.ok) {
+      throw new BadRequestException(dayGate.reason);
     }
 
     if (opts?.lat == null || opts?.lng == null) {

@@ -1,5 +1,9 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { AccountType, NotificationType, TaskStatus } from "@prisma/client";
+import {
+  canAssignOnCourse,
+  canAssignToStudent,
+} from "../common/production-guards";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -58,17 +62,51 @@ export class TasksService {
     }));
   }
 
-  async createTask(data: {
-    title: string;
-    description?: string;
-    studyNotes?: string;
-    audience?: AccountType;
-    assigneeId?: string;
-    createdById?: string;
-    dueAt?: string;
-    timerMinutes?: number;
-    courseId?: string;
-  }) {
+  async createTask(
+    data: {
+      title: string;
+      description?: string;
+      studyNotes?: string;
+      audience?: AccountType;
+      assigneeId?: string;
+      createdById?: string;
+      dueAt?: string;
+      timerMinutes?: number;
+      courseId?: string;
+    },
+    actor?: { teacherId: string; accountType: string },
+  ) {
+    // Production guard: STAFF cannot assign outside their instructed course.
+    if (actor && data.assigneeId) {
+      if (!data.courseId) {
+        throw new ForbiddenException(
+          "courseId required when assigning to a student",
+        );
+      }
+      const course = await this.prisma.course.findUnique({
+        where: { id: data.courseId },
+        select: { id: true, instructorId: true },
+      });
+      if (!course) throw new NotFoundException("Course not found");
+      const own = canAssignOnCourse({
+        accountType: actor.accountType,
+        teacherId: actor.teacherId,
+        instructorId: course.instructorId,
+      });
+      if (!own.ok) throw new ForbiddenException(own.reason);
+
+      const enrollments = await this.prisma.enrollment.findMany({
+        where: { courseId: data.courseId },
+        select: { userId: true },
+      });
+      const enroll = canAssignToStudent({
+        assigneeId: data.assigneeId,
+        courseId: data.courseId,
+        enrolledIds: enrollments.map((e) => e.userId),
+      });
+      if (!enroll.ok) throw new ForbiddenException(enroll.reason);
+    }
+
     const t = await this.prisma.task.create({
       data: {
         title: data.title,
@@ -117,13 +155,12 @@ export class TasksService {
       select: { id: true, title: true, instructorId: true },
     });
     if (!course) throw new NotFoundException("Course not found");
-    if (
-      accountType !== "SUPER_ADMIN" &&
-      course.instructorId &&
-      course.instructorId !== teacherId
-    ) {
-      throw new ForbiddenException("You can only assign for your courses");
-    }
+    const own = canAssignOnCourse({
+      accountType,
+      teacherId,
+      instructorId: course.instructorId,
+    });
+    if (!own.ok) throw new ForbiddenException(own.reason);
 
     const enrollments = await this.prisma.enrollment.findMany({
       where: { courseId: data.courseId },
@@ -141,17 +178,21 @@ export class TasksService {
 
     const created = [];
     for (const assigneeId of targets) {
-      const row = await this.createTask({
-        title: data.title,
-        description: data.description,
-        studyNotes: data.studyNotes,
-        audience: AccountType.STUDENT,
-        assigneeId,
-        createdById: teacherId,
-        courseId: data.courseId,
-        dueAt: data.dueAt,
-        timerMinutes: data.timerMinutes,
-      });
+      const row = await this.createTask(
+        {
+          title: data.title,
+          description: data.description,
+          studyNotes: data.studyNotes,
+          audience: AccountType.STUDENT,
+          assigneeId,
+          createdById: teacherId,
+          courseId: data.courseId,
+          dueAt: data.dueAt,
+          timerMinutes: data.timerMinutes,
+        },
+        // Already validated course ownership above — skip nested re-check noise
+        undefined,
+      );
       if (row) created.push(row);
     }
     return { courseId: data.courseId, assigned: created.length, tasks: created };

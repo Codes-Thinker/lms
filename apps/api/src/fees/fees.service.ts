@@ -8,6 +8,10 @@ import {
 } from "@nestjs/common";
 import { FeeStatus, NotificationType } from "@prisma/client";
 import { assertImageDataUrl } from "../common/media-validation";
+import {
+  canSubmitOrMessageFee,
+  requiresFeeScreenshot,
+} from "../common/production-guards";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -263,10 +267,15 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     },
     actor?: { sub: string; accountType?: string; roles?: string[] }
   ) {
+    const fee = await this.prisma.feeCase.findUnique({ where: { id } });
+    if (!fee) throw new NotFoundException("Fee case not found");
     if (actor) {
-      const fee = await this.prisma.feeCase.findUnique({ where: { id } });
-      if (!fee) throw new NotFoundException("Fee case not found");
       this.assertFeeAccess(fee, actor);
+    }
+    // Students cannot reopen PAID/WAIVED via chat spam.
+    if (input.senderRole !== "ADMIN") {
+      const gate = canSubmitOrMessageFee(fee.status);
+      if (!gate.ok) throw new ForbiddenException(gate.reason);
     }
     await this.prisma.feeMessage.create({
       data: {
@@ -499,9 +508,28 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException("This fee case does not belong to you");
     }
 
+    const statusGate = canSubmitOrMessageFee(fee.status);
+    if (!statusGate.ok) throw new ForbiddenException(statusGate.reason);
+
+    const shotGate = requiresFeeScreenshot(data.screenshotData);
+    if (!shotGate.ok) throw new ForbiddenException(shotGate.reason);
+
+    const pending = await this.prisma.paymentSubmission.findFirst({
+      where: { feeCaseId, status: "PENDING_VERIFICATION" },
+      select: { id: true },
+    });
+    if (pending) {
+      throw new ForbiddenException(
+        "A payment is already pending verification for this fee",
+      );
+    }
+
     const screenshotData = assertImageDataUrl(data.screenshotData, {
       field: "screenshot",
     });
+    if (!screenshotData) {
+      throw new ForbiddenException("Payment screenshot is required");
+    }
 
     // Create a payment submission record
     const submission = await this.prisma.paymentSubmission.create({

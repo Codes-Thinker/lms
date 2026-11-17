@@ -48,17 +48,27 @@ class TeachingCourse {
     required this.students,
   });
 
-  factory TeachingCourse.fromJson(Map<String, dynamic> j) => TeachingCourse(
-        id: j['id']?.toString() ?? '',
-        title: j['title']?.toString() ?? '',
-        category: j['category']?.toString() ?? '',
-        batch: j['batch']?.toString(),
-        enrolledCount: (j['enrolledCount'] as num?)?.toInt() ?? 0,
-        students: ((j['students'] as List?) ?? const [])
-            .map((e) => TeachingStudent.fromJson(
-                Map<String, dynamic>.from(e as Map)))
-            .toList(),
-      );
+  factory TeachingCourse.fromJson(Map<String, dynamic> j) {
+    final rawStudents = j['students'];
+    final students = <TeachingStudent>[];
+    if (rawStudents is List) {
+      for (final e in rawStudents) {
+        if (e is Map) {
+          students.add(
+            TeachingStudent.fromJson(Map<String, dynamic>.from(e)),
+          );
+        }
+      }
+    }
+    return TeachingCourse(
+      id: j['id']?.toString() ?? '',
+      title: j['title']?.toString() ?? '',
+      category: j['category']?.toString() ?? '',
+      batch: j['batch']?.toString(),
+      enrolledCount: (j['enrolledCount'] as num?)?.toInt() ?? students.length,
+      students: students,
+    );
+  }
 }
 
 class TaskThreadMessage {

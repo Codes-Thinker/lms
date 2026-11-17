@@ -34,17 +34,20 @@ export class TasksController {
   @Post("tasks")
   @Roles("SUPER_ADMIN", "STAFF")
   createTask(@CurrentUser() user: AuthUser, @Body() body: Record<string, unknown>) {
-    return this.tasks.createTask({
-      title: String(body.title ?? ""),
-      description: body.description as string | undefined,
-      studyNotes: body.studyNotes as string | undefined,
-      audience: body.audience as AccountType | undefined,
-      assigneeId: body.assigneeId as string | undefined,
-      createdById: user.sub,
-      dueAt: body.dueAt as string | undefined,
-      timerMinutes: body.timerMinutes as number | undefined,
-      courseId: body.courseId as string | undefined,
-    });
+    return this.tasks.createTask(
+      {
+        title: String(body.title ?? ""),
+        description: body.description as string | undefined,
+        studyNotes: body.studyNotes as string | undefined,
+        audience: body.audience as AccountType | undefined,
+        assigneeId: body.assigneeId as string | undefined,
+        createdById: user.sub,
+        dueAt: body.dueAt as string | undefined,
+        timerMinutes: body.timerMinutes as number | undefined,
+        courseId: body.courseId as string | undefined,
+      },
+      { teacherId: user.sub, accountType: user.accountType },
+    );
   }
 
   /** Teacher: assign to whole course/batch or selected students. */

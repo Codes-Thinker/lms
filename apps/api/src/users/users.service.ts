@@ -14,6 +14,7 @@ import {
 } from "@prisma/client";
 import * as argon2 from "argon2";
 import { createHash, randomBytes } from "crypto";
+import { canChangeAccountType } from "../common/production-guards";
 import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -644,7 +645,11 @@ export class UsersService {
     return this.getById(userId);
   }
 
-  async update(id: string, dto: UpdateUserDto) {
+  async update(
+    id: string,
+    dto: UpdateUserDto,
+    actor?: { sub: string; accountType?: string; roles?: string[] },
+  ) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("User not found");
 
@@ -658,6 +663,16 @@ export class UsersService {
 
     if (dto.accountType === AccountType.SUPER_ADMIN) {
       throw new BadRequestException("Cannot set SUPER_ADMIN via this endpoint");
+    }
+
+    // Teachers/staff cannot escalate or demote roles — admin only.
+    if (
+      dto.accountType &&
+      dto.accountType !== existing.accountType &&
+      actor &&
+      !canChangeAccountType(actor)
+    ) {
+      throw new ForbiddenException("Only admin can change account type");
     }
 
     const data: Prisma.UserUpdateInput = {};

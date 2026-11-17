@@ -68,8 +68,12 @@ export class UsersController {
 
   @Patch(":id")
   @Roles("SUPER_ADMIN", "STAFF")
-  update(@Param("id") id: string, @Body() dto: UpdateUserDto) {
-    return this.users.update(id, dto);
+  update(
+    @Param("id") id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.users.update(id, dto, actor);
   }
 
   @Post(":id/resend-invitation")

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -11,6 +12,10 @@ import {
 import { ChatKind, TicketKind, TicketStatus } from "@prisma/client";
 import { AuthUser, CurrentUser } from "../common/decorators/current-user.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
+import {
+  canOpenSupportChatWithUser,
+  supportSenderIsAdmin,
+} from "../common/production-guards";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { PrismaService } from "../prisma/prisma.service";
@@ -99,7 +104,7 @@ export class SupportController {
     return this.support.myChat(user.sub, kind ?? ChatKind.ADMIN);
   }
 
-  /** Admin/staff: open or create ADMIN chat with any student / intern / teacher. */
+  /** SUPER_ADMIN only: open ADMIN chat with any student / intern / teacher. */
   @Post("chats/open")
   @Roles("SUPER_ADMIN", "STAFF")
   openWithUser(
@@ -109,6 +114,12 @@ export class SupportController {
     const targetId = body.userId?.trim();
     if (!targetId) {
       return this.support.myChat(user.sub, ChatKind.ADMIN);
+    }
+    // Teachers must not open student threads as Code's Thinker Admin.
+    if (!canOpenSupportChatWithUser(user)) {
+      throw new ForbiddenException(
+        "Only admin can open support chats with other users",
+      );
     }
     return this.support.openChatWithUser(targetId);
   }
@@ -132,20 +143,14 @@ export class SupportController {
     @Body()
     body: { text?: string; imageData?: string; imageName?: string }
   ) {
-    const isSuper =
-      user.accountType === "SUPER_ADMIN" ||
-      !!user.roles?.includes("SUPER_ADMIN");
-    const isStaff =
-      user.accountType === "STAFF" || !!user.roles?.includes("STAFF");
-
-    // Staff chatting a student thread (dashboard) = ADMIN.
-    // Staff/student opening their own support chat (app) = USER.
+    // Only SUPER_ADMIN may speak as ADMIN on another user's support thread.
+    // STAFF/teachers posting on their own thread remain USER.
     const thread = await this.prisma.chatThread.findUnique({
       where: { id },
       select: { userId: true },
     });
     const ownsThread = thread?.userId === user.sub;
-    const isAdmin = isSuper || (isStaff && !ownsThread);
+    const isAdmin = supportSenderIsAdmin({ actor: user, ownsThread });
 
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub },

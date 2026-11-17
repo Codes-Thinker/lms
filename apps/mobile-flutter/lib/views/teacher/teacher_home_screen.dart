@@ -12,14 +12,12 @@ import '../../core/responsive.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
-import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../widgets/brand_logo.dart';
 import '../attendance/attendance_screen.dart';
 import '../course/all_courses_screen.dart';
-import '../course/course_detail_screen.dart';
 import '../help/help_hub_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../report/report_screen.dart';
@@ -48,20 +46,18 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     });
   }
 
-  /// Pull every teacher dashboard source from the live API.
+  /// Teacher home sources only (no student fees / catalog metrics).
   Future<void> _hydrate({bool silent = true}) async {
     if (!mounted) return;
     final courses = context.read<CourseProvider>();
     final teaching = context.read<TeachingProvider>();
     final tasks = context.read<TaskProvider>();
-    final fees = context.read<FeeProvider>();
     final attendance = context.read<AttendanceProvider>();
     final notes = context.read<NotificationProvider>();
     await Future.wait([
-      courses.fetchAll(),
+      courses.fetchAll(), // search → All Courses
       teaching.load(silent: silent),
       tasks.load(silent: silent),
-      fees.load(),
       attendance.loadMine(),
       notes.load(),
     ]);
@@ -70,7 +66,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final courses = context.watch<CourseProvider>();
     final teaching = context.watch<TeachingProvider>();
     final tasks = context.watch<TaskProvider>();
     final attendance = context.watch<AttendanceProvider>();
@@ -78,33 +73,27 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
 
-    final taughtIds = teaching.courses.map((c) => c.id).toSet();
-    final batches = taughtIds.isEmpty
-        ? courses.courses
-        : courses.courses.where((c) => taughtIds.contains(c.id)).toList();
-    final classCount =
-        teaching.courses.isNotEmpty ? teaching.courses.length : batches.length;
+    // Teacher home uses teaching roster only — never student catalog/enrollment.
+    final myBatches = teaching.courses;
+    final classCount = myBatches.length;
     final staffId = auth.user?.id ?? '';
     final myTasks = tasks.tasksForUser(staffId);
-    // Student fee dues across batches this teacher instructs (backend course totals).
-    final feeDueAcrossBatches = batches.fold<int>(0, (sum, c) {
-      final due = (c.totalFee - c.paidAmount).clamp(0, c.totalFee);
-      return sum + due;
-    });
+    final openTasks = myTasks.where((t) => t.status != 'DONE').length;
     final checkedIn = attendance.today.where((m) => m.isCheckedIn).length;
-    final sessions = batches.take(5).toList();
     final name = auth.user?.name.trim().isNotEmpty == true
         ? auth.user!.name.trim()
         : 'Teacher';
     final role = auth.user?.roleLabel ?? 'Staff';
     final track = auth.trackLabel;
     final mentorBadge = track.trim().isNotEmpty && track != 'Unassigned track'
-        ? track.toUpperCase()
-        : role.toUpperCase();
-    final avatar = auth.avatarImage;
+        ? track
+        : role;
     final unread = notes.unreadCount;
+    final gap = AppResponsive.isCompact(context) ? 6.0 : 8.0;
+    final titleSize = AppResponsive.isCompact(context) ? 11.0 : 12.0;
+    final countSize = AppResponsive.isCompact(context) ? 15.0 : 17.0;
 
-    if (teaching.loading && teaching.courses.isEmpty && batches.isEmpty) {
+    if (teaching.loading && myBatches.isEmpty) {
       return const Scaffold(
         backgroundColor: _bg,
         body: Center(child: AppLoader()),
@@ -176,165 +165,133 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // Mentor bio — flat
+            // Name left · Flutter tab right · tagline below
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 14, pad, 0),
               sliver: SliverToBoxAdapter(
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
                             name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 26,
+                            style: TextStyle(
+                              fontSize:
+                                  AppResponsive.isCompact(context) ? 20 : 24,
                               fontWeight: FontWeight.w800,
                               color: _navy,
-                              letterSpacing: -0.5,
-                              height: 1.1,
+                              letterSpacing: -0.4,
+                              height: 1.15,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _royal,
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              mentorBadge,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.35,
-                              ),
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.blueDark,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            mentorBadge.toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.35,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Lecture students, mentor development, office attendance',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _slate,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _royal, width: 2),
-                      ),
-                      child: CircleAvatar(
-                        radius: 30,
-                        backgroundColor: AppColors.softBlue,
-                        backgroundImage: avatar,
-                        child: avatar == null
-                            ? Text(
-                                _initials(name),
-                                style: const TextStyle(
-                                  color: _royal,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                ),
-                              )
-                            : null,
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
 
-            // 2-column flat metrics
+            // 3 × 2 metric cards — title + count, no icons
             SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 16, pad, 0),
+              padding: EdgeInsets.fromLTRB(pad, 14, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   children: [
                     Row(
                       children: [
                         Expanded(
-                          child: _statCard(
-                            icon: Icons.folder_rounded,
-                            label: 'Classes',
-                            value: '$classCount',
-                            tint: const Color(0xFFE8F1FF),
-                            accent: const Color(0xFF3B82F6),
+                          child: _metricCard(
+                            title: 'Classes',
+                            count: '$classCount',
+                            tint: AppColors.softBlue,
+                            accent: AppColors.blueDark,
+                            titleSize: titleSize,
+                            countSize: countSize,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: gap),
                         Expanded(
-                          child: _statCard(
-                            icon: Icons.groups_rounded,
-                            label: 'Students',
-                            value: '${teaching.totalStudents}',
+                          child: _metricCard(
+                            title: 'Students',
+                            count: '${teaching.totalStudents}',
                             tint: const Color(0xFFE8F8EF),
-                            accent: const Color(0xFF10B981),
+                            accent: const Color(0xFF059669),
+                            titleSize: titleSize,
+                            countSize: countSize,
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
+                        SizedBox(width: gap),
                         Expanded(
-                          child: _statCard(
-                            icon: Icons.assignment_rounded,
-                            label: 'Assigned Tasks',
-                            value: '${teaching.assigned.length}',
+                          child: _metricCard(
+                            title: 'Tasks',
+                            count: '${teaching.assigned.length}',
                             tint: const Color(0xFFF3E8FF),
-                            accent: const Color(0xFF8B5CF6),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _statCard(
-                            icon: Icons.calendar_month_rounded,
-                            label: 'Total Batches',
-                            value: '${batches.length}',
-                            tint: const Color(0xFFFFF4EC),
-                            accent: const Color(0xFFF97316),
+                            accent: const Color(0xFF7C3AED),
+                            titleSize: titleSize,
+                            countSize: countSize,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: gap),
                     Row(
                       children: [
                         Expanded(
-                          child: _statCard(
-                            icon: Icons.payments_rounded,
-                            label: 'Fee due',
-                            value: 'Rs $feeDueAcrossBatches',
-                            tint: const Color(0xFFE6F7F5),
-                            accent: const Color(0xFF14B8A6),
+                          child: _metricCard(
+                            title: 'Batches',
+                            count: '${myBatches.length}',
+                            tint: const Color(0xFFFFF4EC),
+                            accent: const Color(0xFFEA580C),
+                            titleSize: titleSize,
+                            countSize: countSize,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: gap),
                         Expanded(
-                          child: _statCard(
-                            icon: Icons.home_work_rounded,
-                            label: 'In office',
-                            value: '$checkedIn',
-                            tint: const Color(0xFFFFEEF2),
-                            accent: const Color(0xFFEC4899),
+                          child: _metricCard(
+                            title: 'Open tasks',
+                            count: '$openTasks',
+                            tint: const Color(0xFFE6F7F5),
+                            accent: const Color(0xFF0D9488),
+                            titleSize: titleSize,
+                            countSize: countSize,
+                          ),
+                        ),
+                        SizedBox(width: gap),
+                        Expanded(
+                          child: _metricCard(
+                            title: 'In office',
+                            count: '$checkedIn',
+                            tint: const Color(0xFFFFEEF0),
+                            accent: const Color(0xFFDC2626),
+                            titleSize: titleSize,
+                            countSize: countSize,
                           ),
                         ),
                       ],
@@ -344,7 +301,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // Quick actions — solid / outlined pills
+            // Quick actions — ink chips (previous style)
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
               sliver: SliverToBoxAdapter(
@@ -400,20 +357,32 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // Upcoming classes — flat bordered cards
+            // 1) My batches — instructor roster only
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _Section('UPCOMING CLASSES'),
+                    Row(
+                      children: [
+                        const Expanded(child: _Section('MY BATCHES')),
+                        Text(
+                          '${myBatches.length}',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
-                    if (sessions.isEmpty)
+                    if (myBatches.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
                         child: Text(
-                          'No live courses yet. Publish from admin.',
+                          'No batches yet. Admin must set you as course instructor.',
                           style: TextStyle(
                             color: _slate,
                             fontSize: 13,
@@ -422,23 +391,22 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         ),
                       )
                     else
-                      ...List.generate(sessions.length, (i) {
-                        final c = sessions[i];
-                        final batchLabel =
-                            c.batch.isEmpty ? c.category : c.batch;
+                      ...List.generate(myBatches.take(5).length, (i) {
+                        final c = myBatches[i];
+                        final batchLabel = (c.batch ?? '').trim().isEmpty
+                            ? c.category
+                            : c.batch!;
                         return Padding(
                           padding: EdgeInsets.only(
-                            bottom: i == sessions.length - 1 ? 0 : 8,
+                            bottom: i == myBatches.take(5).length - 1 ? 0 : 8,
                           ),
-                          child: _upcomingCard(
+                          child: _batchCard(
                             title: c.title,
-                            subtitle: '$batchLabel · Live catalog',
+                            subtitle:
+                                '$batchLabel · ${c.enrolledCount} students',
                             onOpen: () {
-                              courses.selectCourse(c);
-                              _push(
-                                context,
-                                CourseDetailScreen(courseId: c.id),
-                              );
+                              teaching.selectCourse(c.id);
+                              _push(context, const TeacherClassScreen());
                             },
                           ),
                         );
@@ -448,135 +416,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // My batches
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(child: _Section('MY BATCHES')),
-                        Text(
-                          '${batches.length}',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    if (batches.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 14),
-                        child: Text(
-                          'No batches yet. Admin assigns you as instructor.',
-                          style: TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 13,
-                            height: 1.35,
-                          ),
-                        ),
-                      )
-                    else
-                      ...List.generate(batches.take(5).length, (i) {
-                        final c = batches[i];
-                        final due =
-                            (c.totalFee - c.paidAmount).clamp(0, c.totalFee);
-                        return Column(
-                          children: [
-                            InkWell(
-                              onTap: () {
-                                courses.selectCourse(c);
-                                _push(
-                                  context,
-                                  CourseDetailScreen(courseId: c.id),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: AppColors.softBlue,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        CupertinoIcons.book_fill,
-                                        color: AppColors.blueDark,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            c.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                              color: AppColors.ink,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${c.batch.isEmpty ? c.category : c.batch} · ${c.progressPercent.toStringAsFixed(0)}% · Fee Rs $due',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: AppColors.muted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          ClipRRect(
-                                            borderRadius:
-                                                BorderRadius.circular(100),
-                                            child: LinearProgressIndicator(
-                                              value: (c.progressPercent / 100)
-                                                  .clamp(0.0, 1.0),
-                                              minHeight: 4,
-                                              backgroundColor: AppColors.line,
-                                              color: AppColors.blue,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(
-                                      CupertinoIcons.chevron_forward,
-                                      color: AppColors.muted,
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (i < batches.take(5).length - 1) const _Line(),
-                          ],
-                        );
-                      }),
-                  ],
-                ),
-              ),
-            ),
-
-            // Tasks
+            // 2) My tasks — staff tasks assigned to this teacher
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
               sliver: SliverToBoxAdapter(
@@ -586,18 +426,17 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                     Row(
                       children: [
                         const Expanded(child: _Section('MY TASKS')),
-                        if (myTasks.length > 3)
-                          GestureDetector(
-                            onTap: () => _push(context, const TasksScreen()),
-                            child: const Text(
-                              'See all',
-                              style: TextStyle(
-                                color: AppColors.blueDark,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
+                        GestureDetector(
+                          onTap: () => _push(context, const TasksScreen()),
+                          child: const Text(
+                            'See all',
+                            style: TextStyle(
+                              color: AppColors.blueDark,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
                             ),
                           ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -606,7 +445,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         padding: EdgeInsets.symmetric(vertical: 14),
                         child: Text(
                           'No staff tasks yet',
-                          style: TextStyle(color: AppColors.muted, fontSize: 13),
+                          style:
+                              TextStyle(color: AppColors.muted, fontSize: 13),
                         ),
                       )
                     else
@@ -635,7 +475,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // Students preview
+            // 3) My students — from teaching roster
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 22, pad, 0),
               sliver: SliverToBoxAdapter(
@@ -660,7 +500,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    if (teaching.courses.isEmpty)
+                    if (myBatches.isEmpty || teaching.totalStudents == 0)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 14),
                         child: Text(
@@ -674,13 +514,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                       )
                     else
                       ...() {
-                        final flat = teaching.courses
+                        final flat = myBatches
                             .expand(
                               (c) => c.students.map(
                                 (s) => (
                                   s,
                                   c.title,
-                                  (c.batch ?? '').isEmpty
+                                  (c.batch ?? '').trim().isEmpty
                                       ? c.category
                                       : c.batch!,
                                 ),
@@ -696,7 +536,8 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                               _listRow(
                                 icon: CupertinoIcons.person_fill,
                                 title: s.name,
-                                subtitle: '${row.$3} · ${row.$2}',
+                                subtitle:
+                                    '${s.accountType} · ${row.$3} · ${row.$2}',
                                 onTap: () => _push(
                                   context,
                                   const TeacherClassScreen(),
@@ -712,7 +553,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               ),
             ),
 
-            // Office today
+            // 4) Office today
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 22, pad, bottom + 8),
               sliver: SliverToBoxAdapter(
@@ -774,69 +615,53 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
   }
 
-  String _initials(String name) {
-    final parts =
-        name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (parts.isEmpty) return 'T';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
-  }
-
   void _push(BuildContext context, Widget page) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(AppMotion.fadeSlide(page));
   }
 
-  Widget _statCard({
-    required IconData icon,
-    required String label,
-    required String value,
+  Widget _metricCard({
+    required String title,
+    required String count,
     required Color tint,
     required Color accent,
+    required double titleSize,
+    required double countSize,
   }) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
       decoration: BoxDecoration(
         color: tint,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accent.withValues(alpha: 0.12)),
+        borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(10),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: accent.withValues(alpha: 0.88),
+              fontSize: titleSize,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
             ),
-            child: Icon(icon, size: 18, color: Colors.white),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
+          const SizedBox(height: 6),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              count,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$label: ',
-                    style: TextStyle(
-                      color: accent.withValues(alpha: 0.92),
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  TextSpan(
-                    text: value,
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+              style: TextStyle(
+                color: accent,
+                fontSize: countSize,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: -0.3,
               ),
             ),
           ),
@@ -852,7 +677,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     bool filled = false,
   }) {
     return Material(
-      color: filled ? _royal : Colors.white,
+      color: filled ? AppColors.blueDark : Colors.white,
       borderRadius: BorderRadius.circular(100),
       child: InkWell(
         onTap: onTap,
@@ -862,7 +687,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(100),
             border: Border.all(
-              color: filled ? _royal : _royal.withValues(alpha: 0.45),
+              color: filled
+                  ? AppColors.blueDark
+                  : AppColors.blueDark.withValues(alpha: 0.45),
             ),
           ),
           child: Row(
@@ -871,7 +698,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               Icon(
                 icon,
                 size: 14,
-                color: filled ? Colors.white : _royal,
+                color: filled ? Colors.white : AppColors.blueDark,
               ),
               const SizedBox(width: 6),
               Text(
@@ -879,7 +706,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 12,
-                  color: filled ? Colors.white : _royal,
+                  color: filled ? Colors.white : AppColors.blueDark,
                 ),
               ),
             ],
@@ -889,7 +716,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     );
   }
 
-  Widget _upcomingCard({
+  Widget _batchCard({
     required String title,
     required String subtitle,
     required VoidCallback onOpen,
