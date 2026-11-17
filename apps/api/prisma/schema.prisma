@@ -85,6 +85,20 @@ enum NotificationType {
   GENERAL
   SYSTEM
   CHAT
+  CERTIFICATE
+  QUIZ
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuizAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
 }
 
 model Role {
@@ -169,6 +183,9 @@ model User {
   enrollmentRequests  EnrollmentRequest[] @relation("EnrollmentRequester")
   reviewedEnrollments EnrollmentRequest[] @relation("EnrollmentReviewer")
   instructedCourses   Course[]            @relation("CourseInstructor")
+  createdQuizzes      Quiz[]              @relation("QuizCreator")
+  quizAttempts        QuizAttempt[]
+  certificates        Certificate[]
 
   profileImage    String?
   monthlyFee      Int?
@@ -281,6 +298,8 @@ model Course {
   feeCases         FeeCase[]
   attendance       AttendanceRecord[]
   tasks            Task[]
+  quizzes          Quiz[]
+  certificates     Certificate[]
 }
 
 model EnrollmentRequest {
@@ -650,4 +669,87 @@ model AttendanceReminder {
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
+}
+
+/** MCQ quiz tied to a course. Graded only on the server. */
+model Quiz {
+  id                String           @id @default(cuid())
+  courseId          String
+  course            Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  status            QuizStatus       @default(DRAFT)
+  passPercent       Int              @default(70)
+  timeLimitMinutes  Int?
+  shuffleQuestions  Boolean          @default(false)
+  maxAttempts       Int              @default(3)
+  issueCertificate  Boolean          @default(true)
+  createdById       String?
+  createdBy         User?            @relation("QuizCreator", fields: [createdById], references: [id])
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  questions         QuizQuestion[]
+  attempts          QuizAttempt[]
+  certificates      Certificate[]
+
+  @@index([courseId])
+  @@index([status])
+}
+
+model QuizQuestion {
+  id           String @id @default(cuid())
+  quizId       String
+  quiz         Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  prompt       String
+  /** JSON string array of options, e.g. ["A","B","C","D"] */
+  options      Json
+  correctIndex Int
+  points       Int    @default(1)
+  sortOrder    Int    @default(0)
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id          String            @id @default(cuid())
+  quizId      String
+  quiz        Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      QuizAttemptStatus @default(IN_PROGRESS)
+  /** Map questionId -> selectedIndex */
+  answers     Json?
+  score       Int               @default(0)
+  maxScore    Int               @default(0)
+  percent     Float             @default(0)
+  passed      Boolean           @default(false)
+  startedAt   DateTime          @default(now())
+  submittedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([quizId, userId])
+  @@index([userId])
+}
+
+/** Verifiable course/quiz certificate. */
+model Certificate {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId           String?
+  course             Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  quizId             String?
+  quiz               Quiz?    @relation(fields: [quizId], references: [id], onDelete: SetNull)
+  title              String
+  recipientName      String
+  courseTitle        String?
+  verificationCode   String   @unique
+  issuedAt           DateTime @default(now())
+  meta               Json?
+  createdAt          DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([verificationCode])
 }

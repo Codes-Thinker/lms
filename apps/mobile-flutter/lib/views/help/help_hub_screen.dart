@@ -6,7 +6,9 @@ import '../../core/constants/app_motion.dart';
 import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../certificates/certificates_screen.dart';
 import '../fees/fees_screen.dart';
+import '../quizzes/quizzes_screen.dart';
 import '../report/report_screen.dart';
 import 'admin_chat_screen.dart';
 import 'complain_screen.dart';
@@ -49,6 +51,22 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
             AppMotion.fadeSlide(const FeesScreen()),
           ),
         ),
+      _HelpTile(
+        title: 'Quizzes',
+        subtitle: 'Take course MCQ exams',
+        icon: CupertinoIcons.doc_on_clipboard,
+        onTap: () => Navigator.of(context).push(
+          AppMotion.fadeSlide(const QuizzesScreen()),
+        ),
+      ),
+      _HelpTile(
+        title: 'Certificates',
+        subtitle: 'View and share verification codes',
+        icon: CupertinoIcons.rosette,
+        onTap: () => Navigator.of(context).push(
+          AppMotion.fadeSlide(const CertificatesScreen()),
+        ),
+      ),
       _HelpTile(
         title: 'Report',
         subtitle: 'Batch / class issue report to admin',

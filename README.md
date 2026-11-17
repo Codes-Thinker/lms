@@ -47,6 +47,13 @@ Mobile release APK (after `flutter build apk --release`):
 
 `apps/mobile-flutter/build/app/outputs/flutter-apk/app-release.apk`
 
+## Quizzes and certificates
+
+- Admin: `/quizzes`, `/certificates`
+- Public verify: `/verify/CT-XXXX-XXXX-XXXX` (admin web) or `GET /certificates/verify/:code` (API)
+- Mobile Help hub: Quizzes + Certificates
+- Passing a published quiz (enrolled students) can auto-issue a course certificate
+
 ## Roles
 
 Student, Intern, Teacher / Staff, Super Admin

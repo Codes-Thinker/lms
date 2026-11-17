@@ -13,6 +13,7 @@ import 'providers/support_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/teaching_provider.dart';
 import 'providers/ui_provider.dart';
+import 'providers/quiz_provider.dart';
 import 'providers/version_provider.dart';
 import 'services/push_notification_service.dart';
 import 'views/help/admin_chat_screen.dart';
@@ -136,6 +137,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
         ChangeNotifierProvider(create: (_) => SupportProvider()),
         ChangeNotifierProvider(create: (_) => TeachingProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
+        ChangeNotifierProvider(create: (_) => QuizProvider()),
         ChangeNotifierProvider(create: (_) => VersionProvider()),
       ],
       child: RealtimeBootstrap(
