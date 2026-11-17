@@ -4,16 +4,21 @@ import 'package:flutter/foundation.dart';
 
 enum AppSnackTone { success, error, warning, info }
 
+/// Tips (notifications) = top · Snackbars (actions) = bottom.
+enum AppSnackPlacement { top, bottom }
+
 class AppSnack {
   final String message;
   final String? title;
   final AppSnackTone tone;
+  final AppSnackPlacement placement;
   final VoidCallback? onTap;
 
   const AppSnack(
     this.message, {
     this.title,
     this.tone = AppSnackTone.success,
+    this.placement = AppSnackPlacement.bottom,
     this.onTap,
   });
 }
@@ -52,18 +57,21 @@ class UiProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Bottom snackbar for actions (copy, success, errors, …).
   void showSnack(
     String message, {
     String? title,
     AppSnackTone tone = AppSnackTone.success,
     Duration duration = const Duration(seconds: 3),
     VoidCallback? onTap,
+    AppSnackPlacement placement = AppSnackPlacement.bottom,
   }) {
     _snackTimer?.cancel();
     _activeSnack = AppSnack(
       message,
       title: title,
       tone: tone,
+      placement: placement,
       onTap: onTap,
     );
     notifyListeners();
@@ -71,6 +79,23 @@ class UiProvider extends ChangeNotifier {
       _activeSnack = null;
       notifyListeners();
     });
+  }
+
+  /// Top tip for live notifications (tap to open section).
+  void showTip(
+    String message, {
+    String? title,
+    Duration duration = const Duration(seconds: 5),
+    VoidCallback? onTap,
+  }) {
+    showSnack(
+      message,
+      title: title,
+      tone: AppSnackTone.info,
+      duration: duration,
+      onTap: onTap,
+      placement: AppSnackPlacement.top,
+    );
   }
 
   void queueSnack(String message) => showSnack(message);

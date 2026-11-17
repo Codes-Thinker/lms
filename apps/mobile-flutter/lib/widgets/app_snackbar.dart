@@ -5,7 +5,7 @@ import '../core/constants/app_motion.dart';
 import '../core/responsive.dart';
 import '../providers/ui_provider.dart';
 
-/// Top in-app tip banner (notification-style) — tap to open section.
+/// Tips at top · snackbars at bottom — no overflow.
 class AppSnackHost extends StatelessWidget {
   final Widget child;
 
@@ -14,8 +14,13 @@ class AppSnackHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final snack = context.watch<UiProvider>().activeSnack;
+    final tip =
+        snack?.placement == AppSnackPlacement.top ? snack : null;
+    final bar =
+        snack?.placement == AppSnackPlacement.bottom ? snack : null;
     final pad = AppResponsive.pagePad(context);
     final top = MediaQuery.paddingOf(context).top + 8;
+    final bottom = AppResponsive.shellBottom(context) + 8;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -25,27 +30,46 @@ class AppSnackHost extends StatelessWidget {
           left: pad,
           right: pad,
           top: top,
-          child: IgnorePointer(
-            ignoring: snack == null,
-            child: AnimatedSlide(
-              duration: AppMotion.fast,
-              curve: Curves.easeOutCubic,
-              offset: snack == null ? const Offset(0, -0.4) : Offset.zero,
-              child: AnimatedOpacity(
-                duration: AppMotion.fast,
-                opacity: snack == null ? 0 : 1,
-                child: snack == null
-                    ? const SizedBox.shrink()
-                    : Material(
-                        type: MaterialType.transparency,
-                        elevation: 16,
-                        child: _SnackBanner(snack: snack),
-                      ),
-              ),
-            ),
-          ),
+          child: _AnimatedBanner(snack: tip, fromTop: true),
+        ),
+        Positioned(
+          left: pad,
+          right: pad,
+          bottom: bottom,
+          child: _AnimatedBanner(snack: bar, fromTop: false),
         ),
       ],
+    );
+  }
+}
+
+class _AnimatedBanner extends StatelessWidget {
+  final AppSnack? snack;
+  final bool fromTop;
+
+  const _AnimatedBanner({required this.snack, required this.fromTop});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: snack == null,
+      child: AnimatedSlide(
+        duration: AppMotion.fast,
+        curve: Curves.easeOutCubic,
+        offset: snack == null
+            ? Offset(0, fromTop ? -0.35 : 0.35)
+            : Offset.zero,
+        child: AnimatedOpacity(
+          duration: AppMotion.fast,
+          opacity: snack == null ? 0 : 1,
+          child: snack == null
+              ? const SizedBox.shrink()
+              : Material(
+                  type: MaterialType.transparency,
+                  child: _SnackBanner(snack: snack),
+                ),
+        ),
+      ),
     );
   }
 }
@@ -99,22 +123,15 @@ class _SnackBanner extends StatelessWidget {
             : null,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 52, maxHeight: 72),
-          padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
           decoration: BoxDecoration(
             color: AppColors.card,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.line),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
                 width: 32,
@@ -130,7 +147,6 @@ class _SnackBanner extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
@@ -144,16 +160,16 @@ class _SnackBanner extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       snack.message,
-                      maxLines: 2,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.muted,
                         fontWeight: FontWeight.w500,
                         fontSize: 12.5,
-                        height: 1.25,
+                        height: 1.3,
                       ),
                     ),
                   ],
@@ -161,10 +177,13 @@ class _SnackBanner extends StatelessWidget {
               ),
               if (canTap) ...[
                 const SizedBox(width: 6),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: AppColors.muted.withValues(alpha: 0.75),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: AppColors.muted.withValues(alpha: 0.75),
+                  ),
                 ),
               ],
             ],

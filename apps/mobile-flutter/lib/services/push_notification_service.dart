@@ -194,10 +194,9 @@ class PushNotificationService {
       return;
     }
 
-    ui.showSnack(
+    ui.showTip(
       text,
       title: title.isNotEmpty ? title : NotificationRouter.labelForType(type),
-      tone: AppSnackTone.info,
       duration: const Duration(seconds: 5),
       onTap: () {
         NotificationRouter.setPending(

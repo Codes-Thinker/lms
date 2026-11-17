@@ -133,10 +133,9 @@ class RealtimeService {
             ? NotificationRouter.labelForType(type)
             : title);
     unawaited(NotifyTone.instance.play());
-    _ui?.showSnack(
+    _ui?.showTip(
       text,
       title: displayTitle,
-      tone: AppSnackTone.info,
       duration: const Duration(seconds: 5),
       onTap: () {
         NotificationRouter.setPending(
