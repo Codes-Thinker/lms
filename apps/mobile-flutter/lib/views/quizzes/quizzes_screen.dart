@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
@@ -30,7 +31,7 @@ class _QuizzesScreenState extends State<QuizzesScreen> {
       body: RefreshIndicator(
         onRefresh: () => qp.loadQuizzes(),
         child: qp.loading && qp.quizzes.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [

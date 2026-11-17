@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
@@ -154,7 +155,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         children: [
           Expanded(
             child: support.loading && support.chat.isEmpty
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: AppLoader())
                 : ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.all(16),
@@ -291,14 +292,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       backgroundColor: AppColors.blue,
                     ),
                     icon: _sending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                        ? const AppLoader(size: 18, color: Colors.white)
                         : const Icon(Icons.send_rounded, color: Colors.white),
                   ),
                 ],

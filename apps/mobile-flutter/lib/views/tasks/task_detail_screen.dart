@@ -346,14 +346,7 @@ class _TaskChatBarState extends State<_TaskChatBar> {
               onPressed: _sending ? null : _send,
               style: IconButton.styleFrom(backgroundColor: AppColors.blue),
               icon: _sending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
+                  ? const AppLoader(size: 18, color: Colors.white)
                   : const Icon(Icons.send_rounded, color: Colors.white),
             ),
           ],

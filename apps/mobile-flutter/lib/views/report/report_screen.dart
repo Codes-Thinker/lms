@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/responsive.dart';
@@ -36,7 +37,7 @@ class _ReportView extends StatelessWidget {
       body: Builder(
         builder: (context) {
           if (report.loading && report.courses.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AppLoader());
           }
 
           final useLive = report.courses.isNotEmpty;

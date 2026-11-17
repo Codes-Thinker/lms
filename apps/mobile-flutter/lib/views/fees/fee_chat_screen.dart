@@ -298,14 +298,7 @@ class _FeeChatScreenState extends State<FeeChatScreen> {
                       child: FilledButton.icon(
                         onPressed: busy ? null : _pickAndUpload,
                         icon: _uploading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
+                            ? const AppLoader(size: 18, color: Colors.white)
                             : const Icon(Icons.add_photo_alternate_outlined),
                         label: Text(
                           feeCase.status == 'SENT'

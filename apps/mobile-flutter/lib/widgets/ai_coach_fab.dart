@@ -4,15 +4,15 @@ import '../core/constants/app_colors.dart';
 import '../core/constants/app_motion.dart';
 import '../views/ai/ai_coach_screen.dart';
 
-/// Compact AI coach bubble — tail points down toward the navbar.
+/// Compact AI coach bubble — tail toward navbar, brand soft-blue fill.
 class AiCoachFab extends StatelessWidget {
   const AiCoachFab({super.key});
 
-  static const double _size = 56;
+  static const double _size = 54;
 
   @override
   Widget build(BuildContext context) {
-    final px = (_size * MediaQuery.devicePixelRatioOf(context)).round();
+    final px = ((_size + 8) * MediaQuery.devicePixelRatioOf(context)).round();
 
     return GestureDetector(
       onTap: () {
@@ -25,26 +25,29 @@ class AiCoachFab extends StatelessWidget {
         height: _size + 10,
         child: CustomPaint(
           painter: _BubbleTailPainter(
-            fill: Colors.white,
+            fill: AppColors.softBlue,
             border: const Color(0xFFD4AF37),
           ),
           child: Padding(
-            // Leave room for the bottom-left tail.
-            padding: const EdgeInsets.fromLTRB(3, 2, 3, 10),
+            // Tight padding so robot reads larger/clearer inside.
+            padding: const EdgeInsets.fromLTRB(2, 1, 2, 9),
             child: ClipOval(
-              child: Image.asset(
-                AppBrand.aiRobotBubbleAsset,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
-                isAntiAlias: true,
-                cacheWidth: px,
-                cacheHeight: px,
-                errorBuilder: (_, __, ___) => const ColoredBox(
-                  color: AppColors.blue,
-                  child: Icon(
-                    Icons.smart_toy_rounded,
-                    color: Colors.white,
-                    size: 26,
+              child: Transform.scale(
+                scale: 1.18,
+                child: Image.asset(
+                  AppBrand.aiRobotBubbleAsset,
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.high,
+                  isAntiAlias: true,
+                  cacheWidth: px,
+                  cacheHeight: px,
+                  errorBuilder: (_, __, ___) => const ColoredBox(
+                    color: AppColors.blue,
+                    child: Icon(
+                      Icons.smart_toy_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),
@@ -75,7 +78,6 @@ class _BubbleTailPainter extends CustomPainter {
       Radius.circular(r),
     );
 
-    // Tail points down-left toward navbar.
     final tail = Path()
       ..moveTo(w * 0.28, bodyH - 6)
       ..lineTo(w * 0.12, h - 1)

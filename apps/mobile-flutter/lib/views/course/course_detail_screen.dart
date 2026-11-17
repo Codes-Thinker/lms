@@ -353,11 +353,7 @@ class _NonEnrolledContentState extends State<_NonEnrolledContent> {
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: _busy
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                  ? const AppLoader(size: 22, color: Colors.white)
                   : const Text('Request enrollment',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),

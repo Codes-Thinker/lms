@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/api_errors.dart';
 import '../../core/constants/app_colors.dart';
@@ -183,7 +184,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AppLoader())
           : Column(
               children: [
                 if (_mode != null || _remaining != null)
@@ -219,10 +220,16 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                     itemBuilder: (_, i) {
                       if (_sending && i == _messages.length) {
                         return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            'Thinking…',
-                            style: TextStyle(color: AppColors.muted),
+                          padding: EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            children: [
+                              AppLoader(size: 22),
+                              SizedBox(width: 10),
+                              Text(
+                                'Thinking…',
+                                style: TextStyle(color: AppColors.muted),
+                              ),
+                            ],
                           ),
                         );
                       }

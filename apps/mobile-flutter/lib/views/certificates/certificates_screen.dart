@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/api_config.dart';
@@ -31,7 +32,7 @@ class _CertificatesScreenState extends State<CertificatesScreen> {
       body: RefreshIndicator(
         onRefresh: () => qp.loadCertificates(),
         child: qp.loading && qp.certificates.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : ListView(
                 padding: const EdgeInsets.all(16),
                 children: [

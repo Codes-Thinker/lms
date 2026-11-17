@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/api_errors.dart';
 import '../../core/constants/app_colors.dart';
@@ -98,7 +99,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: Text(widget.title)),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: AppLoader()),
       );
     }
     if (_error != null) {

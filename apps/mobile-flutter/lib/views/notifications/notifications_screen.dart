@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
@@ -126,7 +127,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: RefreshIndicator(
         onRefresh: () => context.read<NotificationProvider>().load(),
         child: notes.loading && notes.items.isEmpty
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppLoader())
             : notes.items.isEmpty
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
