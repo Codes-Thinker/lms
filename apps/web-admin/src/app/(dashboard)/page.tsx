@@ -26,6 +26,7 @@ import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import { useNotifications } from "@/components/ui/notifications-provider";
 import { useAdminActivity } from "@/components/ui/admin-activity-provider";
+import { DashboardSkeleton } from "@/components/ui/skeleton";
 
 type Overview = {
   students: number;
@@ -207,10 +208,14 @@ export default function DashboardPage() {
     },
   ];
 
+  if (!overview && !error) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="page-enter space-y-6">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-[#EFF6FF] via-white to-[#F0FDFA] p-6 sm:p-7">
+      <section className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-[#EFF6FF] via-white to-[#F0FDFA] p-6 sm:p-7 animate-fade-up">
         <div
           aria-hidden
           className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-400/15 blur-3xl"

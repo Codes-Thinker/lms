@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../core/constants/api_config.dart';
 
 typedef UnauthorizedHandler = void Function();
+typedef TryRefreshHandler = Future<bool> Function();
 
 class ApiClient {
   ApiClient._();
@@ -15,6 +16,8 @@ class ApiClient {
 
   String? _token;
   UnauthorizedHandler? onUnauthorized;
+  TryRefreshHandler? onTryRefresh;
+  bool _refreshing = false;
 
   String? get token => _token;
 
@@ -39,12 +42,21 @@ class ApiClient {
     return h;
   }
 
-  Future<dynamic> get(String path, {Map<String, String>? query}) async {
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool skipAuthRefresh = false,
+  }) async {
     try {
       final res = await http
           .get(_uri(path, query), headers: _headers())
           .timeout(requestTimeout);
-      return _decode(res, path: path);
+      return _decode(
+        res,
+        path: path,
+        skipAuthRefresh: skipAuthRefresh,
+        retry: () => get(path, query: query, skipAuthRefresh: true),
+      );
     } on TimeoutException {
       throw ApiException(
         408,
@@ -53,7 +65,11 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> post(String path, {Object? body}) async {
+  Future<dynamic> post(
+    String path, {
+    Object? body,
+    bool skipAuthRefresh = false,
+  }) async {
     try {
       final res = await http
           .post(
@@ -62,7 +78,12 @@ class ApiClient {
             body: body == null ? null : jsonEncode(body),
           )
           .timeout(requestTimeout);
-      return _decode(res, path: path);
+      return _decode(
+        res,
+        path: path,
+        skipAuthRefresh: skipAuthRefresh,
+        retry: () => post(path, body: body, skipAuthRefresh: true),
+      );
     } on TimeoutException {
       throw ApiException(
         408,
@@ -71,7 +92,11 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> patch(String path, {Object? body}) async {
+  Future<dynamic> patch(
+    String path, {
+    Object? body,
+    bool skipAuthRefresh = false,
+  }) async {
     try {
       final res = await http
           .patch(
@@ -80,7 +105,12 @@ class ApiClient {
             body: body == null ? null : jsonEncode(body),
           )
           .timeout(requestTimeout);
-      return _decode(res, path: path);
+      return _decode(
+        res,
+        path: path,
+        skipAuthRefresh: skipAuthRefresh,
+        retry: () => patch(path, body: body, skipAuthRefresh: true),
+      );
     } on TimeoutException {
       throw ApiException(
         408,
@@ -89,7 +119,11 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> put(String path, {Object? body}) async {
+  Future<dynamic> put(
+    String path, {
+    Object? body,
+    bool skipAuthRefresh = false,
+  }) async {
     try {
       final res = await http
           .put(
@@ -98,7 +132,12 @@ class ApiClient {
             body: body == null ? null : jsonEncode(body),
           )
           .timeout(requestTimeout);
-      return _decode(res, path: path);
+      return _decode(
+        res,
+        path: path,
+        skipAuthRefresh: skipAuthRefresh,
+        retry: () => put(path, body: body, skipAuthRefresh: true),
+      );
     } on TimeoutException {
       throw ApiException(
         408,
@@ -107,12 +146,20 @@ class ApiClient {
     }
   }
 
-  Future<dynamic> delete(String path) async {
+  Future<dynamic> delete(
+    String path, {
+    bool skipAuthRefresh = false,
+  }) async {
     try {
       final res = await http
           .delete(_uri(path), headers: _headers())
           .timeout(requestTimeout);
-      return _decode(res, path: path);
+      return _decode(
+        res,
+        path: path,
+        skipAuthRefresh: skipAuthRefresh,
+        retry: () => delete(path, skipAuthRefresh: true),
+      );
     } on TimeoutException {
       throw ApiException(
         408,
@@ -121,7 +168,12 @@ class ApiClient {
     }
   }
 
-  dynamic _decode(http.Response res, {required String path}) {
+  Future<dynamic> _decode(
+    http.Response res, {
+    required String path,
+    bool skipAuthRefresh = false,
+    Future<dynamic> Function()? retry,
+  }) async {
     dynamic data;
     if (res.body.isNotEmpty) {
       try {
@@ -142,10 +194,27 @@ class ApiClient {
     }
 
     if (res.statusCode == 401) {
-      final isAuthRoute =
-          path.contains('/auth/login') || path.contains('/auth/accept');
+      final isAuthRoute = path.contains('/auth/login') ||
+          path.contains('/auth/accept') ||
+          path.contains('/auth/refresh') ||
+          path.contains('/auth/forgot');
       final hadToken = _token != null && _token!.isNotEmpty;
-      // Only clear saved session when an authenticated API call fails.
+
+      if (!isAuthRoute &&
+          !skipAuthRefresh &&
+          hadToken &&
+          onTryRefresh != null &&
+          !_refreshing &&
+          retry != null) {
+        _refreshing = true;
+        try {
+          final ok = await onTryRefresh!();
+          if (ok) return retry();
+        } finally {
+          _refreshing = false;
+        }
+      }
+
       if (hadToken && !isAuthRoute) {
         onUnauthorized?.call();
         throw ApiException(401, 'Session expired. Please sign in again');

@@ -179,7 +179,38 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             },
                           ),
-                          AppSpace.gapXxl,
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () async {
+                                final email = _email.text.trim();
+                                if (email.isEmpty) {
+                                  context.read<UiProvider>().showSnack(
+                                        'Enter your email first',
+                                        tone: AppSnackTone.warning,
+                                      );
+                                  return;
+                                }
+                                final msg = await context
+                                    .read<AuthProvider>()
+                                    .requestPasswordReset(email);
+                                if (!context.mounted) return;
+                                context.read<UiProvider>().showSnack(
+                                      msg ?? 'Check your email for a reset link',
+                                      tone: AppSnackTone.info,
+                                    );
+                              },
+                              child: const Text(
+                                'Forgot password?',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.blue,
+                                ),
+                              ),
+                            ),
+                          ),
+                          AppSpace.gapXl,
                           Builder(
                             builder: (context) {
                               final busy = context.watch<UiProvider>().globalLoading;

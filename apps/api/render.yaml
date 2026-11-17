@@ -32,3 +32,9 @@ services:
       # Comma-separated admin dashboard origins (required in production)
       - key: CORS_ORIGIN
         sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: "12h"
+      - key: REFRESH_TOKEN_DAYS
+        value: "14"

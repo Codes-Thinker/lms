@@ -7,6 +7,7 @@ import {
   OnModuleInit,
 } from "@nestjs/common";
 import { FeeStatus, NotificationType } from "@prisma/client";
+import { assertImageDataUrl } from "../common/media-validation";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -498,13 +499,17 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       throw new ForbiddenException("This fee case does not belong to you");
     }
 
+    const screenshotData = assertImageDataUrl(data.screenshotData, {
+      field: "screenshot",
+    });
+
     // Create a payment submission record
     const submission = await this.prisma.paymentSubmission.create({
       data: {
         feeCaseId,
         studentId,
         amount: data.amount,
-        screenshotData: data.screenshotData ?? null,
+        screenshotData,
         screenshotName: data.screenshotName ?? null,
         status: "PENDING_VERIFICATION",
       },
@@ -515,7 +520,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       where: { id: feeCaseId },
       data: {
         status: FeeStatus.SENT,
-        paymentScreenshotData: data.screenshotData ?? null,
+        paymentScreenshotData: screenshotData,
         paymentSubmittedAt: new Date(),
       },
     });
@@ -528,7 +533,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
         senderName: (await this.prisma.user.findUnique({ where: { id: studentId } }))?.fullName ?? "Student",
         senderRole: "STUDENT",
         text: "Payment screenshot attached. Please verify.",
-        hasScreenshot: Boolean(data.screenshotData),
+        hasScreenshot: Boolean(screenshotData),
       },
     });
 

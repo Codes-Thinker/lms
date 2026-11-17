@@ -85,4 +85,39 @@ export class MailService {
       text,
     });
   }
+
+  async sendPasswordReset(input: {
+    fullName: string;
+    email: string;
+    resetLink: string;
+  }): Promise<void> {
+    const fromName =
+      this.config.get<string>("MAIL_FROM_NAME") ?? "Codes Thinker";
+    const fromEmail =
+      this.config.get<string>("MAIL_FROM_EMAIL") ?? "noreply@codesthinker.com";
+    const subject = "Reset your Codes Thinker LMS password";
+    const text = [
+      `Hello ${input.fullName},`,
+      "",
+      "We received a request to reset your LMS password.",
+      "Use this secure link (expires soon):",
+      input.resetLink,
+      "",
+      "If you did not request this, you can ignore this email.",
+      "",
+      "Codes Thinker Software House",
+    ].join("\n");
+
+    if (!this.transporter) {
+      this.log.log(`[dev mail] To: ${input.email}\nSubject: ${subject}\n${text}`);
+      return;
+    }
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: input.email,
+      subject,
+      text,
+    });
+  }
 }

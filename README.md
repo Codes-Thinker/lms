@@ -36,8 +36,12 @@ Required env on Render:
 - `JWT_SECRET` (auto if using Blueprint)
 - `FIREBASE_SERVICE_ACCOUNT_JSON`
 - `APP_URL` / `API_URL` / `CORS_ORIGIN` as needed
+- `CRON_SECRET` for `POST /ops/cron/fee-reminders` and `POST /ops/cron/auto-checkout`
+- `JWT_EXPIRES_IN` (default `12h`) + refresh tokens
 
 Health check: `GET /health`
+
+DB backup helper: `apps/api/scripts/backup-db.sh`
 
 Mobile release APK (after `flutter build apk --release`):
 

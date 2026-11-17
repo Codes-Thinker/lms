@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,14 +47,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#FAFAF7] px-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-[#F8FAFC] px-4">
+      <Card className="w-full max-w-md animate-fade-up">
         <CardHeader className="items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/app_icon.png"
             alt="Code's Thinker LMS"
-            className="mb-3 h-16 w-16 rounded-2xl object-cover shadow-sm"
+            className="mb-3 h-16 w-16 rounded-2xl object-cover"
           />
           <CardTitle>Code&apos;s Thinker LMS</CardTitle>
           <CardDescription>Admin sign in</CardDescription>
@@ -72,7 +73,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/reset-password"
+                  className="text-xs font-medium text-blue-600 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

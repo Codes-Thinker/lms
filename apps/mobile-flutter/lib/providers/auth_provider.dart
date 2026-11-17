@@ -56,13 +56,55 @@ class AuthProvider extends ChangeNotifier {
   bool get hydrated => _hydrated;
 
   static const _kToken = 'lms_access_token';
+  static const _kRefresh = 'lms_refresh_token';
   static const _kUser = 'lms_user_json';
 
   AuthProvider() {
     ApiClient.instance.onUnauthorized = () {
       logout();
     };
+    ApiClient.instance.onTryRefresh = _tryRefresh;
     restoreSession();
+  }
+
+  Future<bool> _tryRefresh() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refresh = prefs.getString(_kRefresh);
+      if (refresh == null || refresh.isEmpty) return false;
+      final data = await ApiClient.instance.post(
+        '/auth/refresh',
+        body: {'refreshToken': refresh},
+        skipAuthRefresh: true,
+      ) as Map<String, dynamic>;
+      final token = data['accessToken'] as String?;
+      final nextRefresh = data['refreshToken'] as String? ?? refresh;
+      final userJson = data['user'] as Map<String, dynamic>?;
+      if (token == null || userJson == null) return false;
+      ApiClient.instance.setToken(token);
+      _user = AppUser.fromApi(userJson);
+      await _persist(token, userJson, refreshToken: nextRefresh);
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<String?> requestPasswordReset(String email) async {
+    try {
+      final data = await ApiClient.instance.post(
+        '/auth/forgot-password',
+        body: {'email': email.trim().toLowerCase()},
+        skipAuthRefresh: true,
+      ) as Map<String, dynamic>;
+      return data['message']?.toString() ??
+          'If that email is registered, a reset link was sent.';
+    } on ApiException catch (e) {
+      return ApiErrors.fromApi(e);
+    } catch (e) {
+      return ApiErrors.friendly(e);
+    }
   }
 
   Future<void> restoreSession() async {
@@ -156,7 +198,8 @@ class AuthProvider extends ChangeNotifier {
       ApiClient.instance.setToken(token);
       _user = logged;
       _loginRole = _mapRole(logged.role);
-      await _persist(token, userJson);
+      final refresh = data['refreshToken'] as String?;
+      await _persist(token, userJson, refreshToken: refresh);
       await _loadAvatar();
       _loading = false;
       notifyListeners();
@@ -201,15 +244,23 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _persist(String token, Map<String, dynamic> userJson) async {
+  Future<void> _persist(
+    String token,
+    Map<String, dynamic> userJson, {
+    String? refreshToken,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
     await prefs.setString(_kUser, jsonEncode(userJson));
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await prefs.setString(_kRefresh, refreshToken);
+    }
   }
 
   Future<void> _clearPersisted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
+    await prefs.remove(_kRefresh);
     await prefs.remove(_kUser);
     ApiClient.instance.setToken(null);
     await LocalCache.clearSession();

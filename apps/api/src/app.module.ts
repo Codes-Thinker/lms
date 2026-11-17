@@ -12,6 +12,7 @@ import { FeesModule } from "./fees/fees.module";
 import { HealthController } from "./health.controller";
 import { MailModule } from "./mail/mail.module";
 import { NotificationsModule } from "./notifications/notifications.module";
+import { OpsModule } from "./ops/ops.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ReportsModule } from "./reports/reports.module";
@@ -38,6 +39,7 @@ import { UsersModule } from "./users/users.module";
     NotificationsModule,
     ReportsModule,
     SystemModule,
+    OpsModule,
   ],
   controllers: [HealthController],
   providers: [

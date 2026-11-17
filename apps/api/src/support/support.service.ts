@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ChatKind, NotificationType, TicketKind, TicketStatus } from "@prisma/client";
+import { assertImageDataUrl } from "../common/media-validation";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -308,7 +309,7 @@ export class SupportService {
     actor?: { userId: string; isAdmin: boolean }
   ) {
     const text = (input.text ?? "").trim();
-    const imageData = input.imageData?.trim() || null;
+    const imageData = assertImageDataUrl(input.imageData, { field: "image" });
     if (!text && !imageData) {
       throw new NotFoundException("Message or image required");
     }
