@@ -5,7 +5,7 @@ import '../core/constants/app_motion.dart';
 import '../core/responsive.dart';
 import '../providers/ui_provider.dart';
 
-/// Compact bottom toast — soft surface, light type, short height.
+/// Top in-app tip banner (notification-style) — tap to open section.
 class AppSnackHost extends StatelessWidget {
   final Widget child;
 
@@ -15,6 +15,7 @@ class AppSnackHost extends StatelessWidget {
   Widget build(BuildContext context) {
     final snack = context.watch<UiProvider>().activeSnack;
     final pad = AppResponsive.pagePad(context);
+    final top = MediaQuery.paddingOf(context).top + 8;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -23,13 +24,13 @@ class AppSnackHost extends StatelessWidget {
         Positioned(
           left: pad,
           right: pad,
-          bottom: AppResponsive.shellBottom(context) + 8,
+          top: top,
           child: IgnorePointer(
             ignoring: snack == null,
             child: AnimatedSlide(
               duration: AppMotion.fast,
               curve: Curves.easeOutCubic,
-              offset: snack == null ? const Offset(0, 0.35) : Offset.zero,
+              offset: snack == null ? const Offset(0, -0.4) : Offset.zero,
               child: AnimatedOpacity(
                 duration: AppMotion.fast,
                 opacity: snack == null ? 0 : 1,
@@ -37,7 +38,7 @@ class AppSnackHost extends StatelessWidget {
                     ? const SizedBox.shrink()
                     : Material(
                         type: MaterialType.transparency,
-                        elevation: 12,
+                        elevation: 16,
                         child: _SnackBanner(snack: snack),
                       ),
               ),
@@ -76,7 +77,7 @@ class _SnackBanner extends StatelessWidget {
       case AppSnackTone.warning:
         return Icons.info_outline_rounded;
       case AppSnackTone.info:
-        return Icons.notifications_none_rounded;
+        return Icons.notifications_active_rounded;
     }
   }
 
@@ -96,18 +97,18 @@ class _SnackBanner extends StatelessWidget {
                 tap();
               }
             : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44, maxHeight: 64),
-          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+          constraints: const BoxConstraints(minHeight: 52, maxHeight: 72),
+          padding: const EdgeInsets.fromLTRB(12, 11, 10, 11),
           decoration: BoxDecoration(
             color: AppColors.card,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.line),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 16,
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 18,
                 offset: const Offset(0, 6),
               ),
             ],
@@ -116,14 +117,14 @@ class _SnackBanner extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 32,
+                height: 32,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _accent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: _accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(_icon, size: 16, color: _accent),
+                child: Icon(_icon, size: 18, color: _accent),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -132,28 +133,26 @@ class _SnackBanner extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (hasTitle)
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.ink.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12.5,
-                          height: 1.2,
-                        ),
-                      ),
                     Text(
-                      snack.message,
-                      maxLines: hasTitle ? 1 : 2,
+                      hasTitle ? title : "Code's Thinker",
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: hasTitle
-                            ? AppColors.muted
-                            : AppColors.ink.withValues(alpha: 0.88),
+                        color: AppColors.ink.withValues(alpha: 0.92),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      snack.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
                         fontWeight: FontWeight.w500,
-                        fontSize: hasTitle ? 12 : 13,
+                        fontSize: 12.5,
                         height: 1.25,
                       ),
                     ),
@@ -164,8 +163,8 @@ class _SnackBanner extends StatelessWidget {
                 const SizedBox(width: 6),
                 Icon(
                   Icons.chevron_right_rounded,
-                  size: 18,
-                  color: AppColors.muted.withValues(alpha: 0.7),
+                  size: 20,
+                  color: AppColors.muted.withValues(alpha: 0.75),
                 ),
               ],
             ],

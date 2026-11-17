@@ -115,11 +115,18 @@ export class PushService implements OnModuleInit {
           android: {
             priority: "high",
             notification: {
-              channelId: "lms_default",
+              channelId: "lms_ct_notify",
               icon: "ic_launcher",
               color: "#2563EB",
               clickAction: "FLUTTER_NOTIFICATION_CLICK",
-              sound: "default",
+              sound: "ct_notify",
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "ct_notify.wav",
+              },
             },
           },
         });

@@ -11,6 +11,7 @@ import '../providers/task_provider.dart';
 import '../providers/teaching_provider.dart';
 import '../providers/ui_provider.dart';
 import 'api_client.dart';
+import 'notify_tone.dart';
 
 typedef RealtimeOpenHandler = void Function(String type, {String? taskId});
 
@@ -131,6 +132,7 @@ class RealtimeService {
         : (title.trim().isEmpty
             ? NotificationRouter.labelForType(type)
             : title);
+    unawaited(NotifyTone.instance.play());
     _ui?.showSnack(
       text,
       title: displayTitle,

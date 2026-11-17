@@ -10,6 +10,7 @@ import '../core/notification_router.dart';
 import '../firebase_options.dart';
 import '../providers/ui_provider.dart';
 import 'api_client.dart';
+import 'notify_tone.dart';
 
 typedef CurrentUserIdGetter = String? Function();
 
@@ -38,11 +39,14 @@ class PushNotificationService {
   void Function(String type)? _onOpenInApp;
   void Function()? _onForegroundRefresh;
 
+  /// New channel id so Android picks up the Codes Thinker custom sound.
   static const _androidChannel = AndroidNotificationChannel(
-    'lms_default',
-    'LMS Notifications',
+    'lms_ct_notify',
+    "Code's Thinker Alerts",
     description: 'Chat, fees, attendance and system messages',
     importance: Importance.high,
+    playSound: true,
+    sound: RawResourceAndroidNotificationSound('ct_notify'),
   );
 
   bool get isReady => _ready;
@@ -182,6 +186,7 @@ class PushNotificationService {
         : (rawTitle.trim().isNotEmpty ? rawTitle.trim() : 'New update');
 
     _onForegroundRefresh?.call();
+    await NotifyTone.instance.play();
 
     final ui = _ui;
     if (ui == null) {
