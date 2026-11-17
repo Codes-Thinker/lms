@@ -311,6 +311,18 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  static const _fieldRadius = 16.0;
+
+  OutlineInputBorder _fieldBorder({
+    Color color = AppColors.line,
+    double width = 1,
+  }) {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(_fieldRadius),
+      borderSide: BorderSide(color: color, width: width),
+    );
+  }
+
   Widget _field({
     required TextEditingController controller,
     required String label,
@@ -336,6 +348,7 @@ class _LoginScreenState extends State<LoginScreen> {
           controller: controller,
           keyboardType: keyboard,
           obscureText: obscure,
+          cursorColor: AppColors.blue,
           style: const TextStyle(
             fontWeight: FontWeight.w500,
             fontSize: 15,
@@ -343,27 +356,24 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: AppColors.muted, fontWeight: FontWeight.w400),
+            hintStyle: const TextStyle(
+              color: AppColors.muted,
+              fontWeight: FontWeight.w400,
+            ),
             prefixIcon: Icon(icon, color: AppColors.muted, size: 20),
             suffixIcon: suffix,
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppColors.card,
+            // Clean solid border only — no blur / shadow / glow.
             contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpace.lg,
-              vertical: AppSpace.lg,
+              horizontal: 16,
+              vertical: 16,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpace.rPill),
-              borderSide: const BorderSide(color: Color(0xFFE8ECF1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpace.rPill),
-              borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSpace.rPill),
-              borderSide: const BorderSide(color: Color(0xFFE8ECF1)),
-            ),
+            border: _fieldBorder(),
+            enabledBorder: _fieldBorder(),
+            focusedBorder: _fieldBorder(color: AppColors.blue, width: 1.5),
+            errorBorder: _fieldBorder(color: AppColors.danger),
+            focusedErrorBorder: _fieldBorder(color: AppColors.danger, width: 1.5),
           ),
         ),
       ],
