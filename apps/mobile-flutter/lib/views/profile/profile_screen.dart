@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -14,8 +15,16 @@ import '../../providers/ui_provider.dart';
 import '../../services/avatar_service.dart';
 import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
+import '../ai/ai_coach_screen.dart';
 import '../auth/login_screen.dart';
-import '../help/help_hub_screen.dart';
+import '../certificates/certificates_screen.dart';
+import '../fees/fees_screen.dart';
+import '../help/admin_chat_screen.dart';
+import '../help/complain_screen.dart';
+import '../help/report_issue_screen.dart';
+import '../help/survey_screen.dart';
+import '../quizzes/quizzes_screen.dart';
+import '../report/report_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -365,7 +374,7 @@ class ProfileScreen extends StatelessWidget {
 
           const SizedBox(height: 18),
           const Text(
-            'SUPPORT',
+            'HELP & SUPPORT',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 12,
@@ -373,45 +382,63 @@ class ProfileScreen extends StatelessWidget {
               letterSpacing: 0.6,
             ),
           ),
-          const SizedBox(height: 4),
-          InkWell(
-            onTap: () {
-              Navigator.of(context).push(
-                AppMotion.fadeSlide(const HelpHubScreen()),
-              );
-            },
-            borderRadius: BorderRadius.circular(8),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                children: [
-                  Icon(Icons.support_agent_rounded, color: AppColors.blue, size: 22),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Help & support',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Report, complain, survey, admin chat',
-                          style: TextStyle(color: AppColors.muted, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: AppColors.muted, size: 22),
-                ],
-              ),
+          const SizedBox(height: 2),
+          const Text(
+            'Report, complain, survey aur admin chat sab yahan.',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              height: 1.35,
             ),
           ),
+          const SizedBox(height: 6),
+          // Flat rows — no card / shadow / blur so options stay clear.
+          ..._supportLinks(context, auth).expand((item) {
+            return [
+              InkWell(
+                onTap: item.$4,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Icon(item.$3, color: AppColors.blue, size: 22),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.$1,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              item.$2,
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        CupertinoIcons.chevron_forward,
+                        color: AppColors.muted,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 1, thickness: 0.5, color: AppColors.line),
+            ];
+          }),
 
           const SizedBox(height: 28),
           SizedBox(
@@ -471,5 +498,73 @@ class ProfileScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Flat help links on Profile — no card, shadow, or blur.
+  List<(String, String, IconData, VoidCallback)> _supportLinks(
+    BuildContext context,
+    AuthProvider auth,
+  ) {
+    void go(Widget page) {
+      Navigator.of(context).push(AppMotion.fadeSlide(page));
+    }
+
+    return [
+      if (auth.isStudent)
+        (
+          'Fees & payments',
+          'Pay online, screenshot, admin approve',
+          CupertinoIcons.creditcard,
+          () => go(const FeesScreen()),
+        ),
+      (
+        'AI Study Coach',
+        'Study plans, explanations, quiz prep',
+        CupertinoIcons.sparkles,
+        () => go(const AiCoachScreen()),
+      ),
+      (
+        'Quizzes',
+        'Take course MCQ exams',
+        CupertinoIcons.doc_on_clipboard,
+        () => go(const QuizzesScreen()),
+      ),
+      (
+        'Certificates',
+        'View and share verification codes',
+        CupertinoIcons.rosette,
+        () => go(const CertificatesScreen()),
+      ),
+      (
+        'Report',
+        'Batch / class issue report to admin',
+        CupertinoIcons.flag,
+        () => go(const ReportIssueScreen()),
+      ),
+      (
+        'Complain',
+        'Office / facility complain',
+        CupertinoIcons.exclamationmark_circle,
+        () => go(const ComplainScreen()),
+      ),
+      (
+        'Survey',
+        'Complete admin survey, quick fill',
+        CupertinoIcons.doc_checkmark,
+        () => go(const SurveyScreen()),
+      ),
+      (
+        "Chat with Code's Thinker",
+        'Direct support, real-time replies',
+        CupertinoIcons.chat_bubble_2,
+        () => go(const AdminChatScreen()),
+      ),
+      (
+        'My progress report',
+        'Attendance, fees, course stats',
+        CupertinoIcons.chart_bar,
+        () => go(const ReportScreen()),
+      ),
+    ];
   }
 }
