@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { useChatInbox } from "@/components/ui/chat-inbox-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { compressImageFile } from "@/lib/compress-image";
 import { cn } from "@/lib/utils";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
 type Message = {
   id: string;
@@ -55,7 +57,9 @@ function formatTime(raw?: string) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function InboxPage() {
+function InboxPageInner() {
+  const searchParams = useSearchParams();
+  const userIdParam = searchParams.get("userId")?.trim() || "";
   const { refresh } = useChatInbox();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -68,6 +72,7 @@ export default function InboxPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
+  const openedUserRef = useRef<string | null>(null);
 
   const scrollMessagesToEnd = useCallback(() => {
     const el = messagesRef.current;
@@ -108,6 +113,25 @@ export default function InboxPage() {
     const id = window.setInterval(() => void loadList(), 8000);
     return () => window.clearInterval(id);
   }, [loadList]);
+
+  // Deep-link from Students / Users / Interns: open or create chat with user.
+  useEffect(() => {
+    if (!userIdParam) return;
+    if (openedUserRef.current === userIdParam) return;
+    openedUserRef.current = userIdParam;
+    void (async () => {
+      try {
+        const thread = await api<Thread & { id: string }>("/support/chats/open", {
+          method: "POST",
+          body: JSON.stringify({ userId: userIdParam }),
+        });
+        await loadList();
+        await openThread(thread.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not open chat");
+      }
+    })();
+  }, [userIdParam, loadList, openThread]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -510,5 +534,13 @@ export default function InboxPage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+export default function InboxPage() {
+  return (
+    <SearchParamsBoundary>
+      <InboxPageInner />
+    </SearchParamsBoundary>
   );
 }

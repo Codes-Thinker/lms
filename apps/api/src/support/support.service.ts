@@ -276,6 +276,19 @@ export class SupportService {
     return this.mapThread(thread);
   }
 
+  /** Dashboard: start or resume ADMIN chat with student / intern / staff. */
+  async openChatWithUser(targetUserId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, fullName: true, accountType: true, status: true },
+    });
+    if (!user) throw new NotFoundException("User not found");
+    if (user.status === "INACTIVE") {
+      throw new ForbiddenException("Cannot chat with an inactive account");
+    }
+    return this.myChat(user.id, ChatKind.ADMIN);
+  }
+
   async markReadByAdmin(threadId: string) {
     await this.prisma.chatThread.update({
       where: { id: threadId },

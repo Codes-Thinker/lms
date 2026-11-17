@@ -344,6 +344,13 @@ export default function UserProfilePage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          {u.accountType !== "SUPER_ADMIN" ? (
+            <Button asChild size="sm">
+              <Link href={`/inbox?userId=${encodeURIComponent(u.id)}`}>
+                Chat
+              </Link>
+            </Button>
+          ) : null}
           {isStudent ? (
             <Button asChild variant="secondary" size="sm">
               <Link href="/fees">Student fees</Link>

@@ -99,14 +99,28 @@ export class SupportController {
     return this.support.myChat(user.sub, kind ?? ChatKind.ADMIN);
   }
 
+  /** Admin/staff: open or create ADMIN chat with any student / intern / teacher. */
+  @Post("chats/open")
+  @Roles("SUPER_ADMIN", "STAFF")
+  openWithUser(
+    @Body() body: { userId?: string },
+    @CurrentUser() user: AuthUser
+  ) {
+    const targetId = body.userId?.trim();
+    if (!targetId) {
+      return this.support.myChat(user.sub, ChatKind.ADMIN);
+    }
+    return this.support.openChatWithUser(targetId);
+  }
+
   @Get("chats/:id")
-  @Roles("SUPER_ADMIN")
+  @Roles("SUPER_ADMIN", "STAFF")
   getChat(@Param("id") id: string) {
     return this.support.getThread(id);
   }
 
   @Post("chats/:id/read")
-  @Roles("SUPER_ADMIN")
+  @Roles("SUPER_ADMIN", "STAFF")
   markRead(@Param("id") id: string) {
     return this.support.markReadByAdmin(id);
   }
@@ -118,8 +132,20 @@ export class SupportController {
     @Body()
     body: { text?: string; imageData?: string; imageName?: string }
   ) {
-    const isAdmin =
-      user.accountType === "SUPER_ADMIN" || user.roles?.includes("SUPER_ADMIN");
+    const isSuper =
+      user.accountType === "SUPER_ADMIN" ||
+      !!user.roles?.includes("SUPER_ADMIN");
+    const isStaff =
+      user.accountType === "STAFF" || !!user.roles?.includes("STAFF");
+
+    // Staff chatting a student thread (dashboard) = ADMIN.
+    // Staff/student opening their own support chat (app) = USER.
+    const thread = await this.prisma.chatThread.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+    const ownsThread = thread?.userId === user.sub;
+    const isAdmin = isSuper || (isStaff && !ownsThread);
 
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub },

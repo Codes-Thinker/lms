@@ -59,10 +59,6 @@ function accountStatusBadge(status: string) {
   return <Badge variant="outline">{status}</Badge>;
 }
 
-function shortId(id: string) {
-  return id.length > 10 ? `${id.slice(0, 8)}…` : id;
-}
-
 function tabLabel(c: CourseTab) {
   return c.title?.trim() || c.category?.trim() || "Course";
 }
@@ -296,12 +292,12 @@ function StudentsPageInner() {
               <tr>
                 <th className="px-5 py-3 font-medium">Student</th>
                 <th className="px-5 py-3 font-medium">Contact</th>
-                <th className="px-5 py-3 font-medium">Student ID</th>
                 <th className="px-5 py-3 font-medium">Course(s)</th>
                 <th className="px-5 py-3 font-medium">Batch</th>
                 <th className="px-5 py-3 font-medium">Enrolled</th>
                 <th className="px-5 py-3 font-medium">Progress</th>
                 <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Chat</th>
               </tr>
             </thead>
             <tbody>
@@ -355,9 +351,6 @@ function StudentsPageInner() {
                           {s.phone?.trim() || "No phone"}
                         </p>
                       </td>
-                      <td className="px-5 py-3.5 font-mono text-xs text-slate-600">
-                        {shortId(s.id)}
-                      </td>
                       <td
                         className="max-w-[200px] truncate px-5 py-3.5"
                         title={courseTitles}
@@ -381,6 +374,16 @@ function StudentsPageInner() {
                         {s.progressPercent}%
                       </td>
                       <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
+                      <td className="px-5 py-3.5">
+                        <Button size="sm" variant="secondary" asChild>
+                          <Link
+                            href={`/inbox?userId=${encodeURIComponent(s.id)}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Chat
+                          </Link>
+                        </Button>
+                      </td>
                     </tr>
                     {open ? (
                       <tr className="border-t border-slate-100 bg-blue-50/30">
@@ -415,9 +418,18 @@ function StudentsPageInner() {
                                 </ul>
                               )}
                             </div>
-                            <Button size="sm" variant="secondary" asChild>
-                              <Link href={`/users/${s.id}`}>Full profile</Link>
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" variant="secondary" asChild>
+                                <Link
+                                  href={`/inbox?userId=${encodeURIComponent(s.id)}`}
+                                >
+                                  Open chat
+                                </Link>
+                              </Button>
+                              <Button size="sm" variant="secondary" asChild>
+                                <Link href={`/users/${s.id}`}>Full profile</Link>
+                              </Button>
+                            </div>
                           </div>
                         </td>
                       </tr>

@@ -276,12 +276,13 @@ export default function InternsPage() {
                 <th className="px-5 py-3 font-medium">Internship</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Projects</th>
+                <th className="px-5 py-3 font-medium">Chat</th>
               </tr>
             </thead>
             <tbody>
               {interns.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={9} className="px-5 py-10 text-center text-slate-500">
                     No interns yet
                   </td>
                 </tr>
@@ -325,6 +326,13 @@ export default function InternsPage() {
                       ) : (
                         "-"
                       )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link href={`/inbox?userId=${encodeURIComponent(i.id)}`}>
+                          Chat
+                        </Link>
+                      </Button>
                     </td>
                   </tr>
                 );

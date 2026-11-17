@@ -312,6 +312,7 @@ function StaffPageInner() {
               <th className="px-5 py-3 font-medium">Track / Designation</th>
               <th className="px-5 py-3 font-medium">Taught courses</th>
               <th className="px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3 font-medium">Chat</th>
             </tr>
           </thead>
           <tbody>
@@ -354,12 +355,19 @@ function StaffPageInner() {
                     {courseLine}
                   </td>
                   <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
+                  <td className="px-5 py-3.5">
+                    <Button size="sm" variant="secondary" asChild>
+                      <Link href={`/inbox?userId=${encodeURIComponent(s.id)}`}>
+                        Chat
+                      </Link>
+                    </Button>
+                  </td>
                 </tr>
               );
             })}
             {staff.length === 0 && !loading ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
+                <td colSpan={6} className="px-5 py-8 text-center text-slate-500">
                   No teachers yet. Add from Users as Teacher.
                 </td>
               </tr>
