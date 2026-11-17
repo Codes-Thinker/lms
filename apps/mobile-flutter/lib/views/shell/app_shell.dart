@@ -181,44 +181,53 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ),
-            // Floating AI coach — character only, gold ring, no square plate.
+            // Floating AI coach — compact HD character + gold ring.
             Positioned(
-              right: 10,
+              right: 12,
               bottom: AppResponsive.shellBottom(context) - 2,
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    AppMotion.fadeSlide(const AiCoachScreen()),
-                  );
-                },
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFFD4AF37),
-                      width: 2.5,
-                    ),
-                    color: Colors.transparent,
-                  ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/brand/ai_robot_bubble.png',
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.high,
-                      errorBuilder: (_, __, ___) => const ColoredBox(
-                        color: AppColors.blue,
-                        child: Icon(
-                          Icons.smart_toy_rounded,
-                          color: Colors.white,
-                          size: 36,
+              child: Builder(
+                builder: (context) {
+                  const size = 68.0;
+                  final px =
+                      (size * MediaQuery.devicePixelRatioOf(context)).round();
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        AppMotion.fadeSlide(const AiCoachScreen()),
+                      );
+                    },
+                    child: Container(
+                      width: size,
+                      height: size,
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFD4AF37),
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/brand/ai_robot_bubble.png',
+                          fit: BoxFit.cover,
+                          filterQuality: FilterQuality.high,
+                          isAntiAlias: true,
+                          cacheWidth: px,
+                          cacheHeight: px,
+                          errorBuilder: (_, __, ___) => const ColoredBox(
+                            color: AppColors.blue,
+                            child: Icon(
+                              Icons.smart_toy_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           ],
