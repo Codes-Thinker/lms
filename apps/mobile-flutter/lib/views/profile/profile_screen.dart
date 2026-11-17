@@ -216,41 +216,40 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  String _initials(AuthProvider auth) {
+    final name = (auth.user?.name ?? '').trim();
+    if (name.isEmpty) return 'U';
+    final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.length == 1) {
+      return parts.first.substring(0, 1).toUpperCase();
+    }
+    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
     final avatarImage = auth.avatarImage;
     final pad = AppResponsive.pagePad(context);
-
-    final details = <(String, String)>[
-      if (auth.isStudent) ...[
-        ('Track', auth.trackLabel),
-        ('Batch', auth.user?.batch?.trim().isNotEmpty == true
-            ? auth.user!.batch!
-            : 'Not set'),
-        ('Attendance', '${courses.overallAttendance.toStringAsFixed(0)}%'),
-        ('Fees pending', 'Rs ${courses.totalFeeDue}'),
-        ('Enrolled courses', '${courses.enrolledCourses.length}'),
-      ] else ...[
-        ('Department', auth.user?.department?.trim().isNotEmpty == true
-            ? auth.user!.department!
-            : 'Not set'),
-        ('Track', auth.trackLabel),
-        ('Active batches', '${courses.courses.length}'),
-      ],
-    ];
+    final attendancePct = courses.overallAttendance;
+    final feesDue = courses.totalFeeDue;
+    final batch = auth.user?.batch?.trim().isNotEmpty == true
+        ? auth.user!.batch!
+        : 'Not set';
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: AppColors.bg,
+        foregroundColor: AppColors.ink,
         centerTitle: true,
       ),
       body: ListView(
         padding: EdgeInsets.fromLTRB(pad, 4, pad, AppResponsive.shellBottom(context)),
         children: [
+          // Upper profile — mockup style
           Center(
             child: Column(
               children: [
@@ -260,30 +259,31 @@ class ProfileScreen extends StatelessWidget {
                     clipBehavior: Clip.none,
                     children: [
                       CircleAvatar(
-                        radius: 44,
+                        radius: 48,
                         backgroundColor: AppColors.softBlue,
                         backgroundImage: avatarImage,
                         child: avatarImage == null
                             ? Text(
-                                auth.user?.firstName.substring(0, 1) ?? 'U',
+                                _initials(auth),
                                 style: const TextStyle(
-                                  color: AppColors.blue,
-                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.blueDark,
+                                  fontWeight: FontWeight.w800,
                                   fontSize: 28,
+                                  letterSpacing: 0.5,
                                 ),
                               )
                             : null,
                       ),
                       Positioned(
-                        right: 0,
-                        bottom: 0,
+                        right: 2,
+                        bottom: 2,
                         child: Container(
-                          width: 28,
-                          height: 28,
+                          width: 30,
+                          height: 30,
                           decoration: BoxDecoration(
-                            color: AppColors.blue,
+                            color: const Color(0xFF374151),
                             shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.bg, width: 2.5),
+                            border: Border.all(color: Colors.white, width: 2.5),
                           ),
                           child: const Icon(
                             Icons.camera_alt_rounded,
@@ -302,9 +302,9 @@ class ProfileScreen extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 22,
-                    letterSpacing: -0.3,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
+                    letterSpacing: -0.4,
                     color: AppColors.ink,
                   ),
                 ),
@@ -314,65 +314,136 @@ class ProfileScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 14),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  auth.user?.roleLabel ?? 'User',
                   style: const TextStyle(
-                    color: AppColors.blue,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
+                    color: AppColors.muted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.blue, AppColors.blueDark],
+                    ),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    auth.user?.roleLabel ?? 'User',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 28),
+          const SizedBox(height: 26),
           const Text(
             'DETAILS',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.6,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.7,
             ),
           ),
-          const SizedBox(height: 6),
-          // Flat rows — no white container (admin data, read-only)
-          for (final row in details)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      row.$1,
-                      style: const TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 15,
-                      ),
-                    ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              children: [
+                if (auth.isStudent) ...[
+                  _detailRow(
+                    icon: Icons.code_rounded,
+                    iconBg: AppColors.softBlue,
+                    iconColor: AppColors.blueDark,
+                    label: 'Track',
+                    value: auth.trackLabel,
                   ),
-                  Flexible(
-                    child: Text(
-                      row.$2,
-                      textAlign: TextAlign.right,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.ink,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.groups_rounded,
+                    iconBg: const Color(0xFFF3E8FF),
+                    iconColor: const Color(0xFF7C3AED),
+                    label: 'Batch',
+                    value: batch,
+                  ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.pie_chart_rounded,
+                    iconBg: const Color(0xFFFFF4EC),
+                    iconColor: const Color(0xFFEA580C),
+                    label: 'Attendance',
+                    value: '${attendancePct.toStringAsFixed(0)}%',
+                    badge: attendancePct < 75 ? 'Warning' : null,
+                    badgeBg: const Color(0xFFFFF4EC),
+                    badgeFg: const Color(0xFFEA580C),
+                  ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.account_balance_wallet_rounded,
+                    iconBg: const Color(0xFFFFEEF0),
+                    iconColor: const Color(0xFFDC2626),
+                    label: 'Fees pending',
+                    value: 'Rs $feesDue',
+                    badge: feesDue > 0 ? 'Alert ⚠️' : null,
+                    badgeBg: const Color(0xFFFFEEF0),
+                    badgeFg: const Color(0xFFDC2626),
+                  ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.menu_book_rounded,
+                    iconBg: AppColors.softBlue,
+                    iconColor: AppColors.blueDark,
+                    label: 'Enrolled courses',
+                    value: '${courses.enrolledCourses.length}',
+                    showArrow: false,
+                  ),
+                ] else ...[
+                  _detailRow(
+                    icon: Icons.apartment_rounded,
+                    iconBg: AppColors.softBlue,
+                    iconColor: AppColors.blueDark,
+                    label: 'Department',
+                    value: auth.user?.department?.trim().isNotEmpty == true
+                        ? auth.user!.department!
+                        : 'Not set',
+                  ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.code_rounded,
+                    iconBg: AppColors.softBlue,
+                    iconColor: AppColors.blueDark,
+                    label: 'Track',
+                    value: auth.trackLabel,
+                  ),
+                  const Divider(height: 1, color: AppColors.line),
+                  _detailRow(
+                    icon: Icons.groups_rounded,
+                    iconBg: const Color(0xFFF3E8FF),
+                    iconColor: const Color(0xFF7C3AED),
+                    label: 'Active batches',
+                    value: '${courses.courses.length}',
+                    showArrow: false,
                   ),
                 ],
-              ),
+              ],
             ),
+          ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 22),
           const Text(
             'HELP & SUPPORT',
             style: TextStyle(
@@ -495,6 +566,92 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String label,
+    required String value,
+    String? badge,
+    Color? badgeBg,
+    Color? badgeFg,
+    bool showArrow = true,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (showArrow) ...[
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 14,
+                    color: AppColors.muted,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (badge != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: badgeBg ?? AppColors.softBlue,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  color: badgeFg ?? AppColors.blueDark,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
