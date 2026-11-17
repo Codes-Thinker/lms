@@ -1,10 +1,13 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import '../core/constants/app_brand.dart';
 import '../core/constants/app_colors.dart';
 import '../core/constants/app_motion.dart';
 import '../views/ai/ai_coach_screen.dart';
 
-/// Compact AI coach bubble — tail toward navbar, brand soft-blue fill.
+/// Compact AI coach bubble — soft blur fill, small HD robot centered,
+/// tail toward navbar (Zong-style presence, Codes Thinker colors).
 class AiCoachFab extends StatelessWidget {
   const AiCoachFab({super.key});
 
@@ -12,7 +15,9 @@ class AiCoachFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final px = ((_size + 8) * MediaQuery.devicePixelRatioOf(context)).round();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    // Decode sharp for the small inset character.
+    final px = (36 * dpr).round().clamp(72, 256);
 
     return GestureDetector(
       onTap: () {
@@ -25,31 +30,58 @@ class AiCoachFab extends StatelessWidget {
         height: _size + 10,
         child: CustomPaint(
           painter: _BubbleTailPainter(
-            fill: AppColors.softBlue,
+            fill: AppColors.softBlue.withValues(alpha: 0.92),
+            glow: AppColors.blue.withValues(alpha: 0.22),
             border: const Color(0xFFD4AF37),
           ),
           child: Padding(
-            // Tight padding so robot reads larger/clearer inside.
-            padding: const EdgeInsets.fromLTRB(2, 1, 2, 9),
+            padding: const EdgeInsets.fromLTRB(5, 4, 5, 12),
             child: ClipOval(
-              child: Transform.scale(
-                scale: 1.18,
-                child: Image.asset(
-                  AppBrand.aiRobotBubbleAsset,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.high,
-                  isAntiAlias: true,
-                  cacheWidth: px,
-                  cacheHeight: px,
-                  errorBuilder: (_, __, ___) => const ColoredBox(
-                    color: AppColors.blue,
-                    child: Icon(
-                      Icons.smart_toy_rounded,
-                      color: Colors.white,
-                      size: 28,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Soft blur wash (Zong-like frosted bubble).
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: const ColoredBox(
+                      color: Color(0x66EFF6FF),
                     ),
                   ),
-                ),
+                  // Soft brand glow behind character.
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          Color(0x883B82F6),
+                          Color(0x22EFF6FF),
+                          Color(0x00FFFFFF),
+                        ],
+                        stops: [0.0, 0.55, 1.0],
+                      ),
+                    ),
+                  ),
+                  // Small HD robot, centered.
+                  Center(
+                    child: SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: Image.asset(
+                        AppBrand.aiRobotBubbleAsset,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        filterQuality: FilterQuality.high,
+                        isAntiAlias: true,
+                        cacheWidth: px,
+                        cacheHeight: px,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.smart_toy_rounded,
+                          color: AppColors.blueDark,
+                          size: 22,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -59,12 +91,16 @@ class AiCoachFab extends StatelessWidget {
   }
 }
 
-/// Speech bubble with a small arrow at bottom-left (toward navbar).
 class _BubbleTailPainter extends CustomPainter {
   final Color fill;
+  final Color glow;
   final Color border;
 
-  _BubbleTailPainter({required this.fill, required this.border});
+  _BubbleTailPainter({
+    required this.fill,
+    required this.glow,
+    required this.border,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -84,6 +120,12 @@ class _BubbleTailPainter extends CustomPainter {
       ..lineTo(w * 0.42, bodyH - 4)
       ..close();
 
+    // Soft outer glow.
+    final glowPaint = Paint()
+      ..color = glow
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawRRect(body.inflate(1.5), glowPaint);
+
     final fillPaint = Paint()
       ..color = fill
       ..style = PaintingStyle.fill;
@@ -101,5 +143,7 @@ class _BubbleTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) =>
-      oldDelegate.fill != fill || oldDelegate.border != border;
+      oldDelegate.fill != fill ||
+      oldDelegate.glow != glow ||
+      oldDelegate.border != border;
 }
