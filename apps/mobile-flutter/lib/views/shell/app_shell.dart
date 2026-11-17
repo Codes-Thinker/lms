@@ -3,14 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_motion.dart';
 import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../widgets/ai_coach_fab.dart';
 import '../../widgets/app_liquid_nav_bar.dart';
-import '../ai/ai_coach_screen.dart';
 import '../home/home_screen.dart';
 import '../attendance/attendance_screen.dart';
 import '../fees/fees_screen.dart';
@@ -181,54 +180,11 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ),
-            // Floating AI coach — compact HD character + gold ring.
+            // Floating AI coach — smaller bubble, tail toward navbar.
             Positioned(
-              right: 12,
-              bottom: AppResponsive.shellBottom(context) - 2,
-              child: Builder(
-                builder: (context) {
-                  const size = 68.0;
-                  final px =
-                      (size * MediaQuery.devicePixelRatioOf(context)).round();
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        AppMotion.fadeSlide(const AiCoachScreen()),
-                      );
-                    },
-                    child: Container(
-                      width: size,
-                      height: size,
-                      padding: const EdgeInsets.all(2.5),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFFD4AF37),
-                          width: 2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/brand/ai_robot_bubble.png',
-                          fit: BoxFit.cover,
-                          filterQuality: FilterQuality.high,
-                          isAntiAlias: true,
-                          cacheWidth: px,
-                          cacheHeight: px,
-                          errorBuilder: (_, __, ___) => const ColoredBox(
-                            color: AppColors.blue,
-                            child: Icon(
-                              Icons.smart_toy_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+              right: 10,
+              bottom: AppResponsive.shellBottom(context) - 8,
+              child: const AiCoachFab(),
             ),
           ],
         ),
