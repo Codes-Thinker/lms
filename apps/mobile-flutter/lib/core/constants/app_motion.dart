@@ -27,6 +27,22 @@ class AppMotion {
       },
     );
   }
+
+  /// Instant cover for notification deep-links (no Fees/Help flash).
+  static Route<T> cover<T>(Widget page) {
+    return PageRouteBuilder<T>(
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: fast,
+      opaque: true,
+      pageBuilder: (_, __, ___) => page,
+      transitionsBuilder: (_, animation, __, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: curve),
+          child: child,
+        );
+      },
+    );
+  }
 }
 
 class FadeInUp extends StatelessWidget {

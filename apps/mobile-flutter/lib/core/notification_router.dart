@@ -129,63 +129,67 @@ class NotificationRouter {
     required void Function(int tab) goToTab,
   }) async {
     final upper = (type ?? '').toUpperCase();
-    goToTab(tabForType(upper));
-
     final nav = Navigator.of(context, rootNavigator: true);
     final chat = takeOpenAdminChat() || upper == 'CHAT';
     final resolvedTask = taskId ?? takePendingTaskId();
     final resolvedFee = feeCaseId ?? takePendingFeeCaseId();
+    final tab = tabForType(upper);
 
-    // Let the tab settle, then push detail on top of shell.
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!context.mounted) return;
+    void setTabUnderCover() {
+      // After cover is on screen — user never sees Fees/Help flash.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) goToTab(tab);
+      });
+    }
 
+    // Instant cover first (no delay / fade). Avoids 1s glitch.
     if (chat) {
-      await nav.push(AppMotion.fadeSlide(const AdminChatScreen()));
+      nav.push(AppMotion.cover(const AdminChatScreen()));
+      setTabUnderCover();
       return;
     }
 
     if (upper == 'TASK') {
       if (resolvedTask != null && resolvedTask.isNotEmpty) {
         if (isStaff) {
-          await nav.push(
-            AppMotion.fadeSlide(AssignmentChatScreen(taskId: resolvedTask)),
-          );
+          nav.push(AppMotion.cover(AssignmentChatScreen(taskId: resolvedTask)));
         } else {
-          await nav.push(
-            AppMotion.fadeSlide(TaskDetailScreen(taskId: resolvedTask)),
-          );
+          nav.push(AppMotion.cover(TaskDetailScreen(taskId: resolvedTask)));
         }
+        setTabUnderCover();
       } else {
-        await nav.push(AppMotion.fadeSlide(const TasksScreen()));
+        goToTab(tab);
       }
       return;
     }
 
     if (upper == 'FEE') {
       if (resolvedFee != null && resolvedFee.isNotEmpty) {
-        await nav.push(
-          AppMotion.fadeSlide(FeeChatScreen(caseId: resolvedFee)),
-        );
+        nav.push(AppMotion.cover(FeeChatScreen(caseId: resolvedFee)));
+        setTabUnderCover();
       } else {
-        await nav.push(AppMotion.fadeSlide(const FeesScreen()));
+        goToTab(tab);
       }
       return;
     }
 
     if (upper == 'ATTENDANCE') {
-      await nav.push(AppMotion.fadeSlide(const AttendanceScreen()));
+      goToTab(tab);
       return;
     }
 
     if (upper == 'QUIZ') {
-      await nav.push(AppMotion.fadeSlide(const QuizzesScreen()));
+      nav.push(AppMotion.cover(const QuizzesScreen()));
+      setTabUnderCover();
       return;
     }
 
     if (upper == 'CERTIFICATE') {
-      await nav.push(AppMotion.fadeSlide(const CertificatesScreen()));
+      nav.push(AppMotion.cover(const CertificatesScreen()));
+      setTabUnderCover();
       return;
     }
+
+    goToTab(tab);
   }
 }
