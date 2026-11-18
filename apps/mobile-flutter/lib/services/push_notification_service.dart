@@ -328,4 +328,46 @@ class PushNotificationService {
       });
     } catch (_) {}
   }
+
+  /// Local tray alert (arrival / leave office) — works even when FCM is delayed.
+  Future<void> showLocalAlert({
+    required String title,
+    required String body,
+    String type = 'ATTENDANCE',
+    int id = 91001,
+  }) async {
+    if (!_ready) {
+      try {
+        await init();
+      } catch (_) {}
+    }
+    try {
+      await _local.show(
+        id: id,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _androidChannel.id,
+            _androidChannel.name,
+            channelDescription: _androidChannel.description,
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            color: const Color(0xFF2563EB),
+            playSound: true,
+            sound: const RawResourceAndroidNotificationSound('ct_notify'),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        payload: jsonEncode({'type': type}),
+      );
+    } catch (e) {
+      debugPrint('Local alert failed: $e');
+    }
+  }
 }

@@ -84,13 +84,18 @@ class AttendanceProvider extends ChangeNotifier {
   bool _insideGeofence = false;
   int _distanceFromOffice = -1;
   bool _checkingLocation = false;
+  bool _hasGpsFix = false;
   double? _officeLat;
   double? _officeLng;
   int _geofenceRadius = 50;
+  /// Hysteresis: require N consecutive outside readings before flipping inside→outside.
+  int _outsideStreak = 0;
+  static const _outsideFlipThreshold = 3;
 
   bool get insideGeofence => _insideGeofence;
   int get distanceFromOffice => _distanceFromOffice;
   bool get checkingLocation => _checkingLocation;
+  bool get hasGpsFix => _hasGpsFix;
   int get geofenceRadius => _geofenceRadius;
   double? get officeLat => _officeLat;
   double? get officeLng => _officeLng;
@@ -199,8 +204,8 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   /// Verify geofence location — calls backend to check distance.
-  /// [silent] skips loading flicker + skips notify when nothing changed
-  /// (used by GPS stream so Attend tab does not blink).
+  /// [silent] skips loading flicker + keeps last good fix on network blips
+  /// (stops Attend tab blinking Outside/GPS error).
   Future<void> verifyLocation(
     double lat,
     double lng, {
@@ -213,40 +218,81 @@ class AttendanceProvider extends ChangeNotifier {
     try {
       final data = await ApiClient.instance.post('/attendance/verify-location',
           body: {'lat': lat, 'lng': lng}) as Map<String, dynamic>;
-      final inside = data['inside'] as bool? ?? false;
+      final rawInside = data['inside'] as bool? ?? false;
       final dist = (data['distance'] as num?)?.toInt() ?? -1;
       final officeLat = (data['officeLat'] as num?)?.toDouble();
       final officeLng = (data['officeLng'] as num?)?.toDouble();
       final radius = (data['radius'] as num?)?.toInt() ?? 50;
-      final changed = inside != _insideGeofence ||
+
+      // Hysteresis: entering is instant; leaving needs a few outside samples.
+      bool nextInside = _insideGeofence;
+      if (rawInside) {
+        _outsideStreak = 0;
+        nextInside = true;
+      } else if (_insideGeofence) {
+        _outsideStreak += 1;
+        if (_outsideStreak >= _outsideFlipThreshold) {
+          nextInside = false;
+          _outsideStreak = 0;
+        }
+      } else {
+        _outsideStreak = 0;
+        nextInside = false;
+      }
+
+      final changed = nextInside != _insideGeofence ||
           dist != _distanceFromOffice ||
           radius != _geofenceRadius ||
           officeLat != _officeLat ||
-          officeLng != _officeLng;
-      _insideGeofence = inside;
+          officeLng != _officeLng ||
+          !_hasGpsFix;
+      _insideGeofence = nextInside;
       _distanceFromOffice = dist;
       _officeLat = officeLat;
       _officeLng = officeLng;
       _geofenceRadius = radius;
+      _hasGpsFix = true;
       if (!silent) _checkingLocation = false;
       if (changed || !silent) notifyListeners();
     } catch (e) {
       debugPrint('Location verify failed: $e');
-      final changed = _insideGeofence || _distanceFromOffice != -1;
-      _insideGeofence = false;
-      _distanceFromOffice = -1;
-      if (!silent) _checkingLocation = false;
-      if (changed || !silent) notifyListeners();
+      // Keep last good geofence state on silent/network errors — no flicker.
+      if (!silent) {
+        _checkingLocation = false;
+        if (!_hasGpsFix) {
+          _insideGeofence = false;
+          _distanceFromOffice = -1;
+        }
+        notifyListeners();
+      }
     }
   }
 
   /// Process arrival reminder — sends at most one per day.
-  Future<void> processArrivalReminder(double lat, double lng) async {
+  Future<bool> processArrivalReminder(double lat, double lng) async {
     try {
-      await ApiClient.instance
-          .post('/attendance/arrival-reminder', body: {'lat': lat, 'lng': lng});
+      final data = await ApiClient.instance.post(
+        '/attendance/arrival-reminder',
+        body: {'lat': lat, 'lng': lng},
+      ) as Map<String, dynamic>;
+      return data['reminderSent'] == true;
     } catch (e) {
       debugPrint('Arrival reminder failed: $e');
+      return false;
+    }
+  }
+
+  /// Left office while still checked in — server pushes once/day.
+  Future<bool> processExitReminder(double lat, double lng) async {
+    try {
+      final data = await ApiClient.instance.post(
+        '/attendance/exit-reminder',
+        body: {'lat': lat, 'lng': lng},
+      ) as Map<String, dynamic>;
+      return data['reminderSent'] == true;
+    } catch (e) {
+      debugPrint('Exit reminder failed: $e');
+      return false;
     }
   }
 

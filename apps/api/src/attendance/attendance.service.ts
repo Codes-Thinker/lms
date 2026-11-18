@@ -8,6 +8,10 @@ import { canOfficeCheckIn } from "../common/production-guards";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SystemService } from "../system/system.service";
+import {
+  isPastShiftEnd,
+  shiftEndInstantOnDate,
+} from "./attendance-time";
 
 /** Haversine distance in meters between two lat/lng points. */
 function haversine(
@@ -39,8 +43,11 @@ export class AttendanceService implements OnModuleInit {
     private readonly system: SystemService,
   ) {}
 
-  /** Run auto-checkout check every 60 seconds. */
+  /** Run auto-checkout on boot (covers Render wake) + every 60s while awake. */
   onModuleInit() {
+    void this.runAutoCheckout().catch((e) => {
+      console.error("Auto-checkout boot error:", e);
+    });
     this.autoCheckoutTimer = setInterval(() => {
       this.runAutoCheckout().catch((e) => {
         console.error("Auto-checkout error:", e);
@@ -470,14 +477,14 @@ export class AttendanceService implements OnModuleInit {
   }
 
   /**
-   * Auto-checkout: close all open attendance records whose scheduled shift end
-   * has passed. This runs every 60 seconds via setInterval and is idempotent.
+   * Auto-checkout: close open records after Asia/Karachi shift end.
+   * Also closes any previous-day open rows (Render sleep / missed ticks).
    */
   async runAutoCheckout() {
     const today = this.todayDate();
     const now = new Date();
+    let closed = 0;
 
-    // Find all open records (checked in but not checked out) for today
     const openRecords = await this.prisma.attendanceRecord.findMany({
       where: {
         checkInAt: { not: null },
@@ -494,28 +501,27 @@ export class AttendanceService implements OnModuleInit {
         shiftEndStr = shift.endTime;
       }
 
-      const [h, m] = shiftEndStr.split(":").map(Number);
-      const shiftEndDate = new Date(today);
-      shiftEndDate.setHours(h ?? 17, m ?? 0, 0, 0);
+      // Compare using Karachi wall clock — not server UTC setHours().
+      if (!isPastShiftEnd(shiftEndStr, now)) continue;
 
-      if (now >= shiftEndDate) {
-        await this.prisma.attendanceRecord.update({
-          where: { id: record.id },
-          data: {
-            checkOutAt: shiftEndDate,
-            status: AttendanceStatus.CHECKED_OUT,
-            autoCheckout: true,
-          },
-        });
+      const shiftEndDate = shiftEndInstantOnDate(record.date, shiftEndStr);
+      await this.prisma.attendanceRecord.update({
+        where: { id: record.id },
+        data: {
+          checkOutAt: shiftEndDate,
+          status: AttendanceStatus.CHECKED_OUT,
+          autoCheckout: true,
+        },
+      });
+      closed += 1;
 
-        await this.notifications.notifyUser({
-          userId: record.userId,
-          title: "Auto checkout",
-          body: "Your attendance was checked out automatically at shift end.",
-          type: "ATTENDANCE",
-          data: { event: "auto_checkout", attendanceId: record.id },
-        });
-      }
+      await this.notifications.notifyUser({
+        userId: record.userId,
+        title: "Auto checkout",
+        body: "Your attendance was checked out automatically at shift end.",
+        type: "ATTENDANCE",
+        data: { event: "auto_checkout", attendanceId: record.id },
+      });
     }
 
     const staleRecords = await this.prisma.attendanceRecord.findMany({
@@ -533,10 +539,7 @@ export class AttendanceService implements OnModuleInit {
         shiftEndStr = shift.endTime;
       }
 
-      const [h, m] = shiftEndStr.split(":").map(Number);
-      const shiftEndDate = new Date(record.date);
-      shiftEndDate.setHours(h ?? 17, m ?? 0, 0, 0);
-
+      const shiftEndDate = shiftEndInstantOnDate(record.date, shiftEndStr);
       await this.prisma.attendanceRecord.update({
         where: { id: record.id },
         data: {
@@ -545,7 +548,72 @@ export class AttendanceService implements OnModuleInit {
           autoCheckout: true,
         },
       });
+      closed += 1;
+
+      await this.notifications.notifyUser({
+        userId: record.userId,
+        title: "Auto checkout",
+        body: "Your previous day attendance was closed automatically.",
+        type: "ATTENDANCE",
+        data: { event: "auto_checkout_stale", attendanceId: record.id },
+      });
     }
+
+    return { closed };
+  }
+
+  /**
+   * User left the office while still checked in — remind once per open day.
+   */
+  async processExitReminder(userId: string, lat: number, lng: number) {
+    const config = await this.system.getOfficeConfig();
+    const distance = haversine(lat, lng, config.latitude, config.longitude);
+    if (distance <= config.radiusMeters) {
+      return { outside: false, reminderSent: false };
+    }
+
+    const today = this.todayDate();
+    const open = await this.prisma.attendanceRecord.findFirst({
+      where: {
+        userId,
+        date: today,
+        checkInAt: { not: null },
+        checkOutAt: null,
+      },
+    });
+    if (!open) {
+      return { outside: true, reminderSent: false, checkedIn: false };
+    }
+
+    const key = `exit:${userId}:${today.toISOString().slice(0, 10)}`;
+    // Reuse attendanceReminder table with a synthetic date offset marker via notes?
+    // Simpler: store exit reminder as a second row is not possible (unique userId_date).
+    // Use notification dedupe: check if we already sent exit reminder today.
+    const already = await this.prisma.appNotification.findFirst({
+      where: {
+        userId,
+        type: "ATTENDANCE",
+        createdAt: { gte: today },
+        OR: [
+          { body: { contains: "left the office" } },
+          { title: "Outside office zone" },
+        ],
+      },
+      select: { id: true },
+    });
+    if (already) {
+      return { outside: true, reminderSent: false, checkedIn: true };
+    }
+
+    await this.notifications.notifyUser({
+      userId,
+      title: "Outside office zone",
+      body: "You left the office while still checked in. Open Attend and check out.",
+      type: "ATTENDANCE",
+      data: { event: "exit_reminder", attendanceId: open.id, key },
+    });
+
+    return { outside: true, reminderSent: true, checkedIn: true };
   }
 
   private formatDuration(minutes: number | null): string | null {

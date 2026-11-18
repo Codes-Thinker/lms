@@ -145,8 +145,9 @@ class _SplashScreenState extends State<SplashScreen>
         if (auth.isStaff) teaching.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
-      OfficeLocationService.instance.bind(attendance);
-      unawaited(OfficeLocationService.instance.start());
+      final userId = auth.user?.id;
+      OfficeLocationService.instance.bind(attendance, userId: userId);
+      unawaited(OfficeLocationService.instance.start(userId: userId));
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         AppMotion.fadeSlide(const AppShell()),

@@ -80,4 +80,13 @@ export class AttendanceController {
   ) {
     return this.attendance.processArrivalReminder(user.sub, body.lat, body.lng);
   }
+
+  /** Left office while still checked in — remind to check out (once/day). */
+  @Post("exit-reminder")
+  exitReminder(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { lat: number; lng: number },
+  ) {
+    return this.attendance.processExitReminder(user.sub, body.lat, body.lng);
+  }
 }

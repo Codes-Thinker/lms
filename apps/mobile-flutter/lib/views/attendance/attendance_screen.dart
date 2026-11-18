@@ -44,9 +44,10 @@ class _AttendanceScreenState extends State<AttendanceScreen>
 
   Future<void> _bootLocation() async {
     final att = context.read<AttendanceProvider>();
-    OfficeLocationService.instance.bind(att);
+    final userId = context.read<AuthProvider>().user?.id;
+    OfficeLocationService.instance.bind(att, userId: userId);
     setState(() => _locBusy = true);
-    await OfficeLocationService.instance.start();
+    await OfficeLocationService.instance.start(userId: userId);
     if (mounted) setState(() => _locBusy = false);
   }
 
@@ -182,9 +183,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Text(
                         _locBusy || attendance.checkingLocation
                             ? 'Checking location…'
-                            : attendance.insideGeofence
-                                ? 'Inside office zone'
-                                : 'Outside office zone',
+                            : !attendance.hasGpsFix
+                                ? 'Waiting for GPS…'
+                                : attendance.insideGeofence
+                                    ? 'Inside office zone'
+                                    : 'Outside office zone',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -194,7 +197,9 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                       Text(
                         attendance.distanceFromOffice >= 0
                             ? '${attendance.distanceFromOffice}m away, ${attendance.geofenceRadius}m radius'
-                            : 'Enable GPS to unlock check-in',
+                            : attendance.hasGpsFix
+                                ? 'Location updating…'
+                                : 'Enable GPS + Allow all the time for background alerts',
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 12,
@@ -226,7 +231,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Check-in only inside 50m. Arrival reminder once per day. Check-out anytime. Shift end pe auto checkout.',
+            'Check-in only inside 50m. Arrival / leave alerts need Location = Allow all the time. Check-out anytime. Shift end pe auto checkout (Asia/Karachi).',
             style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 20),
