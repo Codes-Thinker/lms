@@ -3,7 +3,7 @@
  * Mobile clients often send no Origin — those are allowed.
  *
  * Set CORS_ORIGIN to a comma-separated list, e.g.
- *   https://admin.example.com,http://localhost:3000
+ *   https://lms-nu-sepia.vercel.app,http://localhost:3000
  * Escape hatch: CORS_ORIGIN=* (not recommended in production).
  */
 export function parseAllowedOrigins(): string[] | true {
@@ -12,12 +12,13 @@ export function parseAllowedOrigins(): string[] | true {
 
   const fromEnv = raw
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/$/, ""))
     .filter(Boolean);
 
   const extras = [
     process.env.APP_URL,
     process.env.API_URL,
+    "https://lms-nu-sepia.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
@@ -26,6 +27,20 @@ export function parseAllowedOrigins(): string[] | true {
     .filter(Boolean);
 
   return [...new Set([...fromEnv, ...extras])];
+}
+
+/** Vercel preview / production *.vercel.app admin hosts. */
+export function isTrustedVercelOrigin(origin: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== "https:") return false;
+    return (
+      hostname === "vercel.app" ||
+      hostname.endsWith(".vercel.app")
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Nest / Express style origin callback. */
@@ -43,9 +58,10 @@ export function corsOriginDelegate(
     callback(null, true);
     return;
   }
-  if (allowed.includes(origin)) {
+  if (allowed.includes(origin) || isTrustedVercelOrigin(origin)) {
     callback(null, true);
     return;
   }
-  callback(new Error(`CORS blocked for origin: ${origin}`), false);
+  // Never throw — throwing becomes HTTP 500 and browsers show "Failed to fetch".
+  callback(null, false);
 }
