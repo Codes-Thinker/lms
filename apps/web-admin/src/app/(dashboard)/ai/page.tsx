@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { Copy, RefreshCw } from "lucide-react";
+import { AiRichText, plainAiText } from "@/components/ai-rich-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +51,15 @@ const ADMIN_PROMPTS = [
   "What are students asking the AI coach?",
 ];
 
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(plainAiText(text));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function AiAdminPage() {
   const [data, setData] = useState<Usage | null>(null);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
@@ -57,6 +68,8 @@ export default function AiAdminPage() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingTx, setLoadingTx] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const chatEnd = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -78,6 +91,15 @@ export default function AiAdminPage() {
     load().catch(() => {});
   }, [load]);
 
+  useEffect(() => {
+    chatEnd.current?.scrollIntoView({ behavior: "smooth" });
+  }, [assist, sending]);
+
+  async function markCopied(id: string) {
+    setCopiedId(id);
+    window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1400);
+  }
+
   async function askAssist(text: string) {
     const message = text.trim();
     if (message.length < 2 || sending) return;
@@ -89,10 +111,7 @@ export default function AiAdminPage() {
         method: "POST",
         body: JSON.stringify({ message }),
       });
-      setAssist((prev) => [
-        ...prev,
-        { role: "assistant", content: res.reply },
-      ]);
+      setAssist((prev) => [...prev, { role: "assistant", content: res.reply }]);
     } catch (e) {
       setAssist((prev) => [
         ...prev,
@@ -117,59 +136,76 @@ export default function AiAdminPage() {
   return (
     <div className="page-enter space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">AI Study Coach</h2>
-        <p className="text-sm text-slate-500">
-          See what students asked, and use Admin Copilot for ops priorities.
-          Keys stay on Render — this page never stores secrets.
+        <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+          AI Study Coach
+        </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Ops copilot + student chat transcripts. Keys stay on Render.
         </p>
       </div>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="glass-card p-4">
-          <p className="text-xs text-slate-500">Mode</p>
-          <p className="mt-1 text-lg font-semibold capitalize">
-            {data?.status.mode ?? "-"}
-          </p>
-          <Badge
-            className="mt-2"
-            variant={data?.status.providerConfigured ? "success" : "secondary"}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          {
+            label: "Mode",
+            value: data?.status.mode ?? "—",
+            extra: (
+              <Badge
+                className="mt-2"
+                variant={
+                  data?.status.providerConfigured ? "success" : "secondary"
+                }
+              >
+                {data?.status.providerConfigured
+                  ? "Cloud key configured"
+                  : "Local coach only"}
+              </Badge>
+            ),
+          },
+          {
+            label: "Model",
+            value: data?.status.model ?? "—",
+            extra: null,
+          },
+          {
+            label: "Requests (7 days)",
+            value: data?.weekRequests ?? "—",
+            extra: null,
+          },
+          {
+            label: "Daily limit / user",
+            value: data?.status.dailyLimit ?? "—",
+            extra: null,
+          },
+        ].map((card) => (
+          <div
+            key={card.label}
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/5"
           >
-            {data?.status.providerConfigured
-              ? "Cloud key configured"
-              : "Local coach only"}
-          </Badge>
-        </div>
-        <div className="glass-card p-4">
-          <p className="text-xs text-slate-500">Model</p>
-          <p className="mt-1 text-lg font-semibold">{data?.status.model ?? "-"}</p>
-        </div>
-        <div className="glass-card p-4">
-          <p className="text-xs text-slate-500">Requests (7 days)</p>
-          <p className="mt-1 text-lg font-semibold">
-            {data?.weekRequests ?? "-"}
-          </p>
-        </div>
-        <div className="glass-card p-4">
-          <p className="text-xs text-slate-500">Daily limit / user</p>
-          <p className="mt-1 text-lg font-semibold">
-            {data?.status.dailyLimit ?? "-"}
-          </p>
-        </div>
+            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              {card.label}
+            </p>
+            <p className="mt-1 truncate text-lg font-semibold capitalize text-slate-900">
+              {card.value}
+            </p>
+            {card.extra}
+          </div>
+        ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="glass-card flex min-h-[420px] flex-col p-5">
-          <div className="flex items-start justify-between gap-3">
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Admin Copilot */}
+        <section className="flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-              <h3 className="font-semibold">Admin Copilot</h3>
+              <h3 className="font-semibold text-slate-900">Admin Copilot</h3>
               <p className="mt-0.5 text-xs text-slate-500">
-                Read-only helper — suggests what to do next (fees, tickets,
-                enrollments). Does not change data for you.
+                Read-only — suggests next actions, never changes data.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2">
               <Button asChild variant="outline" size="sm">
                 <Link href="/fees">Fees</Link>
               </Button>
@@ -179,46 +215,83 @@ export default function AiAdminPage() {
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 px-5 pt-3">
             {ADMIN_PROMPTS.map((p) => (
               <button
                 key={p}
                 type="button"
                 disabled={sending}
                 onClick={() => void askAssist(p)}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
               >
                 {p}
               </button>
             ))}
           </div>
 
-          <div className="mt-4 flex-1 space-y-3 overflow-y-auto rounded-xl bg-slate-50/80 p-3">
+          <div className="mt-3 flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-4 py-3">
             {assist.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                Ask things like “who has overdue fees?” or “what are students
-                asking the coach?”
-              </p>
+              <div className="flex h-full min-h-[160px] items-center justify-center px-4 text-center text-sm text-slate-500">
+                Ask about fees, tickets, enrollments, or student AI prompts.
+              </div>
             ) : (
-              assist.map((m, i) => (
-                <div
-                  key={`${m.role}-${i}`}
-                  className={`max-w-[95%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${
-                    m.role === "user"
-                      ? "ml-auto bg-blue-600 text-white"
-                      : "bg-white text-slate-800 ring-1 ring-slate-200"
-                  }`}
-                >
-                  {m.content}
-                </div>
-              ))
+              assist.map((m, i) => {
+                const id = `assist-${i}`;
+                const isUser = m.role === "user";
+                return (
+                  <div
+                    key={id}
+                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 shadow-sm ${
+                        isUser
+                          ? "rounded-br-md bg-blue-600 text-white"
+                          : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
+                      }`}
+                    >
+                      {!isUser ? (
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            Copilot
+                          </span>
+                          <button
+                            type="button"
+                            title="Copy reply"
+                            onClick={async () => {
+                              if (await copyText(m.content)) void markCopied(id);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-blue-700"
+                          >
+                            <Copy className="h-3 w-3" />
+                            {copiedId === id ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      ) : null}
+                      {isUser ? (
+                        <p className="whitespace-pre-wrap text-sm">{m.content}</p>
+                      ) : (
+                        <AiRichText text={m.content} className="text-slate-700" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
             {sending ? (
-              <p className="text-xs font-medium text-slate-500">Thinking…</p>
+              <div className="flex justify-start">
+                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
+                  Thinking…
+                </div>
+              </div>
             ) : null}
+            <div ref={chatEnd} />
           </div>
 
-          <form onSubmit={onSubmit} className="mt-3 flex gap-2">
+          <form
+            onSubmit={onSubmit}
+            className="flex gap-2 border-t border-slate-100 bg-white p-4"
+          >
             <Textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -231,12 +304,13 @@ export default function AiAdminPage() {
               Ask
             </Button>
           </form>
-        </div>
+        </section>
 
-        <div className="glass-card p-5">
-          <div className="flex items-center justify-between gap-3">
+        {/* Student transcripts */}
+        <section className="flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
             <div>
-              <h3 className="font-semibold">Student transcripts</h3>
+              <h3 className="font-semibold text-slate-900">Student transcripts</h3>
               <p className="mt-0.5 text-xs text-slate-500">
                 Who asked what — and what the coach replied.
               </p>
@@ -249,58 +323,90 @@ export default function AiAdminPage() {
                 void load();
               }}
             >
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
               Refresh
             </Button>
           </div>
 
-          <ul className="mt-4 max-h-[480px] space-y-3 overflow-y-auto pr-1">
+          <ul className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {loadingTx && transcripts.length === 0 ? (
-              <li className="text-sm text-slate-500">Loading…</li>
+              <li className="py-10 text-center text-sm text-slate-500">
+                Loading…
+              </li>
             ) : null}
             {!loadingTx && transcripts.length === 0 ? (
-              <li className="text-sm text-slate-500">No chats yet</li>
+              <li className="py-10 text-center text-sm text-slate-500">
+                No chats yet
+              </li>
             ) : null}
             {transcripts.map((t) => {
-              const mine = t.role === "user";
+              const student = t.role === "user";
               return (
                 <li
                   key={t.id}
-                  className="rounded-xl border border-slate-100 bg-white p-3 text-sm"
+                  className={`rounded-2xl border p-3.5 ${
+                    student
+                      ? "border-blue-100 bg-blue-50/50"
+                      : "border-slate-100 bg-slate-50/70"
+                  }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-medium text-slate-800">
+                    <p className="text-sm font-semibold text-slate-800">
                       {t.user.name || t.user.email}
-                      <span className="ml-2 text-xs font-normal text-slate-400">
+                      <span className="ml-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                         {t.user.accountType}
                       </span>
                     </p>
-                    <span className="text-[11px] text-slate-400">
-                      {new Date(t.createdAt).toLocaleString()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(t.createdAt).toLocaleString()}
+                      </span>
+                      {!student ? (
+                        <button
+                          type="button"
+                          title="Copy reply"
+                          onClick={async () => {
+                            if (await copyText(t.content)) void markCopied(t.id);
+                          }}
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-white hover:text-blue-700"
+                        >
+                          <Copy className="h-3 w-3" />
+                          {copiedId === t.id ? "Copied" : "Copy"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    {mine ? "Student asked" : "AI replied"}
+                  <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    {student ? "Student asked" : "AI replied"}
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap text-slate-700">
-                    {t.content}
-                  </p>
+                  <div className="mt-1.5">
+                    {student ? (
+                      <p className="whitespace-pre-wrap text-sm text-slate-700">
+                        {t.content}
+                      </p>
+                    ) : (
+                      <AiRichText text={t.content} className="text-slate-700" />
+                    )}
+                  </div>
                 </li>
               );
             })}
           </ul>
-        </div>
+        </section>
       </div>
 
-      <div className="glass-card p-5">
-        <h3 className="font-semibold">Top users (7 days)</h3>
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/5">
+        <h3 className="font-semibold text-slate-900">Top users (7 days)</h3>
         <ul className="mt-3 space-y-2 text-sm">
           {(data?.topUsers ?? []).map((u) => (
             <li
               key={u.userId}
               className="flex justify-between gap-3 border-t border-slate-100 pt-2"
             >
-              <span className="truncate">{u.name || u.email || u.userId}</span>
-              <span className="font-medium">{u.count}</span>
+              <span className="truncate text-slate-700">
+                {u.name || u.email || u.userId}
+              </span>
+              <span className="font-semibold text-slate-900">{u.count}</span>
             </li>
           ))}
           {(data?.topUsers.length ?? 0) === 0 ? (
@@ -313,7 +419,7 @@ export default function AiAdminPage() {
             may have been used).
           </p>
         ) : null}
-      </div>
+      </section>
     </div>
   );
 }
