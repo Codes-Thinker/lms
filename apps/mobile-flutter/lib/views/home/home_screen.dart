@@ -12,12 +12,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
 import '../course/all_courses_screen.dart';
 import '../course/course_detail_screen.dart';
-import '../fees/fees_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
@@ -367,50 +367,124 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-            // Soft pastel stats — iOS icons
+            // Compact 6 tappable stats (2×3) — less vertical space
             SliverPadding(
               padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
               sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _pastelStat(
+                child: Builder(
+                  builder: (context) {
+                    final openTasks =
+                        myTasks.where((t) => t.status != 'DONE').length;
+                    final doneTasks =
+                        myTasks.where((t) => t.status == 'DONE').length;
+                    final lecturesDone = continueCourse?.topicsDone ?? 0;
+                    final lecturesTotal = continueCourse?.topicsTotal ?? 0;
+                    final lecturesLeft = continueCourse?.topicsRemaining ?? 0;
+                    final installments =
+                        continueCourse?.installmentCount ?? 0;
+
+                    void openContinueCourse() {
+                      if (continueCourse == null) {
+                        Navigator.of(context).push(
+                          AppMotion.fadeSlide(const AllCoursesScreen()),
+                        );
+                        return;
+                      }
+                      Navigator.of(context).push(
+                        AppMotion.fadeSlide(
+                          CourseDetailScreen(courseId: continueCourse.id),
+                        ),
+                      );
+                    }
+
+                    final tiles = <Widget>[
+                      _pastelStat(
                         icon: CupertinoIcons.book_fill,
                         label: 'Courses',
                         value: '${courses.enrolledCourses.length}',
                         bg: AppColors.softBlue,
                         accent: AppColors.blueDark,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            AppMotion.fadeSlide(const AllCoursesScreen()),
+                          );
+                        },
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _pastelStat(
+                      _pastelStat(
                         icon: CupertinoIcons.chart_pie_fill,
                         label: 'Attendance',
                         value:
                             '${courses.overallAttendance.toStringAsFixed(0)}%',
                         bg: _softOrange,
                         accent: const Color(0xFFEA580C),
+                        onTap: () =>
+                            context.read<UiProvider>().setNavIndex(2),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            AppMotion.fadeSlide(const FeesScreen()),
-                          );
-                        },
-                        child: _pastelStat(
-                          icon: CupertinoIcons.creditcard_fill,
-                          label: 'Due Fee',
-                          value: 'Rs ${courses.totalFeeDue}',
-                          bg: _softRose,
-                          accent: const Color(0xFFDC2626),
+                      _pastelStat(
+                        icon: CupertinoIcons.creditcard_fill,
+                        label: 'Due Fee',
+                        value: 'Rs ${courses.totalFeeDue}',
+                        bg: _softRose,
+                        accent: const Color(0xFFDC2626),
+                        onTap: () =>
+                            context.read<UiProvider>().setNavIndex(3),
+                      ),
+                      _pastelStat(
+                        icon: CupertinoIcons.play_rectangle_fill,
+                        label: lecturesLeft > 0
+                            ? '$lecturesLeft left'
+                            : 'Lectures',
+                        value: lecturesTotal == 0
+                            ? '—'
+                            : '$lecturesDone/$lecturesTotal',
+                        bg: AppColors.softBlue,
+                        accent: AppColors.blueDark,
+                        onTap: openContinueCourse,
+                      ),
+                      _pastelStat(
+                        icon: CupertinoIcons.checkmark_seal_fill,
+                        label: doneTasks > 0 ? '$doneTasks done' : 'Tasks',
+                        value: '$openTasks open',
+                        bg: const Color(0xFFECFDF5),
+                        accent: const Color(0xFF059669),
+                        onTap: () =>
+                            context.read<UiProvider>().setNavIndex(1),
+                      ),
+                      _pastelStat(
+                        icon: CupertinoIcons.money_dollar_circle_fill,
+                        label: 'Installments',
+                        value: installments > 0 ? '$installments×' : '—',
+                        bg: _softRose,
+                        accent: const Color(0xFFDC2626),
+                        onTap: () =>
+                            context.read<UiProvider>().setNavIndex(3),
+                      ),
+                    ];
+
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: tiles[0]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[1]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[2]),
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(child: tiles[3]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[4]),
+                            const SizedBox(width: 8),
+                            Expanded(child: tiles[5]),
+                          ],
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -654,39 +728,46 @@ class HomeScreen extends StatelessWidget {
     required String value,
     required Color bg,
     required Color accent,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: accent),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 15, color: accent),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: accent.withValues(alpha: 0.85),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              color: accent.withValues(alpha: 0.85),
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

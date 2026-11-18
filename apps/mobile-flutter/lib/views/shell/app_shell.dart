@@ -116,6 +116,17 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
+    final desiredTab = context.watch<UiProvider>().navIndex;
+    if (_index.value != desiredTab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_index.value == desiredTab) return;
+        _index.value = desiredTab;
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(desiredTab);
+        }
+      });
+    }
 
     final pages = <Widget>[
       if (auth.isStaff) const TeacherHomeScreen() else const HomeScreen(),

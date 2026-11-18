@@ -643,13 +643,27 @@ class _ChatBubble extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text(
-                      'Coach',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.muted,
-                        letterSpacing: 0.2,
+                    const Expanded(
+                      child: Text(
+                        'Coach',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () => _copyAi(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.copy_rounded,
+                          size: 15,
+                          color: AppColors.blueDark,
+                        ),
                       ),
                     ),
                   ],
@@ -657,7 +671,7 @@ class _ChatBubble extends StatelessWidget {
                 const SizedBox(height: 8),
                 MarkdownBody(
                   data: text,
-                  selectable: false,
+                  selectable: true,
                   softLineBreak: true,
                   styleSheet: MarkdownStyleSheet(
                     p: baseStyle,
