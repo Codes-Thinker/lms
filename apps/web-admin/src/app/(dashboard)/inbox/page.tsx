@@ -7,6 +7,11 @@ import { useChatInbox } from "@/components/ui/chat-inbox-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { compressImageFile } from "@/lib/compress-image";
+import {
+  emitChatTyping,
+  joinChatThread,
+  leaveChatThread,
+} from "@/lib/realtime";
 import { cn } from "@/lib/utils";
 import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
@@ -22,6 +27,7 @@ type Message = {
 
 type Thread = {
   id: string;
+  userId?: string;
   userName: string;
   userRole: string;
   lastMessage?: string | null;
@@ -73,6 +79,8 @@ function InboxPageInner() {
   const messagesRef = useRef<HTMLDivElement>(null);
   const sendingRef = useRef(false);
   const openedUserRef = useRef<string | null>(null);
+  const typingTimerRef = useRef<number | null>(null);
+  const joinedThreadRef = useRef<string | null>(null);
 
   const scrollMessagesToEnd = useCallback(() => {
     const el = messagesRef.current;
@@ -92,12 +100,22 @@ function InboxPageInner() {
 
   const openThread = useCallback(
     async (id: string) => {
+      if (joinedThreadRef.current && joinedThreadRef.current !== id) {
+        leaveChatThread(joinedThreadRef.current);
+        emitChatTyping({
+          threadId: joinedThreadRef.current,
+          typing: false,
+          userId: active?.userId,
+        });
+      }
       setSelectedId(id);
       setShowEmoji(false);
       try {
         await api(`/support/chats/${id}/read`, { method: "POST" });
         const full = await api<Thread>(`/support/chats/${id}`);
         setActive(full);
+        joinChatThread(id);
+        joinedThreadRef.current = id;
         await loadList();
         await refresh();
         requestAnimationFrame(() => scrollMessagesToEnd());
@@ -105,8 +123,41 @@ function InboxPageInner() {
         setError(e instanceof Error ? e.message : "Failed to open chat");
       }
     },
-    [loadList, refresh, scrollMessagesToEnd]
+    [active?.userId, loadList, refresh, scrollMessagesToEnd]
   );
+
+  useEffect(() => {
+    return () => {
+      if (joinedThreadRef.current) {
+        leaveChatThread(joinedThreadRef.current);
+        emitChatTyping({
+          threadId: joinedThreadRef.current,
+          typing: false,
+          userId: active?.userId,
+        });
+      }
+      if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onComposerChange(value: string) {
+    setText(value);
+    if (!selectedId) return;
+    emitChatTyping({
+      threadId: selectedId,
+      userId: active?.userId,
+      typing: true,
+    });
+    if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = window.setTimeout(() => {
+      emitChatTyping({
+        threadId: selectedId,
+        userId: active?.userId,
+        typing: false,
+      });
+    }, 1400);
+  }
 
   useEffect(() => {
     void loadList();
@@ -466,7 +517,7 @@ function InboxPageInner() {
                 </Button>
                 <Input
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
+                  onChange={(e) => onComposerChange(e.target.value)}
                   placeholder="Reply as admin…"
                   className="h-10"
                 />

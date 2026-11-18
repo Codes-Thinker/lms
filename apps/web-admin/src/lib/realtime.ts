@@ -15,9 +15,14 @@ function apiOrigin(): string {
   }
 }
 
+export function getAdminSocket(): Socket | null {
+  return socket;
+}
+
 /** Connect admin browser to Socket.IO `/realtime` for live notifications. */
 export function connectAdminRealtime(opts: {
   onNotification?: (payload: Record<string, unknown>) => void;
+  onChatMessage?: (payload: Record<string, unknown>) => void;
 }): () => void {
   const origin = apiOrigin();
   if (!origin) return () => {};
@@ -38,7 +43,6 @@ export function connectAdminRealtime(opts: {
   });
 
   socket.on("connect", () => {
-    // Server binds room from JWT; join is optional confirmation.
     const user = getAdminUser();
     if (user?.id) socket?.emit("join", { userId: user.id });
     socket?.emit("joinAdmins");
@@ -48,8 +52,35 @@ export function connectAdminRealtime(opts: {
     opts.onNotification?.(payload);
   });
 
+  socket.on("chat:message", (payload: Record<string, unknown>) => {
+    opts.onChatMessage?.(payload);
+  });
+
   return () => {
     socket?.disconnect();
     socket = null;
   };
+}
+
+export function joinChatThread(threadId: string) {
+  if (!threadId || !socket?.connected) return;
+  socket.emit("chat:join", { threadId });
+}
+
+export function leaveChatThread(threadId: string) {
+  if (!threadId || !socket) return;
+  socket.emit("chat:leave", { threadId });
+}
+
+export function emitChatTyping(input: {
+  threadId: string;
+  userId?: string;
+  typing: boolean;
+}) {
+  if (!input.threadId || !socket?.connected) return;
+  socket.emit("chat:typing", {
+    threadId: input.threadId,
+    userId: input.userId,
+    typing: input.typing,
+  });
 }

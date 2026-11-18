@@ -563,6 +563,9 @@ model ChatMessage {
   /// Optional image attachment (data URL or base64) for chat media.
   imageData  String?
   imageName  String?
+  /// USER→ADMIN: delivered when admin opens the thread; seen when admin reads.
+  deliveredAt DateTime?
+  seenAt      DateTime?
   createdAt  DateTime   @default(now())
 }
 

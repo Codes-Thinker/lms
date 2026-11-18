@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 import '../services/image_compress_service.dart';
@@ -28,6 +30,8 @@ class ChatMessage {
   final String sentAt;
   final String? imageData;
   final String? imageName;
+  /// sent | delivered | seen (USER outbound receipts)
+  final String status;
 
   ChatMessage({
     required this.id,
@@ -37,19 +41,34 @@ class ChatMessage {
     required this.sentAt,
     this.imageData,
     this.imageName,
+    this.status = 'sent',
   });
+
+  ChatMessage copyWith({String? status}) {
+    return ChatMessage(
+      id: id,
+      senderRole: senderRole,
+      senderName: senderName,
+      text: text,
+      sentAt: sentAt,
+      imageData: imageData,
+      imageName: imageName,
+      status: status ?? this.status,
+    );
+  }
 }
 
 class SupportProvider extends ChangeNotifier {
   bool _loading = false;
   bool _sending = false;
   bool _surveyDone = false;
+  bool _adminTyping = false;
   String? _threadId;
   int _unreadByUser = 0;
   final List<SupportTicket> _tickets = [];
   final List<ChatMessage> _chat = [];
 
-  final List<String> surveyQuestions = const [
+  List<String> _surveyQuestions = const [
     'How clear are the classes?',
     'What should we improve?',
     "Would you recommend Code's Thinker?",
@@ -60,11 +79,41 @@ class SupportProvider extends ChangeNotifier {
   bool get loading => _loading;
   bool get sending => _sending;
   bool get surveyDone => _surveyDone;
+  bool get adminTyping => _adminTyping;
   String? get threadId => _threadId;
   int get unreadByUser => _unreadByUser;
   List<SupportTicket> get tickets => List.unmodifiable(_tickets);
   List<ChatMessage> get chat => List.unmodifiable(_chat);
+  List<String> get surveyQuestions => List.unmodifiable(_surveyQuestions);
   Map<String, String> get surveyAnswers => Map.unmodifiable(_surveyAnswers);
+
+  /// Load active survey questions from API when available.
+  Future<void> loadSurveyQuestions() async {
+    try {
+      final active = await ApiClient.instance.get('/support/survey/active');
+      if (active is! Map) return;
+      final raw = active['questions'];
+      final parsed = <String>[];
+      if (raw is List) {
+        for (final q in raw) {
+          if (q is String && q.trim().isNotEmpty) {
+            parsed.add(q.trim());
+          } else if (q is Map) {
+            final text = (q['text'] ?? q['question'] ?? q['title'] ?? '')
+                .toString()
+                .trim();
+            if (text.isNotEmpty) parsed.add(text);
+          }
+        }
+      }
+      if (parsed.isNotEmpty) {
+        _surveyQuestions = parsed;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Survey questions load: $e');
+    }
+  }
 
   void setSurveyAnswer(int index, String value) {
     _surveyAnswers['q$index'] = value;
@@ -79,6 +128,14 @@ class SupportProvider extends ChangeNotifier {
       stamp =
           '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {}
+    final status = (map['status'] ?? '').toString().toLowerCase();
+    final seen = map['seenAt'] != null;
+    final delivered = map['deliveredAt'] != null;
+    final receipt = status == 'seen' || seen
+        ? 'seen'
+        : status == 'delivered' || delivered
+            ? 'delivered'
+            : 'sent';
     return ChatMessage(
       id: map['id']?.toString() ?? '',
       senderRole: map['senderRole']?.toString() ?? 'USER',
@@ -87,7 +144,63 @@ class SupportProvider extends ChangeNotifier {
       sentAt: stamp,
       imageData: map['imageData']?.toString(),
       imageName: map['imageName']?.toString(),
+      status: receipt,
     );
+  }
+
+  Timer? _typingAutoClear;
+
+  void setAdminTyping(bool value) {
+    _typingAutoClear?.cancel();
+    if (value) {
+      _typingAutoClear = Timer(const Duration(seconds: 4), () {
+        if (!_adminTyping) return;
+        _adminTyping = false;
+        notifyListeners();
+      });
+    }
+    if (_adminTyping == value) return;
+    _adminTyping = value;
+    notifyListeners();
+  }
+
+  /// Apply socket receipt: mark all USER messages delivered/seen.
+  void applyReceipt(String status) {
+    final next = status.toLowerCase();
+    if (next != 'delivered' && next != 'seen') return;
+    var changed = false;
+    for (var i = 0; i < _chat.length; i++) {
+      final m = _chat[i];
+      if (m.senderRole != 'USER') continue;
+      if (next == 'seen' && m.status != 'seen') {
+        _chat[i] = m.copyWith(status: 'seen');
+        changed = true;
+      } else if (next == 'delivered' && m.status == 'sent') {
+        _chat[i] = m.copyWith(status: 'delivered');
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
+  void upsertLiveMessage(Map<String, dynamic> map) {
+    final msg = _mapMsg(map);
+    if (msg.id.isEmpty) return;
+    final idx = _chat.indexWhere((m) => m.id == msg.id);
+    if (idx >= 0) {
+      _chat[idx] = msg;
+    } else {
+      // Drop matching optimistic local bubble.
+      _chat.removeWhere(
+        (m) =>
+            m.id.startsWith('local-') &&
+            m.senderRole == msg.senderRole &&
+            m.text == msg.text,
+      );
+      _chat.add(msg);
+    }
+    _adminTyping = false;
+    notifyListeners();
   }
 
   Future<void> submitSurvey() async {
@@ -195,6 +308,7 @@ class SupportProvider extends ChangeNotifier {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i].id != b[i].id) return false;
+      if (a[i].status != b[i].status) return false;
       // Image payload may arrive after text-only stub — treat as change.
       final aImg = a[i].imageData ?? '';
       final bImg = b[i].imageData ?? '';

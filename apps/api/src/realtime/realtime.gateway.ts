@@ -99,6 +99,53 @@ export class RealtimeGateway
     return { ok: true };
   }
 
+  /** Admin opens a support thread — join room for typing + live messages. */
+  @SubscribeMessage("chat:join")
+  onChatJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body?: { threadId?: string }
+  ) {
+    const user = client.data.user as SocketUser | undefined;
+    const threadId = body?.threadId?.trim();
+    if (!user?.sub || !threadId) return { ok: false };
+    void client.join(`thread:${threadId}`);
+    return { ok: true, threadId };
+  }
+
+  @SubscribeMessage("chat:leave")
+  onChatLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body?: { threadId?: string }
+  ) {
+    const threadId = body?.threadId?.trim();
+    if (!threadId) return { ok: false };
+    void client.leave(`thread:${threadId}`);
+    return { ok: true };
+  }
+
+  /** Relay typing indicator to the thread room (and personal user room). */
+  @SubscribeMessage("chat:typing")
+  onChatTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    body?: { threadId?: string; typing?: boolean; userId?: string }
+  ) {
+    const user = client.data.user as SocketUser | undefined;
+    const threadId = body?.threadId?.trim();
+    if (!user?.sub || !threadId) return { ok: false };
+    const payload = {
+      threadId,
+      typing: Boolean(body?.typing),
+      fromUserId: user.sub,
+      isAdmin: this.isSuperAdmin(user),
+    };
+    this.server.to(`thread:${threadId}`).except(client.id).emit("chat:typing", payload);
+    if (body?.userId) {
+      this.emitToUser(body.userId, "chat:typing", payload);
+    }
+    return { ok: true };
+  }
+
   emitToUser(userId: string, event: string, payload: Record<string, unknown>) {
     if (!userId || !this.server) return;
     this.server.to(`user:${userId}`).emit(event, payload);
@@ -107,6 +154,11 @@ export class RealtimeGateway
   emitToAdmins(event: string, payload: Record<string, unknown>) {
     if (!this.server) return;
     this.server.to("admins").emit(event, payload);
+  }
+
+  emitToThread(threadId: string, event: string, payload: Record<string, unknown>) {
+    if (!threadId || !this.server) return;
+    this.server.to(`thread:${threadId}`).emit(event, payload);
   }
 
   private isSuperAdmin(user?: SocketUser | null) {

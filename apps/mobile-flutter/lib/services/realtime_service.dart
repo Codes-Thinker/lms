@@ -84,7 +84,45 @@ class RealtimeService {
       })
       ..onDisconnect((_) => debugPrint('Realtime disconnected'))
       ..onConnectError((e) => debugPrint('Realtime connect error: $e'))
-      ..on('notification', _handleNotification);
+      ..on('notification', _handleNotification)
+      ..on('chat:message', _handleChatMessage)
+      ..on('chat:receipt', _handleChatReceipt)
+      ..on('chat:typing', _handleChatTyping);
+  }
+
+  void _handleChatMessage(dynamic data) {
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+    final threadId = map['threadId']?.toString();
+    final support = _support;
+    if (support == null) return;
+    if (threadId != null &&
+        support.threadId != null &&
+        threadId != support.threadId) {
+      return;
+    }
+    final msg = map['message'];
+    if (msg is Map) {
+      support.upsertLiveMessage(Map<String, dynamic>.from(msg));
+    } else {
+      unawaited(support.loadAdminChat(silent: true));
+    }
+  }
+
+  void _handleChatReceipt(dynamic data) {
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+    final status = (map['status'] ?? '').toString();
+    _support?.applyReceipt(status);
+  }
+
+  void _handleChatTyping(dynamic data) {
+    if (data is! Map) return;
+    final map = Map<String, dynamic>.from(data);
+    final isAdmin = map['isAdmin'] == true;
+    if (!isAdmin) return;
+    final typing = map['typing'] == true;
+    _support?.setAdminTyping(typing);
   }
 
   void disconnect() {

@@ -1,13 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../widgets/app_loader.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/support_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../widgets/app_loader.dart';
 import '../../widgets/chat_image.dart';
 
 class AdminChatScreen extends StatefulWidget {
@@ -37,7 +39,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
       await context.read<SupportProvider>().loadAdminChat();
       _scrollToEnd();
     });
-    _poll = Timer.periodic(const Duration(seconds: 4), (_) async {
+    // Light backup poll — sockets handle most live updates.
+    _poll = Timer.periodic(const Duration(seconds: 12), (_) async {
       if (!mounted) return;
       final support = context.read<SupportProvider>();
       if (support.sending) return;
@@ -129,102 +132,111 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     final support = context.watch<SupportProvider>();
     final auth = context.watch<AuthProvider>();
 
+    final itemCount =
+        support.chat.length + (support.adminTyping ? 1 : 0);
+
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: const Color(0xFFF3F6FB),
       appBar: AppBar(
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        elevation: 0,
+        backgroundColor: const Color(0xFFF3F6FB),
+        foregroundColor: AppColors.ink,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            Text(
-              "Code's Thinker",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.blue.withValues(alpha: 0.14),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(5),
+              child: Image.asset(
+                AppBrand.markAsset,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.support_agent_rounded,
+                  color: AppColors.blueDark,
+                  size: 18,
+                ),
+              ),
             ),
-            Text(
-              'Support chat',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Code's Thinker",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Text(
+                    'Support chat',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        backgroundColor: AppColors.bg,
       ),
       body: Column(
         children: [
           Expanded(
-            child: support.loading && support.chat.isEmpty
-                ? const Center(child: AppLoader())
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: support.chat.length,
-                    itemBuilder: (context, index) {
-                      final msg = support.chat[index];
-                      final mine = msg.senderRole == 'USER';
-                      final fromLabel = mine
-                          ? (auth.user?.name ?? 'You')
-                          : "Code's Thinker";
-                      return Align(
-                        key: ValueKey(msg.id),
-                        alignment:
-                            mine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 300),
-                          decoration: BoxDecoration(
-                            color: mine ? AppColors.blue : Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(mine ? 16 : 4),
-                              bottomRight: Radius.circular(mine ? 4 : 16),
-                            ),
-                            border:
-                                mine ? null : Border.all(color: AppColors.line),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '$fromLabel, ${msg.sentAt}',
-                                style: TextStyle(
-                                  color:
-                                      mine ? Colors.white70 : AppColors.muted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                              if (msg.imageData != null &&
-                                  msg.imageData!.startsWith('data:image')) ...[
-                                const SizedBox(height: 6),
-                                ChatImageThumb(
-                                  key: ValueKey('img-${msg.imageData.hashCode}'),
-                                  imageData: msg.imageData!,
-                                  label: msg.imageName,
-                                  mine: mine,
-                                ),
-                              ],
-                              if (msg.text.isNotEmpty &&
-                                  !(msg.imageData != null &&
-                                      (msg.text.trim() == '📷 Photo' ||
-                                          msg.text.trim() == 'Photo'))) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  msg.text,
-                                  style: TextStyle(
-                                    color: mine ? Colors.white : AppColors.ink,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFF3F6FB), Color(0xFFEEF3FA)],
+                ),
+              ),
+              child: support.loading && support.chat.isEmpty
+                  ? const Center(child: AppLoader())
+                  : ListView.builder(
+                      controller: _scroll,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      itemCount: itemCount,
+                      itemBuilder: (context, index) {
+                        if (support.adminTyping &&
+                            index == support.chat.length) {
+                          return const _TypingBubble();
+                        }
+                        final msg = support.chat[index];
+                        final mine = msg.senderRole == 'USER';
+                        final showSeen = mine &&
+                            msg.status == 'seen' &&
+                            (index == support.chat.length - 1 ||
+                                support.chat[index + 1].senderRole != 'USER');
+                        return _SupportBubble(
+                          key: ValueKey(msg.id),
+                          mine: mine,
+                          text: msg.text,
+                          sentAt: msg.sentAt,
+                          status: msg.status,
+                          showSeenLabel: showSeen,
+                          imageData: msg.imageData,
+                          imageName: msg.imageName,
+                        );
+                      },
+                    ),
+            ),
           ),
           if (_showEmoji)
             Container(
@@ -252,50 +264,86 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                     .toList(),
               ),
             ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: _sending
-                        ? null
-                        : () => setState(() => _showEmoji = !_showEmoji),
-                    icon: const Icon(Icons.emoji_emotions_outlined),
-                    color: AppColors.blue,
-                  ),
-                  IconButton(
-                    onPressed: _sending ? null : _chooseSource,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    color: AppColors.blue,
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(auth, support),
-                      decoration: InputDecoration(
-                        hintText: "Message Code's Thinker…",
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.96),
+              border: const Border(top: BorderSide(color: Color(0xFFE6ECF4))),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      onPressed: _sending
+                          ? null
+                          : () => setState(() => _showEmoji = !_showEmoji),
+                      icon: const Icon(Icons.emoji_emotions_outlined),
+                      color: AppColors.blueDark,
+                    ),
+                    IconButton(
+                      onPressed: _sending ? null : _chooseSource,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      color: AppColors.blueDark,
+                    ),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F9FC),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: TextField(
+                          controller: _controller,
+                          enabled: !_sending,
+                          minLines: 1,
+                          maxLines: 4,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _send(auth, support),
+                          decoration: const InputDecoration(
+                            hintText: "Message Code's Thinker…",
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton.filled(
-                    onPressed: _sending ? null : () => _send(auth, support),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.blue,
+                    const SizedBox(width: 8),
+                    Material(
+                      color: AppColors.blueDark,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        onTap: _sending ? null : () => _send(auth, support),
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: 46,
+                          height: 46,
+                          child: Center(
+                            child: _sending
+                                ? const AppLoader(size: 18, color: Colors.white)
+                                : const Icon(
+                                    Icons.arrow_upward_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                          ),
+                        ),
+                      ),
                     ),
-                    icon: _sending
-                        ? const AppLoader(size: 18, color: Colors.white)
-                        : const Icon(Icons.send_rounded, color: Colors.white),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -319,10 +367,323 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     if (!mounted) return;
     setState(() => _sending = false);
     _scrollToEnd();
-    final ui = context.read<UiProvider>();
     if (!ok) {
-      ui.showSnack('Could not send message. Try again.',
-          tone: AppSnackTone.error);
+      context.read<UiProvider>().showSnack(
+            'Could not send message. Try again.',
+            tone: AppSnackTone.error,
+          );
     }
+  }
+}
+
+class _SupportBubble extends StatelessWidget {
+  final bool mine;
+  final String text;
+  final String sentAt;
+  final String status;
+  final bool showSeenLabel;
+  final String? imageData;
+  final String? imageName;
+
+  const _SupportBubble({
+    super.key,
+    required this.mine,
+    required this.text,
+    required this.sentAt,
+    required this.status,
+    required this.showSeenLabel,
+    this.imageData,
+    this.imageName,
+  });
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    context.read<UiProvider>().showSnack('Message copied');
+    HapticFeedback.selectionClick();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (mine) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10, left: 48),
+          constraints: const BoxConstraints(maxWidth: 300),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(6),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.blue.withValues(alpha: 0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (imageData != null &&
+                        imageData!.startsWith('data:image')) ...[
+                      ChatImageThumb(
+                        key: ValueKey('img-${imageData.hashCode}'),
+                        imageData: imageData!,
+                        label: imageName,
+                        mine: true,
+                      ),
+                      if (text.isNotEmpty &&
+                          text.trim() != '📷 Photo' &&
+                          text.trim() != 'Photo')
+                        const SizedBox(height: 6),
+                    ],
+                    if (text.isNotEmpty &&
+                        !(imageData != null &&
+                            (text.trim() == '📷 Photo' ||
+                                text.trim() == 'Photo')))
+                      Text(
+                        text,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          height: 1.35,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          sentAt,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontSize: 10.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        _ReceiptTicks(status: status),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (showSeenLabel)
+                const Padding(
+                  padding: EdgeInsets.only(top: 3, right: 4),
+                  child: Text(
+                    'Seen',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: GestureDetector(
+        onLongPress: text.trim().isEmpty ? null : () => _copy(context),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10, right: 40),
+          constraints: const BoxConstraints(maxWidth: 300),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(6),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(18),
+            ),
+            border: Border.all(color: const Color(0xFFE8EEF6)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E293B).withValues(alpha: 0.05),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Code's Thinker",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ),
+                  if (text.trim().isNotEmpty)
+                    InkWell(
+                      onTap: () => _copy(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(2),
+                        child: Icon(
+                          Icons.copy_rounded,
+                          size: 14,
+                          color: AppColors.blueDark,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              if (imageData != null &&
+                  imageData!.startsWith('data:image')) ...[
+                ChatImageThumb(
+                  key: ValueKey('img-${imageData.hashCode}'),
+                  imageData: imageData!,
+                  label: imageName,
+                  mine: false,
+                ),
+                if (text.isNotEmpty &&
+                    text.trim() != '📷 Photo' &&
+                    text.trim() != 'Photo')
+                  const SizedBox(height: 6),
+              ],
+              if (text.isNotEmpty &&
+                  !(imageData != null &&
+                      (text.trim() == '📷 Photo' || text.trim() == 'Photo')))
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    height: 1.4,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              const SizedBox(height: 4),
+              Text(
+                sentAt,
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 10.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReceiptTicks extends StatelessWidget {
+  final String status;
+
+  const _ReceiptTicks({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final seen = status == 'seen';
+    final delivered = status == 'delivered' || seen;
+    final color = seen
+        ? const Color(0xFFBFDBFE)
+        : Colors.white.withValues(alpha: 0.85);
+
+    if (!delivered) {
+      // Single tick — sent, admin not in chat yet.
+      return Icon(Icons.done_rounded, size: 14, color: color);
+    }
+    // Double tick — delivered / seen (blurred for delivered, clearer for seen).
+    return Opacity(
+      opacity: seen ? 1 : 0.55,
+      child: Icon(Icons.done_all_rounded, size: 15, color: color),
+    );
+  }
+}
+
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble> {
+  int _step = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 380), (_) {
+      if (!mounted) return;
+      setState(() => _step = (_step + 1) % 3);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10, right: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(6),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
+            bottomRight: Radius.circular(18),
+          ),
+          border: Border.all(color: const Color(0xFFE8EEF6)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final active = i <= _step;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: EdgeInsets.only(right: i == 2 ? 0 : 5),
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: active ? AppColors.blue : const Color(0xFFD8E0EA),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        ),
+      ),
+    );
   }
 }

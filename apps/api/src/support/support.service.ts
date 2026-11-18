@@ -7,12 +7,14 @@ import { ChatKind, NotificationType, TicketKind, TicketStatus } from "@prisma/cl
 import { assertImageDataUrl } from "../common/media-validation";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 
 @Injectable()
 export class SupportService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeGateway
   ) {}
 
   async listTickets(userId?: string) {
@@ -290,10 +292,38 @@ export class SupportService {
   }
 
   async markReadByAdmin(threadId: string) {
+    const thread = await this.prisma.chatThread.findUnique({
+      where: { id: threadId },
+      select: { id: true, userId: true },
+    });
+    if (!thread) throw new NotFoundException("Thread not found");
+
+    const now = new Date();
+    // Opening the chat = delivered + seen for student messages.
+    await this.prisma.chatMessage.updateMany({
+      where: {
+        threadId,
+        senderRole: "USER",
+        OR: [{ deliveredAt: null }, { seenAt: null }],
+      },
+      data: { deliveredAt: now, seenAt: now },
+    });
     await this.prisma.chatThread.update({
       where: { id: threadId },
       data: { unreadByAdmin: 0 },
     });
+
+    this.realtime.emitToUser(thread.userId, "chat:receipt", {
+      threadId,
+      status: "seen",
+      at: now.toISOString(),
+    });
+    this.realtime.emitToThread(threadId, "chat:receipt", {
+      threadId,
+      status: "seen",
+      at: now.toISOString(),
+    });
+
     return this.getThread(threadId);
   }
 
@@ -340,7 +370,7 @@ export class SupportService {
       }
     }
 
-    await this.prisma.chatMessage.create({
+    const created = await this.prisma.chatMessage.create({
       data: {
         threadId,
         senderId: input.senderId,
@@ -389,6 +419,27 @@ export class SupportService {
       });
     }
 
+    const mapped = {
+      id: created.id,
+      senderId: created.senderId,
+      senderName: created.senderName,
+      senderRole: created.senderRole,
+      text: created.text,
+      imageData: created.imageData ?? null,
+      imageName: created.imageName ?? null,
+      sentAt: created.createdAt.toISOString(),
+      deliveredAt: null as string | null,
+      seenAt: null as string | null,
+      status: "sent" as const,
+    };
+    const live = { threadId, message: mapped };
+    this.realtime.emitToUser(thread.userId, "chat:message", live);
+    this.realtime.emitToAdmins("chat:message", {
+      ...live,
+      userId: thread.userId,
+    });
+    this.realtime.emitToThread(threadId, "chat:message", live);
+
     return this.getThread(threadId);
   }
 
@@ -409,6 +460,8 @@ export class SupportService {
       text: string;
       imageData?: string | null;
       imageName?: string | null;
+      deliveredAt?: Date | null;
+      seenAt?: Date | null;
       createdAt: Date;
     }[];
   }) {
@@ -422,16 +475,28 @@ export class SupportService {
       updatedAt: t.updatedAt.toISOString(),
       unreadByAdmin: t.unreadByAdmin,
       unreadByUser: t.unreadByUser ?? 0,
-      messages: t.messages.map((m) => ({
-        id: m.id,
-        senderId: m.senderId,
-        senderName: m.senderName,
-        senderRole: m.senderRole,
-        text: m.text,
-        imageData: m.imageData ?? null,
-        imageName: m.imageName ?? null,
-        sentAt: m.createdAt.toISOString(),
-      })),
+      messages: t.messages.map((m) => {
+        const seenAt = m.seenAt?.toISOString() ?? null;
+        const deliveredAt = m.deliveredAt?.toISOString() ?? null;
+        const status = seenAt
+          ? "seen"
+          : deliveredAt
+            ? "delivered"
+            : "sent";
+        return {
+          id: m.id,
+          senderId: m.senderId,
+          senderName: m.senderName,
+          senderRole: m.senderRole,
+          text: m.text,
+          imageData: m.imageData ?? null,
+          imageName: m.imageName ?? null,
+          sentAt: m.createdAt.toISOString(),
+          deliveredAt,
+          seenAt,
+          status,
+        };
+      }),
     };
   }
 }
