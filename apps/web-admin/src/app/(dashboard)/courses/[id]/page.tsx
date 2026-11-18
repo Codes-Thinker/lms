@@ -288,21 +288,15 @@ export default function EditCoursePage() {
           if (!params?.id) return;
           setSaving(true);
           try {
-            await api(`/courses/${params.id}`, {
+            const saved = await api<CourseDto>(`/courses/${params.id}`, {
               method: "PATCH",
               body: JSON.stringify(editorValueToPayload(value)),
             });
             await syncInstructorProfile(value);
-            show("Course updated and synced for students");
-            const [fresh, students] = await Promise.all([
-              api<CourseDto>(`/courses/${params.id}`),
-              api<StudentsPayload>(`/courses/${params.id}/students`).catch(
-                () => null
-              ),
-            ]);
-            setCourseMeta(fresh);
-            setValue(courseToEditorValue(fresh));
-            if (students) setEnrollment(students);
+            setCourseMeta(saved);
+            setValue(courseToEditorValue(saved));
+            show("Course saved. Students notified and app will refresh live.");
+            router.push("/courses");
           } catch (e) {
             show(e instanceof Error ? e.message : "Could not save", "error");
           } finally {

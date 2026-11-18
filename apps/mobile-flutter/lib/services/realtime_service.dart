@@ -5,6 +5,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../core/constants/api_config.dart';
 import '../core/notification_router.dart';
+import '../providers/course_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
@@ -28,6 +29,7 @@ class RealtimeService {
   SupportProvider? _support;
   TaskProvider? _tasks;
   TeachingProvider? _teaching;
+  CourseProvider? _courses;
   RealtimeOpenHandler? _onOpen;
 
   void bind({
@@ -36,6 +38,7 @@ class RealtimeService {
     required SupportProvider support,
     required TaskProvider tasks,
     required TeachingProvider teaching,
+    required CourseProvider courses,
     required RealtimeOpenHandler onOpen,
   }) {
     _ui = ui;
@@ -43,6 +46,7 @@ class RealtimeService {
     _support = support;
     _tasks = tasks;
     _teaching = teaching;
+    _courses = courses;
     _onOpen = onOpen;
   }
 
@@ -85,9 +89,20 @@ class RealtimeService {
       ..onDisconnect((_) => debugPrint('Realtime disconnected'))
       ..onConnectError((e) => debugPrint('Realtime connect error: $e'))
       ..on('notification', _handleNotification)
+      ..on('course_updated', _handleCourseUpdated)
       ..on('chat:message', _handleChatMessage)
       ..on('chat:receipt', _handleChatReceipt)
       ..on('chat:typing', _handleChatTyping);
+  }
+
+  void _refreshCourses() {
+    final courses = _courses;
+    if (courses == null) return;
+    unawaited(courses.fetchEnrolledCourses());
+  }
+
+  void _handleCourseUpdated(dynamic data) {
+    _refreshCourses();
   }
 
   void _handleChatMessage(dynamic data) {
@@ -162,6 +177,10 @@ class RealtimeService {
       final teaching = _teaching;
       if (tasks != null) unawaited(tasks.load(silent: true));
       if (teaching != null) unawaited(teaching.load(silent: true));
+    }
+    final event = (dataMap['event'] ?? '').toString().toLowerCase();
+    if (event == 'course_updated') {
+      _refreshCourses();
     }
 
     final text = body.trim().isEmpty ? title : body.trim();

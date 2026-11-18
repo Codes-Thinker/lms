@@ -115,18 +115,17 @@ export function courseToEditorValue(course: {
     instructorId: course.instructorId ?? "",
     instructorExperience: course.instructorExperience ?? "",
     instructorBio: course.instructorBio ?? "",
-    outline:
-      course.outline?.map((s) => ({
-        key: s.id,
-        id: s.id,
-        title: s.title,
-        topics: s.topics.map((t) => ({
-          key: t.id,
-          id: t.id,
-          title: t.title,
-          minutes: t.minutes ?? 45,
-        })),
-      })) ?? emptyCourseValue().outline,
+    outline: (course.outline ?? []).map((s) => ({
+      key: s.id,
+      id: s.id,
+      title: s.title,
+      topics: (s.topics ?? []).map((t) => ({
+        key: t.id,
+        id: t.id,
+        title: t.title,
+        minutes: t.minutes ?? 45,
+      })),
+    })),
   };
 }
 

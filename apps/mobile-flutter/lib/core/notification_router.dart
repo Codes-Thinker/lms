@@ -111,6 +111,8 @@ class NotificationRouter {
         return 'Certificate';
       case 'SYSTEM':
         return 'System';
+      case 'GENERAL':
+        return 'Update';
       default:
         return 'Alert';
     }

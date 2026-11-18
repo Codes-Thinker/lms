@@ -25,9 +25,11 @@ export class CoursesController {
     @CurrentUser() user: AuthUser,
     @Query("all") all?: string
   ) {
-    const publishedOnly =
-      all !== "1" || !["SUPER_ADMIN", "STAFF"].includes(user.accountType);
-    return this.courses.list(user.sub, publishedOnly);
+    const isStaff = ["SUPER_ADMIN", "STAFF"].includes(user.accountType);
+    const publishedOnly = all !== "1" || !isStaff;
+    return this.courses.list(user.sub, publishedOnly, {
+      includeOutline: isStaff && !publishedOnly,
+    });
   }
 
   /** Teacher/staff: courses they instruct + enrolled students. */
@@ -61,7 +63,8 @@ export class CoursesController {
 
   @Get(":id")
   get(@Param("id") id: string, @CurrentUser() user: AuthUser) {
-    return this.courses.get(id, user.sub);
+    const isStaff = ["SUPER_ADMIN", "STAFF"].includes(user.accountType);
+    return this.courses.get(id, user.sub, { includeOutline: isStaff });
   }
 
   /**

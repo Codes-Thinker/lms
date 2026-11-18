@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { NotificationType } from "@prisma/client";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 
 type OutlineTopicInput = {
   id?: string;
@@ -47,7 +50,11 @@ export type EnrollmentStatusLabel =
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeGateway
+  ) {}
 
   private progressFor(
     topics: { id: string }[],
@@ -115,6 +122,8 @@ export class CoursesService {
         batchCode: string | null;
       } | null;
       paidFromFees?: number | null;
+      /** Admin/staff editors need outline even when not enrolled. */
+      includeOutline?: boolean;
     }
   ) {
     const topics = c.sections.flatMap((s) => s.topics);
@@ -204,22 +213,23 @@ export class CoursesService {
       paidAmount,
       feeStatus,
       progressPercent: progress.percent,
-      outline: enrollment
-        ? c.sections.map((s) => ({
-            id: s.id,
-            title: s.title,
-            order: s.sortOrder,
-            topics: s.topics
-              .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((t) => ({
-                id: t.id,
-                title: t.title,
-                minutes: t.minutes,
-                order: t.sortOrder,
-                completed: completedIds.has(t.id),
-              })),
-          }))
-        : [],
+      outline:
+        enrollment || opts?.includeOutline
+          ? c.sections.map((s) => ({
+              id: s.id,
+              title: s.title,
+              order: s.sortOrder,
+              topics: s.topics
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  minutes: t.minutes,
+                  order: t.sortOrder,
+                  completed: completedIds.has(t.id),
+                })),
+            }))
+          : [],
       topicsTotal: topics.length,
       topicsDone: enrollment
         ? topics.filter((t) => completedIds.has(t.id)).length
@@ -238,7 +248,12 @@ export class CoursesService {
     return "NOT_ENROLLED";
   }
 
-  async list(userId?: string, publishedOnly = true) {
+  async list(
+    userId?: string,
+    publishedOnly = true,
+    opts?: { includeOutline?: boolean }
+  ) {
+    const includeOutline = Boolean(opts?.includeOutline);
     const [courses, student, feePaidRows] = await Promise.all([
       this.prisma.course.findMany({
         where: publishedOnly ? { published: true } : undefined,
@@ -318,12 +333,17 @@ export class CoursesService {
       this.mapCourse(c, completedIds, {
         studentFees,
         paidFromFees: paidByCourse.get(c.id) ?? 0,
+        includeOutline,
       })
     );
   }
 
-  async get(id: string, userId?: string) {
-    const list = await this.list(userId, false);
+  async get(
+    id: string,
+    userId?: string,
+    opts?: { includeOutline?: boolean }
+  ) {
+    const list = await this.list(userId, false, opts);
     const course = list.find((c) => c.id === id);
     if (!course) throw new NotFoundException("Course not found");
     return course;
@@ -852,7 +872,7 @@ export class CoursesService {
       await this.replaceOutline(course.id, data.outline);
     }
 
-    return this.get(course.id);
+    return this.get(course.id, undefined, { includeOutline: true });
   }
 
   async update(id: string, data: CourseWriteInput) {
@@ -891,7 +911,52 @@ export class CoursesService {
       await this.replaceOutline(id, data.outline);
     }
 
-    return this.get(id);
+    const fresh = await this.get(id, undefined, { includeOutline: true });
+    await this.notifyEnrolledOfCourseUpdate(id, fresh);
+    return fresh;
+  }
+
+  /** Push + socket so enrolled students refresh course details without pull. */
+  private async notifyEnrolledOfCourseUpdate(
+    courseId: string,
+    course: {
+      title?: string;
+      instructorName?: string | null;
+      instructorId?: string | null;
+    }
+  ) {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { courseId },
+      select: { userId: true },
+    });
+    if (!enrollments.length) return;
+
+    const title = (course.title || "Course").trim();
+    const instructor =
+      (course.instructorName || "").trim() || "your instructor";
+    const body = `${title} was updated. Instructor: ${instructor}. Open the course to see the latest modules and details.`;
+    const payload = {
+      courseId,
+      event: "course_updated",
+      instructorName: instructor,
+    };
+
+    await Promise.all(
+      enrollments.map(async (e) => {
+        this.realtime.emitToUser(e.userId, "course_updated", payload);
+        await this.notifications.notifyUser({
+          userId: e.userId,
+          title: "Course updated",
+          body,
+          type: NotificationType.GENERAL,
+          data: {
+            courseId,
+            event: "course_updated",
+            instructorName: instructor,
+          },
+        });
+      })
+    );
   }
 
   async remove(id: string) {
