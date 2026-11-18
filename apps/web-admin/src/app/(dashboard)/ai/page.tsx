@@ -2,12 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Sparkles, MessagesSquare, BarChart3 } from "lucide-react";
 import { AiRichText, plainAiText } from "@/components/ai-rich-text";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Usage = {
   totalAllTime: number;
@@ -43,6 +44,7 @@ type Transcript = {
 };
 
 type AssistMsg = { role: "user" | "assistant"; content: string };
+type TabId = "copilot" | "transcripts" | "stats";
 
 const ADMIN_PROMPTS = [
   "What should I handle first today?",
@@ -61,6 +63,7 @@ async function copyText(text: string) {
 }
 
 export default function AiAdminPage() {
+  const [tab, setTab] = useState<TabId>("copilot");
   const [data, setData] = useState<Usage | null>(null);
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +73,7 @@ export default function AiAdminPage() {
   const [loadingTx, setLoadingTx] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const chatEnd = useRef<HTMLDivElement | null>(null);
+  const txEnd = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,8 +96,16 @@ export default function AiAdminPage() {
   }, [load]);
 
   useEffect(() => {
-    chatEnd.current?.scrollIntoView({ behavior: "smooth" });
-  }, [assist, sending]);
+    if (tab === "copilot") {
+      chatEnd.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [assist, sending, tab]);
+
+  useEffect(() => {
+    if (tab === "transcripts") {
+      txEnd.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    }
+  }, [transcripts, tab]);
 
   async function markCopied(id: string) {
     setCopiedId(id);
@@ -103,6 +115,7 @@ export default function AiAdminPage() {
   async function askAssist(text: string) {
     const message = text.trim();
     if (message.length < 2 || sending) return;
+    setTab("copilot");
     setSending(true);
     setDraft("");
     setAssist((prev) => [...prev, { role: "user", content: message }]);
@@ -134,292 +147,354 @@ export default function AiAdminPage() {
   }
 
   return (
-    <div className="page-enter space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-900">
-          AI Study Coach
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Ops copilot + student chat transcripts. Keys stay on Render.
-        </p>
-      </div>
+    <div className="page-enter flex h-[calc(100dvh-7.25rem)] min-h-[520px] flex-col overflow-hidden">
+      {/* Compact top bar — no tall page header stack */}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            AI Study Coach
+          </h2>
+          <p className="truncate text-xs text-slate-500">
+            {data?.status.providerConfigured
+              ? `${data.status.model} · ${data.status.dailyLimit}/user/day`
+              : "Local mode · set AI_API_KEY on Render"}
+          </p>
+        </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Mode",
-            value: data?.status.mode ?? "—",
-            extra: (
-              <Badge
-                className="mt-2"
-                variant={
-                  data?.status.providerConfigured ? "success" : "secondary"
-                }
-              >
-                {data?.status.providerConfigured
-                  ? "Cloud key configured"
-                  : "Local coach only"}
-              </Badge>
-            ),
-          },
-          {
-            label: "Model",
-            value: data?.status.model ?? "—",
-            extra: null,
-          },
-          {
-            label: "Requests (7 days)",
-            value: data?.weekRequests ?? "—",
-            extra: null,
-          },
-          {
-            label: "Daily limit / user",
-            value: data?.status.dailyLimit ?? "—",
-            extra: null,
-          },
-        ].map((card) => (
-          <div
-            key={card.label}
-            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/5"
-          >
-            <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-              {card.label}
-            </p>
-            <p className="mt-1 truncate text-lg font-semibold capitalize text-slate-900">
-              {card.value}
-            </p>
-            {card.extra}
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        {/* Admin Copilot */}
-        <section className="flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
-            <div>
-              <h3 className="font-semibold text-slate-900">Admin Copilot</h3>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Read-only — suggests next actions, never changes data.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/fees">Fees</Link>
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/inbox">Inbox</Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2 px-5 pt-3">
-            {ADMIN_PROMPTS.map((p) => (
+        <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          {(
+            [
+              { id: "copilot", label: "Copilot", icon: Sparkles },
+              { id: "transcripts", label: "Student chats", icon: MessagesSquare },
+              { id: "stats", label: "Stats", icon: BarChart3 },
+            ] as const
+          ).map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.id;
+            return (
               <button
-                key={p}
+                key={t.id}
                 type="button"
-                disabled={sending}
-                onClick={() => void askAssist(p)}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition",
+                  active
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-50"
+                )}
               >
-                {p}
+                <Icon className="h-3.5 w-3.5" />
+                {t.label}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+      </div>
 
-          <div className="mt-3 flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-4 py-3">
-            {assist.length === 0 ? (
-              <div className="flex h-full min-h-[160px] items-center justify-center px-4 text-center text-sm text-slate-500">
-                Ask about fees, tickets, enrollments, or student AI prompts.
+      {error ? (
+        <p className="mb-2 shrink-0 text-sm text-red-600">{error}</p>
+      ) : null}
+
+      {/* Single pane — ChatGPT style */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+        {tab === "copilot" ? (
+          <>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+              <p className="text-xs text-slate-500">
+                Read-only ops helper — never changes fees or tickets itself.
+              </p>
+              <div className="flex gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/fees">Fees</Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/inbox">Inbox</Link>
+                </Button>
               </div>
-            ) : (
-              assist.map((m, i) => {
-                const id = `assist-${i}`;
-                const isUser = m.role === "user";
-                return (
-                  <div
-                    key={id}
-                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[92%] rounded-2xl px-3.5 py-2.5 shadow-sm ${
-                        isUser
-                          ? "rounded-br-md bg-blue-600 text-white"
-                          : "rounded-bl-md border border-slate-200 bg-white text-slate-800"
-                      }`}
-                    >
-                      {!isUser ? (
-                        <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                            Copilot
-                          </span>
-                          <button
-                            type="button"
-                            title="Copy reply"
-                            onClick={async () => {
-                              if (await copyText(m.content)) void markCopied(id);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 hover:text-blue-700"
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+                {assist.length === 0 && !sending ? (
+                  <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+                      <Sparkles className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      How can I help today?
+                    </h3>
+                    <p className="mt-1 max-w-md text-sm text-slate-500">
+                      Ask about fees, tickets, enrollments, or what students are
+                      asking the study coach.
+                    </p>
+                    <div className="mt-6 flex w-full max-w-lg flex-wrap justify-center gap-2">
+                      {ADMIN_PROMPTS.map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          disabled={sending}
+                          onClick={() => void askAssist(p)}
+                          className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-left text-xs font-medium text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-50"
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {assist.map((m, i) => {
+                      const id = `assist-${i}`;
+                      const isUser = m.role === "user";
+                      return (
+                        <div
+                          key={id}
+                          className={cn(
+                            "flex w-full gap-3",
+                            isUser ? "justify-end" : "justify-start"
+                          )}
+                        >
+                          {!isUser ? (
+                            <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                              <Sparkles className="h-4 w-4" />
+                            </div>
+                          ) : null}
+                          <div
+                            className={cn(
+                              "max-w-[min(100%,36rem)] rounded-2xl px-4 py-3",
+                              isUser
+                                ? "rounded-br-md bg-blue-600 text-white"
+                                : "rounded-bl-md border border-slate-200 bg-slate-50 text-slate-800"
+                            )}
                           >
-                            <Copy className="h-3 w-3" />
-                            {copiedId === id ? "Copied" : "Copy"}
-                          </button>
+                            {!isUser ? (
+                              <div className="mb-2 flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                  Copilot
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (await copyText(m.content)) {
+                                      void markCopied(id);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-white hover:text-blue-700"
+                                >
+                                  <Copy className="h-3 w-3" />
+                                  {copiedId === id ? "Copied" : "Copy"}
+                                </button>
+                              </div>
+                            ) : null}
+                            {isUser ? (
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                                {m.content}
+                              </p>
+                            ) : (
+                              <AiRichText
+                                text={m.content}
+                                className="text-slate-700"
+                              />
+                            )}
+                          </div>
                         </div>
-                      ) : null}
-                      {isUser ? (
-                        <p className="whitespace-pre-wrap text-sm">{m.content}</p>
+                      );
+                    })}
+                    {sending ? (
+                      <div className="flex gap-3">
+                        <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500">
+                          Thinking…
+                        </div>
+                      </div>
+                    ) : null}
+                    <div ref={chatEnd} />
+                  </>
+                )}
+              </div>
+            </div>
+
+            <form
+              onSubmit={onSubmit}
+              className="shrink-0 border-t border-slate-100 bg-white px-4 py-3"
+            >
+              <div className="mx-auto flex w-full max-w-3xl gap-2">
+                <Textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="Message Admin Copilot…"
+                  className="min-h-[48px] max-h-32 flex-1 resize-none rounded-2xl border-slate-200 bg-slate-50 px-4 py-3"
+                  rows={1}
+                  disabled={sending}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void askAssist(draft);
+                    }
+                  }}
+                />
+                <Button
+                  type="submit"
+                  className="h-12 rounded-2xl px-5"
+                  disabled={sending || draft.trim().length < 2}
+                >
+                  Send
+                </Button>
+              </div>
+            </form>
+          </>
+        ) : null}
+
+        {tab === "transcripts" ? (
+          <>
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+              <p className="text-xs text-slate-500">
+                Live student ↔ study coach messages
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setLoadingTx(true);
+                  void load();
+                }}
+              >
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Refresh
+              </Button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl space-y-3 px-4 py-5">
+                {loadingTx && transcripts.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-slate-500">
+                    Loading…
+                  </p>
+                ) : null}
+                {!loadingTx && transcripts.length === 0 ? (
+                  <p className="py-16 text-center text-sm text-slate-500">
+                    No student chats yet
+                  </p>
+                ) : null}
+                {[...transcripts].reverse().map((t) => {
+                  const student = t.role === "user";
+                  return (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        "rounded-2xl border px-4 py-3",
+                        student
+                          ? "border-blue-100 bg-blue-50/60"
+                          : "border-slate-200 bg-slate-50"
+                      )}
+                    >
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-slate-800">
+                          {t.user.name || t.user.email}
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                            {t.user.accountType}
+                          </span>
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(t.createdAt).toLocaleString()}
+                          </span>
+                          {!student ? (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (await copyText(t.content)) {
+                                  void markCopied(t.id);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-white hover:text-blue-700"
+                            >
+                              <Copy className="h-3 w-3" />
+                              {copiedId === t.id ? "Copied" : "Copy"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        {student ? "Student asked" : "AI replied"}
+                      </p>
+                      {student ? (
+                        <p className="whitespace-pre-wrap text-sm text-slate-700">
+                          {t.content}
+                        </p>
                       ) : (
-                        <AiRichText text={m.content} className="text-slate-700" />
+                        <AiRichText text={t.content} className="text-slate-700" />
                       )}
                     </div>
-                  </div>
-                );
-              })
-            )}
-            {sending ? (
-              <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
-                  Thinking…
+                  );
+                })}
+                <div ref={txEnd} />
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {tab === "stats" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-3xl space-y-5 px-4 py-6">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Mode
+                  </p>
+                  <p className="mt-1 text-lg font-semibold capitalize text-slate-900">
+                    {data?.status.mode ?? "—"}
+                  </p>
+                  <Badge
+                    className="mt-2"
+                    variant={
+                      data?.status.providerConfigured ? "success" : "secondary"
+                    }
+                  >
+                    {data?.status.providerConfigured
+                      ? "Cloud key configured"
+                      : "Local coach only"}
+                  </Badge>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Requests (7 days)
+                  </p>
+                  <p className="mt-1 text-lg font-semibold text-slate-900">
+                    {data?.weekRequests ?? "—"}
+                  </p>
+                  {(data?.weekFailures ?? 0) > 0 ? (
+                    <p className="mt-2 text-xs text-amber-700">
+                      {data?.weekFailures} provider failures this week
+                    </p>
+                  ) : null}
                 </div>
               </div>
-            ) : null}
-            <div ref={chatEnd} />
-          </div>
 
-          <form
-            onSubmit={onSubmit}
-            className="flex gap-2 border-t border-slate-100 bg-white p-4"
-          >
-            <Textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Ask Admin Copilot…"
-              className="min-h-[44px] flex-1 resize-none rounded-xl border-slate-200"
-              rows={2}
-              disabled={sending}
-            />
-            <Button type="submit" disabled={sending || draft.trim().length < 2}>
-              Ask
-            </Button>
-          </form>
-        </section>
-
-        {/* Student transcripts */}
-        <section className="flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-            <div>
-              <h3 className="font-semibold text-slate-900">Student transcripts</h3>
-              <p className="mt-0.5 text-xs text-slate-500">
-                Who asked what — and what the coach replied.
-              </p>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="font-semibold text-slate-900">Top users (7 days)</h3>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {(data?.topUsers ?? []).map((u) => (
+                    <li
+                      key={u.userId}
+                      className="flex justify-between gap-3 border-t border-slate-100 pt-2"
+                    >
+                      <span className="truncate text-slate-700">
+                        {u.name || u.email || u.userId}
+                      </span>
+                      <span className="font-semibold text-slate-900">{u.count}</span>
+                    </li>
+                  ))}
+                  {(data?.topUsers.length ?? 0) === 0 ? (
+                    <li className="text-slate-500">No AI usage yet</li>
+                  ) : null}
+                </ul>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setLoadingTx(true);
-                void load();
-              }}
-            >
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              Refresh
-            </Button>
           </div>
-
-          <ul className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            {loadingTx && transcripts.length === 0 ? (
-              <li className="py-10 text-center text-sm text-slate-500">
-                Loading…
-              </li>
-            ) : null}
-            {!loadingTx && transcripts.length === 0 ? (
-              <li className="py-10 text-center text-sm text-slate-500">
-                No chats yet
-              </li>
-            ) : null}
-            {transcripts.map((t) => {
-              const student = t.role === "user";
-              return (
-                <li
-                  key={t.id}
-                  className={`rounded-2xl border p-3.5 ${
-                    student
-                      ? "border-blue-100 bg-blue-50/50"
-                      : "border-slate-100 bg-slate-50/70"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {t.user.name || t.user.email}
-                      <span className="ml-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                        {t.user.accountType}
-                      </span>
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">
-                        {new Date(t.createdAt).toLocaleString()}
-                      </span>
-                      {!student ? (
-                        <button
-                          type="button"
-                          title="Copy reply"
-                          onClick={async () => {
-                            if (await copyText(t.content)) void markCopied(t.id);
-                          }}
-                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-white hover:text-blue-700"
-                        >
-                          <Copy className="h-3 w-3" />
-                          {copiedId === t.id ? "Copied" : "Copy"}
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                  <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    {student ? "Student asked" : "AI replied"}
-                  </p>
-                  <div className="mt-1.5">
-                    {student ? (
-                      <p className="whitespace-pre-wrap text-sm text-slate-700">
-                        {t.content}
-                      </p>
-                    ) : (
-                      <AiRichText text={t.content} className="text-slate-700" />
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      </div>
-
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/5">
-        <h3 className="font-semibold text-slate-900">Top users (7 days)</h3>
-        <ul className="mt-3 space-y-2 text-sm">
-          {(data?.topUsers ?? []).map((u) => (
-            <li
-              key={u.userId}
-              className="flex justify-between gap-3 border-t border-slate-100 pt-2"
-            >
-              <span className="truncate text-slate-700">
-                {u.name || u.email || u.userId}
-              </span>
-              <span className="font-semibold text-slate-900">{u.count}</span>
-            </li>
-          ))}
-          {(data?.topUsers.length ?? 0) === 0 ? (
-            <li className="text-slate-500">No AI usage yet</li>
-          ) : null}
-        </ul>
-        {(data?.weekFailures ?? 0) > 0 ? (
-          <p className="mt-3 text-xs text-amber-700">
-            {data?.weekFailures} failed provider calls this week (local fallback
-            may have been used).
-          </p>
         ) : null}
-      </section>
+      </div>
     </div>
   );
 }
