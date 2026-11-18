@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/project_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/avatar_service.dart';
@@ -144,9 +145,10 @@ class ProfileScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  "Iske baad aapka account nahi rahega. Courses, fees, attendance, "
-                  "chat aur saara data permanently delete ho jayega. Admin ko bhi "
-                  "pata chal jayega. Dobara login invalid email/password dikhayega.",
+                  'Your account will be permanently removed. Courses, fees, '
+                  'attendance, chat, and all related data will be deleted. '
+                  'Admins will be notified. Signing in again will show an '
+                  'invalid email or password error.',
                   style: TextStyle(
                     fontSize: 14,
                     height: 1.45,
@@ -206,6 +208,7 @@ class ProfileScreen extends StatelessWidget {
     if (!context.mounted) return;
     context.read<CourseProvider>().clearMemory();
     context.read<TaskProvider>().clearMemory();
+    context.read<ProjectProvider>().clear();
     context.read<FeeProvider>().clearMemory();
     context.read<AttendanceProvider>().clearMemory();
     context.read<NotificationProvider>().clearMemory();
@@ -485,7 +488,7 @@ class ProfileScreen extends StatelessWidget {
           const _SectionLabel('HELP & SUPPORT'),
           const SizedBox(height: 4),
           const Text(
-            'Report, complain, survey aur admin chat sab yahan.',
+            'Reports, complaints, surveys, and admin chat are all here.',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -582,6 +585,7 @@ class ProfileScreen extends StatelessWidget {
                 if (!context.mounted) return;
                 context.read<CourseProvider>().clearMemory();
                 context.read<TaskProvider>().clearMemory();
+                context.read<ProjectProvider>().clear();
                 context.read<FeeProvider>().clearMemory();
                 context.read<AttendanceProvider>().clearMemory();
                 context.read<NotificationProvider>().clearMemory();

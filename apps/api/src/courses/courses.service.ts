@@ -80,6 +80,7 @@ export class CoursesService {
       startMonth: string | null;
       rating: number;
       batchLabel: string | null;
+      batch?: { code: string; name: string } | null;
       sections: {
         id: string;
         title: string;
@@ -93,10 +94,28 @@ export class CoursesService {
       }[];
       enrollments?: { paidAmount: number; feeStatus: string }[] | false;
       enrollmentRequests?: { status: string }[] | false;
-      instructor?: { id: string; fullName: string } | null;
+      instructor?: {
+        id: string;
+        fullName: string;
+        experience?: string | null;
+        bio?: string | null;
+        designation?: string | null;
+      } | null;
       _count: { enrollments: number };
     },
-    completedIds: Set<string>
+    completedIds: Set<string>,
+    opts?: {
+      studentFees?: {
+        monthlyFee: number | null;
+        totalCourseFee: number | null;
+        paymentType: string | null;
+        installment1Amount: number | null;
+        installment2Amount: number | null;
+        courseDurationMonths: number | null;
+        batchCode: string | null;
+      } | null;
+      paidFromFees?: number | null;
+    }
   ) {
     const topics = c.sections.flatMap((s) => s.topics);
     const enrollment = Array.isArray(c.enrollments) ? c.enrollments[0] : null;
@@ -108,6 +127,51 @@ export class CoursesService {
       Boolean(enrollment),
       request?.status
     );
+
+    const student = opts?.studentFees;
+    const enrolled = Boolean(enrollment);
+    // Enrolled students see their admin-configured plan when present.
+    const monthlyFee =
+      enrolled && student?.monthlyFee != null ? student.monthlyFee : c.monthlyFee;
+    const totalFee =
+      enrolled && student?.totalCourseFee != null
+        ? student.totalCourseFee
+        : c.totalFee;
+    let installmentCount = c.installmentCount;
+    let installmentFee = c.installmentFee;
+    let paymentType: string | null = null;
+    if (enrolled && student) {
+      paymentType = student.paymentType;
+      if (student.paymentType === "TWO_INSTALLMENTS") {
+        installmentCount = 2;
+        const a = student.installment1Amount ?? 0;
+        const b = student.installment2Amount ?? 0;
+        installmentFee = a || b || Math.round(totalFee / 2);
+      } else if (student.paymentType === "MONTHLY") {
+        installmentCount =
+          student.courseDurationMonths ?? c.durationMonths ?? c.installmentCount;
+        installmentFee = monthlyFee || c.installmentFee;
+      }
+    }
+
+    const paidAmount = Math.max(
+      enrollment?.paidAmount ?? 0,
+      opts?.paidFromFees ?? 0
+    );
+    const remainingBalance = Math.max(0, totalFee - paidAmount);
+    let feeStatus = enrollment?.feeStatus ?? null;
+    if (enrolled) {
+      if (paidAmount <= 0) feeStatus = feeStatus || "DUE";
+      else if (totalFee > 0 && paidAmount >= totalFee) feeStatus = "PAID";
+      else if (paidAmount > 0) feeStatus = "PARTIAL";
+    }
+
+    const batch =
+      (enrolled ? student?.batchCode : null) ||
+      c.batch?.code ||
+      c.batchLabel ||
+      null;
+
     return {
       id: c.id,
       title: c.title,
@@ -115,38 +179,51 @@ export class CoursesService {
       description: c.description,
       thumbnailUrl: c.thumbnailUrl,
       durationMonths: c.durationMonths,
-      monthlyFee: c.monthlyFee,
-      totalFee: c.totalFee,
-      installmentFee: c.installmentFee,
-      installmentCount: c.installmentCount,
+      monthlyFee,
+      totalFee,
+      installmentFee,
+      installmentCount,
+      paymentType,
+      remainingBalance,
+      installment1Amount: student?.installment1Amount ?? null,
+      installment2Amount: student?.installment2Amount ?? null,
       published: c.published,
       allowEnrollmentRequests: Boolean(c.allowEnrollmentRequests),
       instructorId: c.instructorId ?? null,
       instructorName: c.instructor?.fullName ?? null,
+      instructorExperience:
+        c.instructor?.experience || c.instructor?.designation || null,
+      instructorBio: c.instructor?.bio ?? null,
       startMonth: c.startMonth,
       rating: c.rating,
-      batch: c.batchLabel,
+      batch,
       enrolledCount: c._count.enrollments,
-      enrolled: Boolean(enrollment),
+      enrolled,
       enrollmentStatus,
       requestStatus: request?.status ?? null,
-      paidAmount: enrollment?.paidAmount ?? 0,
-      feeStatus: enrollment?.feeStatus ?? null,
+      paidAmount,
+      feeStatus,
       progressPercent: progress.percent,
-      outline: c.sections.map((s) => ({
-        id: s.id,
-        title: s.title,
-        order: s.sortOrder,
-        topics: s.topics
-          .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((t) => ({
-            id: t.id,
-            title: t.title,
-            minutes: t.minutes,
-            order: t.sortOrder,
-            completed: completedIds.has(t.id),
-          })),
-      })),
+      outline: enrollment
+        ? c.sections.map((s) => ({
+            id: s.id,
+            title: s.title,
+            order: s.sortOrder,
+            topics: s.topics
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((t) => ({
+                id: t.id,
+                title: t.title,
+                minutes: t.minutes,
+                order: t.sortOrder,
+                completed: completedIds.has(t.id),
+              })),
+          }))
+        : [],
+      topicsTotal: topics.length,
+      topicsDone: enrollment
+        ? topics.filter((t) => completedIds.has(t.id)).length
+        : 0,
     };
   }
 
@@ -162,20 +239,52 @@ export class CoursesService {
   }
 
   async list(userId?: string, publishedOnly = true) {
-    const courses = await this.prisma.course.findMany({
-      where: publishedOnly ? { published: true } : undefined,
-      include: {
-        sections: {
-          include: { topics: true },
-          orderBy: { sortOrder: "asc" },
+    const [courses, student, feePaidRows] = await Promise.all([
+      this.prisma.course.findMany({
+        where: publishedOnly ? { published: true } : undefined,
+        include: {
+          sections: {
+            include: { topics: true },
+            orderBy: { sortOrder: "asc" },
+          },
+          enrollments: userId ? { where: { userId } } : false,
+          enrollmentRequests: userId ? { where: { userId } } : false,
+          batch: { select: { code: true, name: true } },
+          instructor: {
+            select: {
+              id: true,
+              fullName: true,
+              experience: true,
+              bio: true,
+              designation: true,
+            },
+          },
+          _count: { select: { enrollments: true } },
         },
-        enrollments: userId ? { where: { userId } } : false,
-        enrollmentRequests: userId ? { where: { userId } } : false,
-        instructor: { select: { id: true, fullName: true } },
-        _count: { select: { enrollments: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      userId
+        ? this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              monthlyFee: true,
+              totalCourseFee: true,
+              paymentType: true,
+              installment1Amount: true,
+              installment2Amount: true,
+              courseDurationMonths: true,
+              batch: { select: { code: true } },
+            },
+          })
+        : Promise.resolve(null),
+      userId
+        ? this.prisma.feeCase.groupBy({
+            by: ["courseId"],
+            where: { studentId: userId, courseId: { not: null } },
+            _sum: { amountPaid: true },
+          })
+        : Promise.resolve([]),
+    ]);
 
     let completedIds = new Set<string>();
     if (userId) {
@@ -186,7 +295,31 @@ export class CoursesService {
       completedIds = new Set(progress.map((p) => p.topicId));
     }
 
-    return courses.map((c) => this.mapCourse(c, completedIds));
+    const paidByCourse = new Map<string, number>();
+    for (const row of feePaidRows) {
+      if (row.courseId) {
+        paidByCourse.set(row.courseId, row._sum.amountPaid ?? 0);
+      }
+    }
+
+    const studentFees = student
+      ? {
+          monthlyFee: student.monthlyFee,
+          totalCourseFee: student.totalCourseFee,
+          paymentType: student.paymentType,
+          installment1Amount: student.installment1Amount,
+          installment2Amount: student.installment2Amount,
+          courseDurationMonths: student.courseDurationMonths,
+          batchCode: student.batch?.code ?? null,
+        }
+      : null;
+
+    return courses.map((c) =>
+      this.mapCourse(c, completedIds, {
+        studentFees,
+        paidFromFees: paidByCourse.get(c.id) ?? 0,
+      })
+    );
   }
 
   async get(id: string, userId?: string) {

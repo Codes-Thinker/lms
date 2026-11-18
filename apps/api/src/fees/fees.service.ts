@@ -358,6 +358,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     if (status === FeeStatus.PAID) data.amountPaid = fee.amount;
     if (status === FeeStatus.WAIVED) data.amountPaid = fee.amountPaid ?? 0;
     await this.prisma.feeCase.update({ where: { id }, data });
+    await this.syncEnrollmentPaid(fee.studentId, fee.courseId ?? null);
     if (status === FeeStatus.PAID) {
       await this.notifications.notifyUser({
         userId: fee.studentId,
@@ -368,6 +369,48 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       });
     }
     return this.get(id);
+  }
+
+  /**
+   * Keep Enrollment.paidAmount / feeStatus in sync with verified FeeCase payments
+   * so the student app course details match the admin fee workflow.
+   */
+  async syncEnrollmentPaid(studentId: string, courseId: string | null) {
+    if (!courseId) return;
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { userId_courseId: { userId: studentId, courseId } },
+    });
+    if (!enrollment) return;
+
+    const [agg, course, student] = await Promise.all([
+      this.prisma.feeCase.aggregate({
+        where: { studentId, courseId },
+        _sum: { amountPaid: true },
+      }),
+      this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { totalFee: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: studentId },
+        select: { totalCourseFee: true },
+      }),
+    ]);
+
+    const paid = Math.max(0, agg._sum.amountPaid ?? 0);
+    const total = Math.max(
+      0,
+      student?.totalCourseFee ?? course?.totalFee ?? 0
+    );
+    let feeStatus = enrollment.feeStatus;
+    if (paid <= 0) feeStatus = "DUE";
+    else if (total > 0 && paid >= total) feeStatus = "PAID";
+    else feeStatus = "PARTIAL";
+
+    await this.prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: { paidAmount: paid, feeStatus },
+    });
   }
 
   /**
@@ -610,6 +653,8 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
           data: { status: "APPROVED", reviewedById: reviewerId, reviewedAt: new Date() },
         });
       }
+
+      await this.syncEnrollmentPaid(fee.studentId, fee.courseId);
 
       // Notify student
       await this.notifications.notifyUser({

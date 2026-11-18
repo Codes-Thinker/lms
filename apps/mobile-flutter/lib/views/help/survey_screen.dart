@@ -5,8 +5,21 @@ import '../../providers/support_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 
-class SurveyScreen extends StatelessWidget {
+class SurveyScreen extends StatefulWidget {
   const SurveyScreen({super.key});
+
+  @override
+  State<SurveyScreen> createState() => _SurveyScreenState();
+}
+
+class _SurveyScreenState extends State<SurveyScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SupportProvider>().loadSurveyQuestions();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +39,8 @@ class SurveyScreen extends StatelessWidget {
             ),
             child: Text(
               support.surveyDone
-                  ? 'Survey complete. Admin Feedback mein aapka naam dikhega.'
-                  : 'November training feedback, 2 minute, admin sab responses dekhega.',
+                  ? 'Survey complete. Your name will appear in Admin Feedback.'
+                  : 'Training feedback — takes about 2 minutes. Admins can view all responses.',
               style: const TextStyle(fontWeight: FontWeight.w600, height: 1.4),
             ),
           ),

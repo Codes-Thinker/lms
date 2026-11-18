@@ -25,6 +25,7 @@ class AssignedTask {
   final String assignedBy;
   String status; // DONE | IN_PROGRESS | PENDING
   final DateTime dueAt;
+  final DateTime? createdAt;
   final int timerMinutes;
   int spentSeconds;
   final String updatedAt;
@@ -45,6 +46,7 @@ class AssignedTask {
     required this.spentSeconds,
     required this.updatedAt,
     required this.chat,
+    this.createdAt,
   });
 
   /// Count-up elapsed work time (always).

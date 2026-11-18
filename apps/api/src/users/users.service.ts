@@ -29,6 +29,20 @@ export class UsersService {
     private readonly notifications: NotificationsService
   ) {}
 
+  async listBatches() {
+    const rows = await this.prisma.batch.findMany({
+      orderBy: [{ code: "asc" }, { name: "asc" }],
+      include: { department: { select: { name: true } } },
+    });
+    return rows.map((b) => ({
+      id: b.id,
+      code: b.code,
+      name: b.name,
+      departmentId: b.departmentId,
+      departmentName: b.department?.name ?? null,
+    }));
+  }
+
   private hashToken(token: string): string {
     return createHash("sha256").update(token).digest("hex");
   }
@@ -201,6 +215,8 @@ export class UsersService {
           accountType: u.accountType,
           status: u.status,
           designation: u.designation,
+          experience: u.experience,
+          bio: u.bio,
           phone: u.phone,
           track: u.track,
           profileImage: u.profileImage,
@@ -269,15 +285,23 @@ export class UsersService {
       accountType: u.accountType,
       status: u.status,
       designation: u.designation,
+      experience: u.experience,
+      bio: u.bio,
       phone: u.phone,
       track: u.track,
       profileImage: u.profileImage,
       monthlyFee: u.monthlyFee,
       feeStartDate: u.feeStartDate,
       feeDueDay: u.feeDueDay,
+      totalCourseFee: u.totalCourseFee,
+      courseDurationMonths: u.courseDurationMonths,
+      paymentType: u.paymentType,
+      installment1Amount: u.installment1Amount,
+      installment2Amount: u.installment2Amount,
       department: u.department?.name ?? null,
       departmentId: u.departmentId,
       batch: u.batch?.code ?? null,
+      batchName: u.batch?.name ?? null,
       batchId: u.batchId,
       roles: u.roles.map((r) => r.role.code),
       invitedAt: u.invitedAt,
@@ -527,6 +551,8 @@ export class UsersService {
         accountType: dto.accountType,
         status: hasPassword ? AccountStatus.ACTIVE : AccountStatus.INVITED,
         designation: dto.designation,
+        experience: dto.experience?.trim() || null,
+        bio: dto.bio?.trim() || null,
         phone: dto.phone,
         track: dto.track,
         departmentId: dto.departmentId,
@@ -680,10 +706,27 @@ export class UsersService {
     if (dto.email !== undefined) data.email = dto.email.toLowerCase().trim();
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.designation !== undefined) data.designation = dto.designation;
+    if (dto.experience !== undefined) {
+      data.experience = dto.experience?.trim() || null;
+    }
+    if (dto.bio !== undefined) data.bio = dto.bio?.trim() || null;
     if (dto.phone !== undefined) data.phone = dto.phone?.trim() || null;
     if (dto.track !== undefined) data.track = dto.track?.trim() || null;
     if (dto.profileImage !== undefined) data.profileImage = dto.profileImage;
     if (dto.monthlyFee !== undefined) data.monthlyFee = dto.monthlyFee;
+    if (dto.paymentType !== undefined) data.paymentType = dto.paymentType;
+    if (dto.installment1Amount !== undefined) {
+      data.installment1Amount = dto.installment1Amount;
+    }
+    if (dto.installment2Amount !== undefined) {
+      data.installment2Amount = dto.installment2Amount;
+    }
+    if (dto.courseDurationMonths !== undefined) {
+      data.courseDurationMonths = dto.courseDurationMonths;
+    }
+    if (dto.totalCourseFee !== undefined) {
+      data.totalCourseFee = dto.totalCourseFee;
+    }
     if (dto.internshipStart !== undefined) {
       data.internshipStart = dto.internshipStart
         ? new Date(dto.internshipStart)

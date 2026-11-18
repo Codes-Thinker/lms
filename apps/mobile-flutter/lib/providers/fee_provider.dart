@@ -5,12 +5,13 @@ import '../services/image_compress_service.dart';
 import '../services/local_cache.dart';
 
 class FeeProvider extends ChangeNotifier {
-  String adminName = 'Ayaz Aslam';
-  String adminPhone = '+92 300 0000001';
-  String jazzCash = '0300-0000001';
-  String easyPaisa = '0300-0000001';
-  String bankTitle = "Code's Thinker";
-  String bankAccount = 'PK00 CTBK 0000 0000 0001';
+  // Empty until /fees/payment-info loads — never show fake account numbers.
+  String adminName = '';
+  String adminPhone = '';
+  String jazzCash = '';
+  String easyPaisa = '';
+  String bankTitle = '';
+  String bankAccount = '';
 
   bool _loading = false;
   List<FeePaymentCase> _cases = [];
@@ -58,7 +59,9 @@ class FeeProvider extends ChangeNotifier {
         courseTitle: j['courseTitle'] as String? ?? '',
         month: j['month'] as String? ?? '',
         amount: (j['amount'] as num?)?.toInt() ?? 0,
+        amountPaid: (j['amountPaid'] as num?)?.toInt() ?? 0,
         status: _mapStatus(j['status'] as String?),
+        dueDate: j['dueDate'] as String? ?? j['nextPaymentDate'] as String?,
         chat: _mapChat(j['chat'] as List?),
         paymentScreenshotData: j['paymentScreenshotData'] as String?,
       );
@@ -120,7 +123,12 @@ class FeeProvider extends ChangeNotifier {
 
   void clearMemory() {
     _cases = [];
-    adminName = 'Ayaz Aslam';
+    adminName = '';
+    adminPhone = '';
+    jazzCash = '';
+    easyPaisa = '';
+    bankTitle = '';
+    bankAccount = '';
     notifyListeners();
   }
 

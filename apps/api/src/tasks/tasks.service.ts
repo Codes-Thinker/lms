@@ -518,10 +518,12 @@ export class TasksService {
       assignedBy: p.createdBy?.fullName ?? null,
       status: p.status,
       deadline: p.deadline?.toISOString().slice(0, 10) ?? null,
+      startDate: p.createdAt.toISOString().slice(0, 10),
       techStack: p.techStack,
       repoUrl: p.repoUrl,
       progressPercent: p.progressPercent,
       updatedAt: p.updatedAt.toISOString(),
+      createdAt: p.createdAt.toISOString(),
     }));
   }
 
@@ -556,10 +558,28 @@ export class TasksService {
       progressPercent: number;
       title: string;
       description: string;
-    }>
+    }>,
+    actor?: { userId: string; accountType: string },
   ) {
+    const existing = await this.prisma.project.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Project not found");
+
+    // Interns may only update their own project; staff/admin may update any.
+    if (
+      actor &&
+      actor.accountType !== "SUPER_ADMIN" &&
+      actor.accountType !== "STAFF" &&
+      existing.internId !== actor.userId
+    ) {
+      throw new ForbiddenException("You can only update your own projects");
+    }
+
     await this.prisma.project.update({ where: { id }, data });
-    const list = await this.listProjects();
+    const list = await this.listProjects(
+      actor?.accountType === "SUPER_ADMIN" || actor?.accountType === "STAFF"
+        ? undefined
+        : actor?.userId,
+    );
     const row = list.find((x) => x.id === id);
     if (!row) throw new NotFoundException("Project not found");
     return row;

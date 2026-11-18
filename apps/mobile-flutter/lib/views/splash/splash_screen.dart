@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../providers/project_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -136,6 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
       final attendance = context.read<AttendanceProvider>();
       final notes = context.read<NotificationProvider>();
       final teaching = context.read<TeachingProvider>();
+      final projects = context.read<ProjectProvider>();
       await Future.wait([
         courses.fetchAll(),
         tasks.load(),
@@ -143,6 +145,7 @@ class _SplashScreenState extends State<SplashScreen>
         attendance.loadMine(),
         notes.load(),
         if (auth.isStaff) teaching.load(),
+        if (auth.isIntern) projects.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
       final userId = auth.user?.id;

@@ -41,9 +41,10 @@ class TimeUtils {
   }
 
   static String countdown(DateTime target, [DateTime? now]) {
-    final current = now ?? DateTime.now();
-    var diff = target.difference(current);
-    if (diff.isNegative) return 'Started';
+    final current = (now ?? DateTime.now()).toLocal();
+    final end = target.toLocal();
+    var diff = end.difference(current);
+    if (diff.isNegative) return 'Overdue';
     final hours = diff.inHours;
     final minutes = diff.inMinutes.remainder(60);
     final seconds = diff.inSeconds.remainder(60);

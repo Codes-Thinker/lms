@@ -26,6 +26,16 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     return '$m:$s';
   }
 
+  String _dateLabel(DateTime dt) {
+    final local = dt.toLocal();
+    final y = local.year.toString().padLeft(4, '0');
+    final mo = local.month.toString().padLeft(2, '0');
+    final d = local.day.toString().padLeft(2, '0');
+    final h = local.hour.toString().padLeft(2, '0');
+    final mi = local.minute.toString().padLeft(2, '0');
+    return '$y-$mo-$d $h:$mi';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +86,22 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   '${task.courseTitle}, assigned by ${task.assignedBy}',
                   style: const TextStyle(color: AppColors.muted),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  [
+                    'Status: ${task.status}',
+                    if (task.createdAt != null)
+                      'Assigned: ${_dateLabel(task.createdAt!)}',
+                    'Deadline: ${_dateLabel(task.dueAt)}',
+                    if (task.timerMinutes > 0)
+                      'Timer goal: ${task.timerMinutes} min',
+                  ].join('\n'),
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
+                    height: 1.45,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -85,7 +111,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Text('Due in',
+                      const Text('Time left',
                           style: TextStyle(fontWeight: FontWeight.w600)),
                       const Spacer(),
                       LiveCountdown(

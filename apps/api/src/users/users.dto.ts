@@ -29,6 +29,14 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  experience?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bio?: string | null;
+
+  @IsOptional()
+  @IsString()
   phone?: string;
 
   @IsOptional()
@@ -125,6 +133,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   designation?: string;
+
+  @IsOptional()
+  @IsString()
+  experience?: string | null;
+
+  @IsOptional()
+  @IsString()
+  bio?: string | null;
 
   @IsOptional()
   @IsString()

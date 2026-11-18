@@ -179,8 +179,12 @@ export class TasksController {
   @Patch("projects/:id")
   updateProject(
     @Param("id") id: string,
-    @Body() body: { status?: TaskStatus; progressPercent?: number }
+    @CurrentUser() user: AuthUser,
+    @Body() body: { status?: TaskStatus; progressPercent?: number },
   ) {
-    return this.tasks.updateProject(id, body);
+    return this.tasks.updateProject(id, body, {
+      userId: user.sub,
+      accountType: user.accountType,
+    });
   }
 }

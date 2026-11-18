@@ -65,6 +65,14 @@ const emptyForm = {
   accountType: "STUDENT" as (typeof ACCOUNT_TYPES)[number],
   track: "",
   phone: "",
+  batchId: "",
+};
+
+type BatchOption = {
+  id: string;
+  code: string;
+  name: string;
+  departmentName?: string | null;
 };
 
 const emptyStudentFee = {
@@ -150,6 +158,7 @@ function UsersPageInner() {
   const [form, setForm] = useState(emptyForm);
   const [studentFee, setStudentFee] = useState(emptyStudentFee);
   const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
+  const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [q, setQ] = useState(qFromUrl);
   const [roleTab, setRoleTab] = useState<RoleTab>("ALL");
@@ -185,6 +194,9 @@ function UsersPageInner() {
     api<CourseOption[]>("/courses?all=1")
       .then(setCourseOptions)
       .catch(() => setCourseOptions([]));
+    api<BatchOption[]>("/users/meta/batches")
+      .then(setBatchOptions)
+      .catch(() => setBatchOptions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qFromUrl]);
 
@@ -305,6 +317,7 @@ function UsersPageInner() {
         sendInvitation: !form.password.trim(),
       };
       if (form.accountType === "STUDENT") {
+        if (form.batchId.trim()) body.batchId = form.batchId.trim();
         if (studentFee.courseIds.length) body.courseIds = studentFee.courseIds;
         const monthlyFee = numOrUndefined(studentFee.monthlyFee);
         const totalCourseFee = numOrUndefined(studentFee.totalCourseFee);
@@ -537,6 +550,29 @@ function UsersPageInner() {
               <p className="text-xs text-slate-500">
                 Optional: configure course access and payment plan at signup
               </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="student-batch">Batch</Label>
+              <select
+                id="student-batch"
+                className="flex h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                value={form.batchId}
+                onChange={(e) => setField("batchId", e.target.value)}
+              >
+                <option value="">No batch assigned</option>
+                {batchOptions.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.code}
+                    {b.name ? ` — ${b.name}` : ""}
+                    {b.departmentName ? ` (${b.departmentName})` : ""}
+                  </option>
+                ))}
+              </select>
+              {batchOptions.length === 0 ? (
+                <p className="text-xs text-slate-500">
+                  No batches found. Create batches in the system first.
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label>Courses</Label>

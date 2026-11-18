@@ -9,6 +9,7 @@ import {
   CourseEditor,
   emptyCourseValue,
   editorValueToPayload,
+  syncInstructorProfile,
   type CourseEditorValue,
 } from "@/components/courses/course-editor";
 
@@ -44,6 +45,7 @@ export default function NewCoursePage() {
               method: "POST",
               body: JSON.stringify(editorValueToPayload(value)),
             });
+            await syncInstructorProfile(value);
             show("Course created. Live for students if published.");
             router.push(`/courses/${created.id}`);
           } catch (e) {

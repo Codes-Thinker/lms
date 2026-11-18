@@ -26,7 +26,9 @@ class FeePaymentCase {
   final String courseTitle;
   final String month;
   final int amount;
-  final String status; // DUE | SENT | APPROVED | REJECTED
+  final int amountPaid;
+  final String status; // DUE | SENT | APPROVED | REJECTED | PAID
+  final String? dueDate;
   final List<FeeChatMessage> chat;
   final String? paymentScreenshotData;
 
@@ -36,7 +38,9 @@ class FeePaymentCase {
     required this.courseTitle,
     required this.month,
     required this.amount,
+    this.amountPaid = 0,
     required this.status,
+    this.dueDate,
     required this.chat,
     this.paymentScreenshotData,
   });
@@ -45,6 +49,8 @@ class FeePaymentCase {
     String? status,
     List<FeeChatMessage>? chat,
     String? paymentScreenshotData,
+    int? amountPaid,
+    String? dueDate,
   }) {
     return FeePaymentCase(
       id: id,
@@ -52,7 +58,9 @@ class FeePaymentCase {
       courseTitle: courseTitle,
       month: month,
       amount: amount,
+      amountPaid: amountPaid ?? this.amountPaid,
       status: status ?? this.status,
+      dueDate: dueDate ?? this.dueDate,
       chat: chat ?? this.chat,
       paymentScreenshotData:
           paymentScreenshotData ?? this.paymentScreenshotData,

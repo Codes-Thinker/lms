@@ -27,6 +27,13 @@ export class UsersController {
     return this.users.list(query);
   }
 
+  /** Batches for student assignment dropdowns. */
+  @Get("meta/batches")
+  @Roles("SUPER_ADMIN", "STAFF")
+  listBatches() {
+    return this.users.listBatches();
+  }
+
   /** Self hard-delete — any signed-in app user. */
   @Delete("me")
   @Roles("SUPER_ADMIN", "STAFF", "STUDENT", "INTERN")

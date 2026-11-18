@@ -101,11 +101,17 @@ class CourseProvider extends ChangeNotifier {
     );
   }
 
+  /// Office / report attendance % (not per-course placeholder).
+  double _reportAttendancePercent = 0;
+  double get reportAttendancePercent => _reportAttendancePercent;
+
   double get overallAttendance {
+    if (_reportAttendancePercent > 0) return _reportAttendancePercent;
     final enrolled = enrolledCourses;
     if (enrolled.isEmpty) return 0;
-    return enrolled.map((c) => c.attendancePercent).reduce((a, b) => a + b) /
-        enrolled.length;
+    final sum =
+        enrolled.map((c) => c.attendancePercent).fold<double>(0, (a, b) => a + b);
+    return sum / enrolled.length;
   }
 
   int get totalFeeDue {
@@ -168,11 +174,25 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Pull real attendance % from /reports/me (office + history based).
+  Future<void> fetchReportStats() async {
+    try {
+      final data =
+          await ApiClient.instance.get('/reports/me') as Map<String, dynamic>;
+      _reportAttendancePercent =
+          (data['attendancePercent'] as num?)?.toDouble() ?? 0;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Report stats fetch failed: $e');
+    }
+  }
+
   /// Fetch both courses and categories in parallel.
   Future<void> fetchAll() async {
     await Future.wait([
       fetchEnrolledCourses(),
       fetchCategories(),
+      fetchReportStats(),
     ]);
   }
 
@@ -180,6 +200,7 @@ class CourseProvider extends ChangeNotifier {
     _courses = [];
     _categories = [];
     _activeCourse = null;
+    _reportAttendancePercent = 0;
     _markedAttendance.clear();
     _selectedCategory = 'All';
     _searchQuery = '';
@@ -203,11 +224,15 @@ class CourseProvider extends ChangeNotifier {
 
   Future<void> markTopicComplete(String courseId, String topicId) async {
     final course = _courses.firstWhere((c) => c.id == courseId);
+    Topic? target;
     for (final section in course.outline) {
       for (final topic in section.topics) {
-        if (topic.id == topicId) topic.completed = true;
+        if (topic.id == topicId) target = topic;
       }
     }
+    if (target == null) return;
+    final wasCompleted = target.completed;
+    target.completed = true;
     course.progressPercent = course.topicsTotal == 0
         ? 0
         : (course.topicsDone / course.topicsTotal) * 100;
@@ -216,7 +241,16 @@ class CourseProvider extends ChangeNotifier {
       await ApiClient.instance.post('/courses/topics/$topicId/progress', body: {
         'completed': true,
       });
-    } catch (_) {}
+      // Refresh enrolled courses so progress matches DB after restart.
+      await fetchEnrolledCourses();
+    } catch (e) {
+      target.completed = wasCompleted;
+      course.progressPercent = course.topicsTotal == 0
+          ? 0
+          : (course.topicsDone / course.topicsTotal) * 100;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   void markStudentAttendance(String studentKey, String status) {

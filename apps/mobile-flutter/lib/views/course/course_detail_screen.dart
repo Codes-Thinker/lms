@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/api_errors.dart' show ApiErrors;
 import '../../models/course.dart';
+import '../../models/fee_payment.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/fee_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/api_client.dart';
 import '../../widgets/app_loader.dart';
@@ -11,15 +13,29 @@ import '../../widgets/course_cover.dart';
 import '../../widgets/live_countdown.dart';
 import '../help/admin_chat_screen.dart';
 
-class CourseDetailScreen extends StatelessWidget {
+class CourseDetailScreen extends StatefulWidget {
   final String courseId;
 
   const CourseDetailScreen({super.key, required this.courseId});
 
   @override
+  State<CourseDetailScreen> createState() => _CourseDetailScreenState();
+}
+
+class _CourseDetailScreenState extends State<CourseDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CourseProvider>().fetchEnrolledCourses();
+      context.read<FeeProvider>().load();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final courses = context.watch<CourseProvider>();
-    final matches = courses.courses.where((c) => c.id == courseId);
+    final matches = courses.courses.where((c) => c.id == widget.courseId);
     final course = matches.isEmpty ? null : matches.first;
 
     if (course == null) {
@@ -102,18 +118,100 @@ class _EnrolledContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        if ((course.instructorName ?? '').isNotEmpty ||
+            course.batch.isNotEmpty) ...[
+          Row(
+            children: [
+              if ((course.instructorName ?? '').isNotEmpty)
+                Expanded(
+                  child: _infoCard(
+                    'Instructor',
+                    course.instructorName!,
+                    subtitle: course.instructorExperience,
+                  ),
+                ),
+              if ((course.instructorName ?? '').isNotEmpty &&
+                  course.batch.isNotEmpty)
+                const SizedBox(width: 8),
+              if (course.batch.isNotEmpty)
+                Expanded(
+                  child: _infoCard('Batch', course.batch),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
         Row(
           children: [
             _chip('Monthly', 'Rs ${course.monthlyFee}'),
             const SizedBox(width: 8),
-            _chip('${course.installmentCount}× inst.',
-                'Rs ${course.installmentFee}'),
+            _chip(course.paymentPlanLabel, 'Rs ${course.installmentFee}'),
             const SizedBox(width: 8),
-            _chip('Complete', 'Rs ${course.totalFee}'),
+            _chip('Total fee', 'Rs ${course.totalFee}'),
           ],
         ),
+        if (course.paymentType == 'TWO_INSTALLMENTS' &&
+            (course.installment1Amount != null ||
+                course.installment2Amount != null)) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _chip(
+                'Installment 1',
+                'Rs ${course.installment1Amount ?? course.installmentFee}',
+              ),
+              const SizedBox(width: 8),
+              _chip(
+                'Installment 2',
+                'Rs ${course.installment2Amount ?? course.installmentFee}',
+              ),
+              const SizedBox(width: 8),
+              const Expanded(child: SizedBox()),
+            ],
+          ),
+        ],
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _chip('Paid', 'Rs ${course.paidAmount}'),
+            const SizedBox(width: 8),
+            _chip('Remaining', 'Rs ${course.remainingBalance}'),
+            const SizedBox(width: 8),
+            _chip('Status', course.feeStatusLabel),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const Text('Payment history',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Consumer<FeeProvider>(
+          builder: (context, fees, _) {
+            final history = fees.cases
+                .where((c) => c.courseId == course.id)
+                .toList();
+            if (history.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Text(
+                  'No payment records yet.',
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              );
+            }
+            return Column(
+              children: history
+                  .map((c) => _paymentHistoryTile(c))
+                  .toList(),
+            );
+          },
+        ),
         const SizedBox(height: 20),
-        const Text('Roadmap',
+        const Text('Lectures',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         ...course.outline.map<Widget>((section) {
@@ -136,8 +234,18 @@ class _EnrolledContent extends StatelessWidget {
                 trailing: topic.completed
                     ? null
                     : TextButton(
-                        onPressed: () =>
-                            courses.markTopicComplete(course.id, topic.id),
+                        onPressed: () async {
+                          try {
+                            await courses.markTopicComplete(
+                                course.id, topic.id);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            context.read<UiProvider>().showSnack(
+                                  ApiErrors.friendly(e),
+                                  tone: AppSnackTone.error,
+                                );
+                          }
+                        },
                         child: const Text('Done'),
                       ),
               );
@@ -169,6 +277,87 @@ class _EnrolledContent extends StatelessWidget {
                     const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _infoCard(String label, String value, {String? subtitle}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+          const SizedBox(height: 4),
+          Text(value,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          if ((subtitle ?? '').isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(subtitle!,
+                style: const TextStyle(color: AppColors.muted, fontSize: 11)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentHistoryTile(FeePaymentCase c) {
+    final paid = c.status == 'APPROVED' || c.status == 'PAID';
+    final statusLabel = paid
+        ? 'Paid'
+        : c.status == 'SENT'
+            ? 'Under review'
+            : c.status == 'REJECTED'
+                ? 'Rejected'
+                : 'Pending';
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(c.month,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(
+                  c.dueDate == null || c.dueDate!.isEmpty
+                      ? 'Due amount Rs ${c.amount}'
+                      : 'Due ${c.dueDate} · Rs ${c.amount}',
+                  style:
+                      const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+                if (c.amountPaid > 0)
+                  Text('Verified paid Rs ${c.amountPaid}',
+                      style: const TextStyle(
+                          color: AppColors.green, fontSize: 12)),
+              ],
+            ),
+          ),
+          Text(statusLabel,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: paid
+                    ? AppColors.green
+                    : c.status == 'REJECTED'
+                        ? Colors.redAccent
+                        : AppColors.blue,
+              )),
+        ],
       ),
     );
   }

@@ -24,14 +24,23 @@ type Report = {
     status?: string;
     track?: string | null;
     designation?: string | null;
+    experience?: string | null;
+    bio?: string | null;
     department?: string | null;
     batch?: string | null;
+    batchId?: string | null;
     phone?: string | null;
     profileImage?: string | null;
     lastLoginAt?: string | null;
     createdAt?: string;
     internshipStart?: string | null;
     internshipEnd?: string | null;
+    monthlyFee?: number | null;
+    totalCourseFee?: number | null;
+    paymentType?: string | null;
+    installment1Amount?: number | null;
+    installment2Amount?: number | null;
+    courseDurationMonths?: number | null;
   };
   attendancePercent: number;
   feesPending: number;
@@ -91,12 +100,28 @@ type RawUser = {
   status?: string;
   track?: string | null;
   designation?: string | null;
+  experience?: string | null;
+  bio?: string | null;
   department?: { name?: string } | string | null;
   batch?: { code?: string } | string | null;
+  batchId?: string | null;
   phone?: string | null;
   profileImage?: string | null;
   lastLoginAt?: string | null;
   createdAt?: string;
+  monthlyFee?: number | null;
+  totalCourseFee?: number | null;
+  paymentType?: string | null;
+  installment1Amount?: number | null;
+  installment2Amount?: number | null;
+  courseDurationMonths?: number | null;
+};
+
+type BatchOption = {
+  id: string;
+  code: string;
+  name: string;
+  departmentName?: string | null;
 };
 
 function emptyReportFromUser(u: RawUser): Report {
@@ -115,12 +140,21 @@ function emptyReportFromUser(u: RawUser): Report {
       status: u.status,
       track: u.track,
       designation: u.designation,
+      experience: u.experience,
+      bio: u.bio,
       department: dept,
       batch,
+      batchId: u.batchId ?? null,
       phone: u.phone,
       profileImage: u.profileImage,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
+      monthlyFee: u.monthlyFee,
+      totalCourseFee: u.totalCourseFee,
+      paymentType: u.paymentType,
+      installment1Amount: u.installment1Amount,
+      installment2Amount: u.installment2Amount,
+      courseDurationMonths: u.courseDurationMonths,
     },
     attendancePercent: 0,
     feesPending: 0,
@@ -148,6 +182,7 @@ export default function UserProfilePage() {
   const [catalog, setCatalog] = useState<Array<{ id: string; title: string }>>(
     []
   );
+  const [batchOptions, setBatchOptions] = useState<BatchOption[]>([]);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -156,6 +191,15 @@ export default function UserProfilePage() {
     phone: "",
     track: "",
     designation: "",
+    experience: "",
+    bio: "",
+    batchId: "",
+    monthlyFee: "",
+    totalCourseFee: "",
+    paymentType: "MONTHLY",
+    installment1Amount: "",
+    installment2Amount: "",
+    courseDurationMonths: "",
     password: "",
     courseIds: [] as string[],
   });
@@ -169,6 +213,26 @@ export default function UserProfilePage() {
       phone: r.user.phone || "",
       track: r.user.track || "",
       designation: r.user.designation || "",
+      experience: r.user.experience || "",
+      bio: r.user.bio || "",
+      batchId: r.user.batchId || "",
+      monthlyFee:
+        r.user.monthlyFee != null ? String(r.user.monthlyFee) : "",
+      totalCourseFee:
+        r.user.totalCourseFee != null ? String(r.user.totalCourseFee) : "",
+      paymentType: r.user.paymentType || "MONTHLY",
+      installment1Amount:
+        r.user.installment1Amount != null
+          ? String(r.user.installment1Amount)
+          : "",
+      installment2Amount:
+        r.user.installment2Amount != null
+          ? String(r.user.installment2Amount)
+          : "",
+      courseDurationMonths:
+        r.user.courseDurationMonths != null
+          ? String(r.user.courseDurationMonths)
+          : "",
       password: "",
       courseIds: r.courses.map((c) => c.id),
     });
@@ -179,10 +243,38 @@ export default function UserProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await api<Report>(`/reports/users/${params.id}`);
+        const [data, detail] = await Promise.all([
+          api<Report>(`/reports/users/${params.id}`),
+          api<RawUser>(`/users/${params.id}`).catch(() => null),
+        ]);
         if (!cancelled) {
-          setReport(data);
-          hydrateForm(data);
+          const merged: Report = {
+            ...data,
+            user: {
+              ...data.user,
+              batchId: detail?.batchId ?? data.user.batchId ?? null,
+              experience: detail?.experience ?? data.user.experience ?? null,
+              bio: detail?.bio ?? data.user.bio ?? null,
+              monthlyFee: detail?.monthlyFee ?? data.user.monthlyFee ?? null,
+              totalCourseFee:
+                detail?.totalCourseFee ?? data.user.totalCourseFee ?? null,
+              paymentType: detail?.paymentType ?? data.user.paymentType ?? null,
+              installment1Amount:
+                detail?.installment1Amount ??
+                data.user.installment1Amount ??
+                null,
+              installment2Amount:
+                detail?.installment2Amount ??
+                data.user.installment2Amount ??
+                null,
+              courseDurationMonths:
+                detail?.courseDurationMonths ??
+                data.user.courseDurationMonths ??
+                null,
+            },
+          };
+          setReport(merged);
+          hydrateForm(merged);
         }
       } catch (reportErr) {
         try {
@@ -226,6 +318,12 @@ export default function UserProfilePage() {
         }
       } catch {
         /* optional */
+      }
+      try {
+        const batches = await api<BatchOption[]>("/users/meta/batches");
+        if (!cancelled) setBatchOptions(batches);
+      } catch {
+        if (!cancelled) setBatchOptions([]);
       }
     })();
     return () => {
@@ -291,9 +389,32 @@ export default function UserProfilePage() {
         phone: form.phone.trim() || null,
         track: form.track.trim() || null,
         designation: form.designation.trim() || null,
+        experience: form.experience.trim() || null,
+        bio: form.bio.trim() || null,
+        batchId: form.batchId.trim() || null,
         courseIds: form.courseIds,
       };
       if (form.password.trim()) body.password = form.password.trim();
+      if (form.accountType === "STUDENT") {
+        const monthly = Number(form.monthlyFee);
+        const total = Number(form.totalCourseFee);
+        const months = Number(form.courseDurationMonths);
+        const inst1 = Number(form.installment1Amount);
+        const inst2 = Number(form.installment2Amount);
+        if (form.monthlyFee.trim() !== "" && !Number.isNaN(monthly))
+          body.monthlyFee = monthly;
+        if (form.totalCourseFee.trim() !== "" && !Number.isNaN(total))
+          body.totalCourseFee = total;
+        if (form.courseDurationMonths.trim() !== "" && !Number.isNaN(months))
+          body.courseDurationMonths = months;
+        body.paymentType = form.paymentType;
+        if (form.paymentType === "TWO_INSTALLMENTS") {
+          if (form.installment1Amount.trim() !== "" && !Number.isNaN(inst1))
+            body.installment1Amount = inst1;
+          if (form.installment2Amount.trim() !== "" && !Number.isNaN(inst2))
+            body.installment2Amount = inst2;
+        }
+      }
       await api(`/users/${params.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -481,6 +602,134 @@ export default function UserProfilePage() {
                 }
               />
             </div>
+            {form.accountType === "STAFF" ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Instructor experience</Label>
+                  <Input
+                    value={form.experience}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, experience: e.target.value }))
+                    }
+                    placeholder="e.g. 5 years Flutter"
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Instructor profile / bio</Label>
+                  <Input
+                    value={form.bio}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, bio: e.target.value }))
+                    }
+                    placeholder="Short profile shown on course details"
+                  />
+                </div>
+              </>
+            ) : null}
+            {form.accountType === "STUDENT" ? (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Batch</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    value={form.batchId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, batchId: e.target.value }))
+                    }
+                  >
+                    <option value="">No batch assigned</option>
+                    {batchOptions.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.code}
+                        {b.name ? ` — ${b.name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Monthly fee (Rs)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.monthlyFee}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, monthlyFee: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Total course fee (Rs)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.totalCourseFee}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, totalCourseFee: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Duration (months)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.courseDurationMonths}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        courseDurationMonths: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Payment type</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
+                    value={form.paymentType}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, paymentType: e.target.value }))
+                    }
+                  >
+                    <option value="MONTHLY">MONTHLY</option>
+                    <option value="TWO_INSTALLMENTS">TWO INSTALLMENTS</option>
+                    <option value="CUSTOM">CUSTOM</option>
+                  </select>
+                </div>
+                {form.paymentType === "TWO_INSTALLMENTS" ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label>Installment 1 (Rs)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={form.installment1Amount}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            installment1Amount: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Installment 2 (Rs)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={form.installment2Amount}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            installment2Amount: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </>
+            ) : null}
             <div className="space-y-1.5">
               <Label>New password (optional)</Label>
               <div className="flex gap-2">

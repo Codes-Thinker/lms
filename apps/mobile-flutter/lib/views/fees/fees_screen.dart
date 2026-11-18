@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/responsive.dart';
+import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
 import '../../providers/ui_provider.dart';
 import 'fee_chat_screen.dart';
@@ -17,9 +18,15 @@ class FeesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fees = context.watch<FeeProvider>();
+    final courses = context.watch<CourseProvider>();
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
     final pending = fees.pendingAmount;
+    final enrolled = courses.enrolledCourses;
+    final paidCases =
+        fees.cases.where((c) => c.status == 'APPROVED' || c.status == 'PAID');
+    final pendingCases = fees.cases
+        .where((c) => c.status != 'APPROVED' && c.status != 'PAID');
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -54,7 +61,7 @@ class FeesScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Online transfer ➡️ screenshot in chat ➡️ admin approves.',
+            'Online transfer → screenshot in chat → admin approves.',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -62,6 +69,65 @@ class FeesScreen extends StatelessWidget {
               fontWeight: FontWeight.w500,
             ),
           ),
+          if (enrolled.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Text(
+              'COURSE FEE SUMMARY',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.7,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...enrolled.map((c) {
+              final remaining = (c.totalFee - c.paidAmount).clamp(0, c.totalFee);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        c.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Total Rs ${c.totalFee} · '
+                        '${c.installmentCount}× Rs ${c.installmentFee} · '
+                        'Paid Rs ${c.paidAmount} · Remaining Rs $remaining',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            Text(
+              'Installments: ${paidCases.length} paid · ${pendingCases.length} pending',
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
 
           const SizedBox(height: 26),
           const Text(
@@ -75,7 +141,9 @@ class FeesScreen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Pay to ${fees.adminName}, then open fee chat & attach screenshot',
+            fees.adminName.trim().isEmpty
+                ? 'Payment details will appear once the admin publishes them.'
+                : 'Pay to ${fees.adminName}, then open fee chat and attach a screenshot',
             style: const TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -83,48 +151,77 @@ class FeesScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.line),
+          if (fees.jazzCash.isEmpty &&
+              fees.easyPaisa.isEmpty &&
+              fees.adminPhone.isEmpty &&
+              fees.bankAccount.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: const Text(
+                'No payment accounts configured yet.',
+                style: TextStyle(color: AppColors.muted),
+              ),
+            )
+          else
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Column(
+                children: [
+                  if (fees.jazzCash.isNotEmpty) ...[
+                    _payRow(
+                      context,
+                      label: 'JazzCash',
+                      value: fees.jazzCash,
+                      color: const Color(0xFFCC0000),
+                      icon: Icons.account_balance_wallet_rounded,
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                  ],
+                  if (fees.easyPaisa.isNotEmpty) ...[
+                    _payRow(
+                      context,
+                      label: 'EasyPaisa',
+                      value: fees.easyPaisa,
+                      color: const Color(0xFF00A651),
+                      icon: Icons.payments_rounded,
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                  ],
+                  if (fees.adminPhone.isNotEmpty) ...[
+                    _payRow(
+                      context,
+                      label: 'Phone',
+                      value: fees.adminPhone,
+                      color: AppColors.blueDark,
+                      icon: Icons.phone_rounded,
+                    ),
+                    const Divider(height: 1, color: AppColors.line),
+                  ],
+                  if (fees.bankAccount.isNotEmpty ||
+                      fees.bankTitle.isNotEmpty)
+                    _payRow(
+                      context,
+                      label: 'Bank',
+                      value: [
+                        if (fees.bankTitle.isNotEmpty) fees.bankTitle,
+                        if (fees.bankAccount.isNotEmpty) fees.bankAccount,
+                      ].join(', '),
+                      color: const Color(0xFF1A1C2E),
+                      icon: Icons.account_balance_rounded,
+                    ),
+                ],
+              ),
             ),
-            child: Column(
-              children: [
-                _payRow(
-                  context,
-                  label: 'JazzCash',
-                  value: fees.jazzCash,
-                  color: const Color(0xFFCC0000),
-                  icon: Icons.account_balance_wallet_rounded,
-                ),
-                const Divider(height: 1, color: AppColors.line),
-                _payRow(
-                  context,
-                  label: 'EasyPaisa',
-                  value: fees.easyPaisa,
-                  color: const Color(0xFF00A651),
-                  icon: Icons.payments_rounded,
-                ),
-                const Divider(height: 1, color: AppColors.line),
-                _payRow(
-                  context,
-                  label: 'Phone',
-                  value: fees.adminPhone,
-                  color: AppColors.blueDark,
-                  icon: Icons.phone_rounded,
-                ),
-                const Divider(height: 1, color: AppColors.line),
-                _payRow(
-                  context,
-                  label: 'Bank',
-                  value: '${fees.bankTitle}, ${fees.bankAccount}',
-                  color: const Color(0xFF1A1C2E),
-                  icon: Icons.account_balance_rounded,
-                ),
-              ],
-            ),
-          ),
 
           const SizedBox(height: 26),
           const Text(

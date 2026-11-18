@@ -38,6 +38,8 @@ export type CourseEditorValue = {
   published: boolean;
   allowEnrollmentRequests: boolean;
   instructorId: string;
+  instructorExperience: string;
+  instructorBio: string;
   outline: EditorSection[];
 };
 
@@ -60,6 +62,8 @@ export function emptyCourseValue(): CourseEditorValue {
     published: true,
     allowEnrollmentRequests: false,
     instructorId: "",
+    instructorExperience: "",
+    instructorBio: "",
     outline: [
       {
         key: uid("sec"),
@@ -87,6 +91,8 @@ export function courseToEditorValue(course: {
   published: boolean;
   allowEnrollmentRequests?: boolean;
   instructorId?: string | null;
+  instructorExperience?: string | null;
+  instructorBio?: string | null;
   outline?: {
     id: string;
     title: string;
@@ -107,6 +113,8 @@ export function courseToEditorValue(course: {
     published: course.published,
     allowEnrollmentRequests: course.allowEnrollmentRequests ?? false,
     instructorId: course.instructorId ?? "",
+    instructorExperience: course.instructorExperience ?? "",
+    instructorBio: course.instructorBio ?? "",
     outline:
       course.outline?.map((s) => ({
         key: s.id,
@@ -151,6 +159,19 @@ export function editorValueToPayload(value: CourseEditorValue) {
   };
 }
 
+/** Persist instructor experience/bio on the assigned staff user. */
+export async function syncInstructorProfile(value: CourseEditorValue) {
+  const instructorId = value.instructorId.trim();
+  if (!instructorId) return;
+  await api(`/users/${instructorId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      experience: value.instructorExperience.trim() || null,
+      bio: value.instructorBio.trim() || null,
+    }),
+  });
+}
+
 async function fileToCoverDataUrl(file: File): Promise<string> {
   const bitmap = await createImageBitmap(file);
   const maxW = 960;
@@ -188,13 +209,27 @@ export function CourseEditor({
   const [coverError, setCoverError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [instructors, setInstructors] = useState<
-    { id: string; fullName?: string; name?: string; email: string }[]
+    {
+      id: string;
+      fullName?: string;
+      name?: string;
+      email: string;
+      experience?: string | null;
+      bio?: string | null;
+    }[]
   >([]);
 
   useEffect(() => {
-    api<{ items: { id: string; fullName?: string; name?: string; email: string }[] }>(
-      "/users?accountType=STAFF&pageSize=100"
-    )
+    api<{
+      items: {
+        id: string;
+        fullName?: string;
+        name?: string;
+        email: string;
+        experience?: string | null;
+        bio?: string | null;
+      }[];
+    }>("/users?accountType=STAFF&pageSize=100")
       .then((r) => setInstructors(r.items))
       .catch(() => {});
   }, []);
@@ -230,6 +265,21 @@ export function CourseEditor({
     key: K,
     next: CourseEditorValue[K]
   ) => onChange({ ...value, [key]: next });
+
+  useEffect(() => {
+    if (!value.instructorId) return;
+    const match = instructors.find((u) => u.id === value.instructorId);
+    if (!match) return;
+    const patch: Partial<CourseEditorValue> = {};
+    if (!value.instructorExperience && match.experience) {
+      patch.instructorExperience = match.experience;
+    }
+    if (!value.instructorBio && match.bio) {
+      patch.instructorBio = match.bio;
+    }
+    if (Object.keys(patch).length) onChange({ ...value, ...patch });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instructors, value.instructorId]);
 
   const updateSection = (key: string, patch: Partial<EditorSection>) => {
     set(
@@ -388,7 +438,16 @@ export function CourseEditor({
           <select
             className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
             value={value.instructorId}
-            onChange={(e) => set("instructorId", e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              const match = instructors.find((u) => u.id === id);
+              onChange({
+                ...value,
+                instructorId: id,
+                instructorExperience: match?.experience ?? "",
+                instructorBio: match?.bio ?? "",
+              });
+            }}
           >
             <option value="">No instructor assigned</option>
             {instructors.map((u) => (
@@ -398,6 +457,27 @@ export function CourseEditor({
             ))}
           </select>
         </div>
+        {value.instructorId ? (
+          <>
+            <div className="space-y-2">
+              <Label>Instructor experience</Label>
+              <Input
+                value={value.instructorExperience}
+                onChange={(e) => set("instructorExperience", e.target.value)}
+                placeholder="e.g. 5 years industry experience"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Instructor profile / description</Label>
+              <Textarea
+                value={value.instructorBio}
+                onChange={(e) => set("instructorBio", e.target.value)}
+                placeholder="Short bio shown on student course details"
+                rows={3}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="glass-card space-y-4 p-5">

@@ -6,6 +6,7 @@ import '../../core/constants/app_motion.dart';
 import '../../core/responsive.dart';
 import '../../models/task.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/project_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../widgets/app_loader.dart';
 import 'task_detail_screen.dart';
@@ -17,6 +18,7 @@ class TasksScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final tasks = context.watch<TaskProvider>();
+    final projects = context.watch<ProjectProvider>();
     final userId = auth.user?.id ?? '';
     final mine = tasks.tasksForUser(userId);
     final pad = AppResponsive.pagePad(context);
@@ -70,10 +72,19 @@ class TasksScreen extends StatelessWidget {
           const SizedBox(width: 6),
         ],
       ),
-      body: tasks.loading
+      body: tasks.loading && mine.isEmpty && projects.projects.isEmpty
           ? const Center(child: AppLoader())
-          : ListView(
+          : RefreshIndicator(
+              color: AppColors.blue,
+              onRefresh: () async {
+                await Future.wait([
+                  context.read<TaskProvider>().load(),
+                  if (auth.isIntern) context.read<ProjectProvider>().load(),
+                ]);
+              },
+              child: ListView(
               padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom),
+              physics: const AlwaysScrollableScrollPhysics(),
               children: [
                 Text(
                   subtitle,
@@ -95,10 +106,90 @@ class TasksScreen extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 14),
+                if (auth.isIntern && projects.projects.isNotEmpty) ...[
+                  const Text(
+                    'ASSIGNED PROJECTS',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...projects.projects.map(
+                    (p) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              [
+                                p.status,
+                                if (p.startDate != null)
+                                  'Start ${p.startDate!.toLocal().toString().split(' ').first}',
+                                if (p.deadline != null)
+                                  'Due ${p.deadline!.toLocal().toString().split(' ').first}',
+                                '${p.progressPercent}%',
+                                if ((p.techStack ?? '').isNotEmpty) p.techStack!,
+                              ].join(' · '),
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            if ((p.description ?? '').trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                p.description!.trim(),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'TASKS & TIMER',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (mine.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 48),
-                    child: Center(
+                  Padding(
+                    padding: EdgeInsets.only(
+                      top: auth.isIntern && projects.projects.isNotEmpty ? 12 : 48,
+                    ),
+                    child: const Center(
                       child: Text(
                         'No tasks assigned yet',
                         style: TextStyle(color: AppColors.muted),
@@ -123,6 +214,7 @@ class TasksScreen extends StatelessWidget {
                     ),
                   ),
               ],
+            ),
             ),
     );
   }

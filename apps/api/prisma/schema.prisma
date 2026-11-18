@@ -140,6 +140,10 @@ model User {
   accountType    AccountType
   status         AccountStatus @default(INVITED)
   designation    String?
+  /** Staff/instructor years or experience blurb (e.g. "5 years"). */
+  experience     String?
+  /** Optional instructor / staff profile text. */
+  bio            String?
   phone          String?
   track          String?
   departmentId   String?

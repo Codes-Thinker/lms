@@ -146,8 +146,11 @@ class TaskProvider extends ChangeNotifier {
       assignedToName: json['assignedToName'] as String? ?? '',
       assignedBy: json['assignedBy'] as String? ?? '',
       status: status,
-      dueAt: DateTime.tryParse(json['dueAt'] as String? ?? '') ??
-          DateTime.now().add(const Duration(days: 1)),
+      dueAt: (DateTime.tryParse(json['dueAt'] as String? ?? '') ??
+              DateTime.now().add(const Duration(days: 1)))
+          .toLocal(),
+      createdAt:
+          DateTime.tryParse(json['createdAt'] as String? ?? '')?.toLocal(),
       timerMinutes: (json['timerMinutes'] as num?)?.toInt() ?? 0,
       spentSeconds: ((json['spentMinutes'] as num?)?.toInt() ?? 0) * 60,
       updatedAt: json['updatedAt'] as String? ?? '',

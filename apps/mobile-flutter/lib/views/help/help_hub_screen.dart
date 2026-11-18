@@ -135,7 +135,7 @@ class _HelpHubScreenState extends State<HelpHubScreen> {
         ),
         children: [
           const Text(
-            'Report, complain, survey aur admin chat sab yahan.',
+            'Reports, complaints, surveys, and admin chat are all here.',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 13,

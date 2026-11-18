@@ -12,6 +12,7 @@ import {
   courseToEditorValue,
   editorValueToPayload,
   emptyCourseValue,
+  syncInstructorProfile,
   type CourseEditorValue,
 } from "@/components/courses/course-editor";
 
@@ -31,6 +32,8 @@ type CourseDto = {
   allowEnrollmentRequests?: boolean;
   instructorId?: string | null;
   instructorName?: string | null;
+  instructorExperience?: string | null;
+  instructorBio?: string | null;
   enrolledCount?: number;
   outline?: {
     id: string;
@@ -289,6 +292,7 @@ export default function EditCoursePage() {
               method: "PATCH",
               body: JSON.stringify(editorValueToPayload(value)),
             });
+            await syncInstructorProfile(value);
             show("Course updated and synced for students");
             const [fresh, students] = await Promise.all([
               api<CourseDto>(`/courses/${params.id}`),

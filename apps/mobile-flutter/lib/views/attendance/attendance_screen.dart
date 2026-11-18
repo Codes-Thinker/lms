@@ -76,7 +76,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     if (!att.insideGeofence) {
       setState(() => _locBusy = false);
       ui.showSnack(
-        'Office ke ${att.geofenceRadius}m ke andar aao (ab ${att.distanceFromOffice}m door)',
+        'Move within ${att.geofenceRadius}m of the office (currently ${att.distanceFromOffice}m away)',
         tone: AppSnackTone.warning,
       );
       return;
@@ -231,7 +231,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
           ),
           const SizedBox(height: 8),
           const Text(
-            'Check-in only inside 50m. Arrival / leave alerts need Location = Allow all the time. Check-out anytime. Shift end pe auto checkout (Asia/Karachi).',
+            'Check-in only inside the office geofence. Background alerts need Location = Allow all the time. Check out anytime. Auto check-out runs at shift end (Asia/Karachi).',
             style: TextStyle(color: AppColors.muted, fontSize: 13, height: 1.35),
           ),
           const SizedBox(height: 20),
@@ -301,7 +301,7 @@ class _AttendanceScreenState extends State<AttendanceScreen>
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
-                'Office zone mein aao. Check-in enable hoga. Pehli entry pe din mein ek reminder milega.',
+                'Enter the office zone to enable check-in. You will get one arrival reminder per day.',
                 style: TextStyle(color: AppColors.muted, height: 1.4),
               ),
             )
@@ -363,6 +363,93 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                 ],
               );
             }),
+          const SizedBox(height: 28),
+          const Text(
+            'HISTORY',
+            style: TextStyle(
+              color: AppColors.muted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (attendance.history.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No attendance records yet. Total attendance: 0.',
+                style: TextStyle(color: AppColors.muted, height: 1.4),
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${attendance.history.length} record${attendance.history.length == 1 ? '' : 's'}',
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ),
+            ...List.generate(
+              attendance.history.length > 30 ? 30 : attendance.history.length,
+              (i) {
+                final row = attendance.history[i];
+                final day = row.checkInAt.toLocal();
+                final dayLabel =
+                    '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+                final out = row.checkOutAt;
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dayLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'In ${_fmt(row.checkInAt)}'
+                                  '${out != null ? ' → Out ${_fmt(out)} · ${row.durationLabel}' : ''}',
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            row.status,
+                            style: const TextStyle(
+                              color: AppColors.blue,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (i <
+                        (attendance.history.length > 30
+                                ? 30
+                                : attendance.history.length) -
+                            1)
+                      const Divider(
+                          height: 1, thickness: 0.5, color: AppColors.line),
+                  ],
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
