@@ -30,6 +30,22 @@ class HomeScreen extends StatelessWidget {
   static const _softOrange = Color(0xFFFFF4EC);
   static const _softRose = Color(0xFFFFEEF0);
 
+  /// Attendance card tone by %: under 20 red, under 50 orange,
+  /// under 75 amber, 75+ green.
+  static ({Color bg, Color accent}) _attendanceTone(double percent) {
+    final p = percent.isNaN ? 0.0 : percent.clamp(0, 100);
+    if (p < 20) {
+      return (bg: const Color(0xFFFFEEF0), accent: const Color(0xFFDC2626));
+    }
+    if (p < 50) {
+      return (bg: const Color(0xFFFFF4EC), accent: const Color(0xFFEA580C));
+    }
+    if (p < 75) {
+      return (bg: const Color(0xFFFFFBEB), accent: const Color(0xFFD97706));
+    }
+    return (bg: const Color(0xFFECFDF5), accent: const Color(0xFF059669));
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -397,6 +413,9 @@ class HomeScreen extends StatelessWidget {
                       );
                     }
 
+                    final attendancePct = courses.overallAttendance;
+                    final attendanceTone = _attendanceTone(attendancePct);
+
                     final tiles = <Widget>[
                       _pastelStat(
                         icon: CupertinoIcons.book_fill,
@@ -413,10 +432,9 @@ class HomeScreen extends StatelessWidget {
                       _pastelStat(
                         icon: CupertinoIcons.chart_pie_fill,
                         label: 'Attendance',
-                        value:
-                            '${courses.overallAttendance.toStringAsFixed(0)}%',
-                        bg: _softOrange,
-                        accent: const Color(0xFFEA580C),
+                        value: '${attendancePct.toStringAsFixed(0)}%',
+                        bg: attendanceTone.bg,
+                        accent: attendanceTone.accent,
                         onTap: () =>
                             context.read<UiProvider>().setNavIndex(2),
                       ),
