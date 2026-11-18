@@ -289,42 +289,72 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final modeLabel = _mode == 'llm'
-        ? 'Study plan'
-        : (_mode == 'local' ||
-                _mode == 'local-fallback' ||
-                _mode == 'safe-guard')
-            ? 'Study plan'
-            : null;
     final subtitle = [
       if (_remainingToday != null) '$_remainingToday left today',
-      if (modeLabel != null) modeLabel,
-      if (_remainingToday == null && modeLabel == null)
-        'Your enrolled courses only',
+      'Study plan',
     ].join(' · ');
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: const Color(0xFFF3F6FB),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        backgroundColor: const Color(0xFFF3F6FB),
+        foregroundColor: AppColors.ink,
+        titleSpacing: 0,
+        title: Row(
           children: [
-            const Text(
-              'AI Study Coach',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.blue.withValues(alpha: 0.14),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Image.asset(
+                AppBrand.aiRobotBubbleAsset,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppColors.blueDark,
+                  size: 20,
+                ),
+              ),
             ),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'AI Study Coach',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.ink,
         actions: [
           if (_messages.isNotEmpty)
             IconButton(
@@ -337,72 +367,143 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _loading && _messages.isEmpty
-                ? const _SkeletonChat()
-                : _messages.isEmpty
-                    ? _EmptyState(onSuggestion: _sending ? null : _send)
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        itemCount: _messages.length + (_sending ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (_sending && index == _messages.length) {
-                            return const _TypingBubble();
-                          }
-                          final msg = _messages[index];
-                          return _ChatBubble(
-                            key: ValueKey(msg.id),
-                            mine: msg.role == 'user',
-                            text: msg.content,
-                          );
-                        },
-                      ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focus,
-                      enabled: !_sending,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _send(),
-                      decoration: InputDecoration(
-                        hintText: 'Ask about your study plan…',
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sending ? null : () => _send(),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.blue,
-                    ),
-                    icon: _sending
-                        ? const AppLoader(size: 18, color: Colors.white)
-                        : const Icon(Icons.send_rounded, color: Colors.white),
-                  ),
-                ],
+            child: DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFF3F6FB), Color(0xFFEEF3FA)],
+                ),
               ),
+              child: _loading && _messages.isEmpty
+                  ? const _SkeletonChat()
+                  : _messages.isEmpty
+                      ? _EmptyState(onSuggestion: _sending ? null : _send)
+                      : ListView.builder(
+                          controller: _scroll,
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                          itemCount: _messages.length + (_sending ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (_sending && index == _messages.length) {
+                              return const _TypingBubble();
+                            }
+                            final msg = _messages[index];
+                            return _ChatBubble(
+                              key: ValueKey(msg.id),
+                              mine: msg.role == 'user',
+                              text: msg.content,
+                            );
+                          },
+                        ),
             ),
           ),
+          _ComposerBar(
+            controller: _controller,
+            focusNode: _focus,
+            sending: _sending,
+            onSend: _send,
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _ComposerBar extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool sending;
+  final VoidCallback onSend;
+
+  const _ComposerBar({
+    required this.controller,
+    required this.focusNode,
+    required this.sending,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        border: const Border(top: BorderSide(color: Color(0xFFE6ECF4))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF7F9FC),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    enabled: !sending,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => onSend(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: AppColors.ink,
+                      height: 1.35,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Ask about your study plan…',
+                      hintStyle: TextStyle(
+                        color: AppColors.muted,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Material(
+                color: AppColors.blueDark,
+                borderRadius: BorderRadius.circular(16),
+                elevation: 0,
+                child: InkWell(
+                  onTap: sending ? null : onSend,
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Center(
+                      child: sending
+                          ? const AppLoader(size: 20, color: Colors.white)
+                          : const Icon(
+                              Icons.arrow_upward_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -414,7 +515,6 @@ class _ChatBubble extends StatelessWidget {
 
   const _ChatBubble({super.key, required this.mine, required this.text});
 
-  /// Clipboard-friendly plain text (no raw markdown markers).
   static String plainCopy(String raw) {
     var s = raw;
     s = s.replaceAllMapped(
@@ -437,61 +537,141 @@ class _ChatBubble extends StatelessWidget {
     return s.trim();
   }
 
-  Future<void> _copy(BuildContext context) async {
+  Future<void> _copyAi(BuildContext context) async {
     await Clipboard.setData(ClipboardData(text: plainCopy(text)));
     if (!context.mounted) return;
-    context.read<UiProvider>().showSnack('Message copied');
+    context.read<UiProvider>().showSnack('Reply copied');
+    HapticFeedback.selectionClick();
   }
 
   @override
   Widget build(BuildContext context) {
-    final baseStyle = TextStyle(
-      color: mine ? Colors.white : AppColors.ink,
-      height: 1.4,
+    if (mine) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12, left: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          constraints: const BoxConstraints(maxWidth: 300),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF3B82F6), Color(0xFF2563EB)],
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(18),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.blue.withValues(alpha: 0.28),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              height: 1.35,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final baseStyle = const TextStyle(
+      color: AppColors.ink,
+      height: 1.45,
       fontSize: 14.5,
+      fontWeight: FontWeight.w500,
     );
 
     return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: GestureDetector(
-        onLongPress: () => _copy(context),
+        onLongPress: () => _copyAi(context),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          margin: const EdgeInsets.only(bottom: 12, right: 40),
           constraints: const BoxConstraints(maxWidth: 320),
           decoration: BoxDecoration(
-            color: mine ? AppColors.blue : Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(mine ? 16 : 4),
-              bottomRight: Radius.circular(mine ? 4 : 16),
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(6),
+              topRight: Radius.circular(18),
+              bottomLeft: Radius.circular(18),
+              bottomRight: Radius.circular(18),
             ),
-            border: mine ? null : Border.all(color: AppColors.line),
+            border: Border.all(color: const Color(0xFFE8EEF6)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E293B).withValues(alpha: 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (mine)
-                SelectableText(text, style: baseStyle)
-              else
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: AppColors.softBlue,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: Image.asset(
+                        AppBrand.aiRobotBubbleAsset,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 12,
+                          color: AppColors.blueDark,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Coach',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.muted,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 MarkdownBody(
                   data: text,
-                  selectable: true,
+                  selectable: false,
                   softLineBreak: true,
                   styleSheet: MarkdownStyleSheet(
                     p: baseStyle,
+                    pPadding: const EdgeInsets.only(bottom: 6),
                     strong: baseStyle.copyWith(fontWeight: FontWeight.w800),
                     em: baseStyle.copyWith(fontStyle: FontStyle.italic),
                     listBullet: baseStyle,
-                    unorderedListAlign: WrapAlignment.start,
-                    orderedListAlign: WrapAlignment.start,
+                    listIndent: 18,
                     h1: baseStyle.copyWith(
-                      fontSize: 17,
+                      fontSize: 16.5,
                       fontWeight: FontWeight.w800,
                     ),
                     h2: baseStyle.copyWith(
-                      fontSize: 16,
+                      fontSize: 15.5,
                       fontWeight: FontWeight.w800,
                     ),
                     h3: baseStyle.copyWith(
@@ -509,27 +689,8 @@ class _ChatBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  tooltip: 'Copy',
-                  onPressed: () => _copy(context),
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 28,
-                    minHeight: 28,
-                  ),
-                  icon: Icon(
-                    Icons.copy_rounded,
-                    size: 15,
-                    color: mine
-                        ? Colors.white.withValues(alpha: 0.85)
-                        : AppColors.muted,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -620,36 +781,42 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 20),
       children: [
         Center(
-          child: Image.asset(
-            AppBrand.aiRobotBubbleAsset,
-            width: 88,
-            height: 88,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-            errorBuilder: (_, __, ___) => Container(
-              width: 80,
-              height: 80,
-              decoration: const BoxDecoration(
-                color: AppColors.softBlue,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
+          child: Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.blue.withValues(alpha: 0.16),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(14),
+            child: Image.asset(
+              AppBrand.aiRobotBubbleAsset,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.high,
+              errorBuilder: (_, __, ___) => const Icon(
                 Icons.auto_awesome_rounded,
                 color: AppColors.blueDark,
-                size: 36,
+                size: 40,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         const Text(
           'Your study-plan coach',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.w800,
             color: AppColors.ink,
-            letterSpacing: -0.3,
+            letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: 8),
@@ -658,38 +825,59 @@ class _EmptyState extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
-            height: 1.4,
+            height: 1.45,
             color: AppColors.muted,
             fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
         ..._AiCoachScreenState._suggestions.map(
           (s) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Material(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(16),
+              elevation: 0,
+              shadowColor: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 onTap: onSuggestion == null ? null : () => onSuggestion!(s),
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
-                    vertical: 12,
+                    vertical: 13,
                   ),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.line),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE6ECF4)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF1E293B).withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    s,
-                    style: const TextStyle(
-                      color: AppColors.ink,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13.5,
-                    ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          s,
+                          style: const TextStyle(
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13.5,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.north_east_rounded,
+                        size: 16,
+                        color: AppColors.blue,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -732,17 +920,24 @@ class _TypingBubbleState extends State<_TypingBubble> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 12, right: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(16),
+            topLeft: Radius.circular(6),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
+            bottomRight: Radius.circular(18),
           ),
-          border: Border.all(color: AppColors.line),
+          border: Border.all(color: const Color(0xFFE8EEF6)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E293B).withValues(alpha: 0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -754,7 +949,7 @@ class _TypingBubbleState extends State<_TypingBubble> {
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: active ? AppColors.blue : AppColors.line,
+                color: active ? AppColors.blue : const Color(0xFFD8E0EA),
                 shape: BoxShape.circle,
               ),
             );
