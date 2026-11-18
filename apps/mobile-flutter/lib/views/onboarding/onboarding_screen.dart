@@ -65,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   final _page = PageController();
   final _index = ValueNotifier<int>(0);
   late final AnimationController _loop;
-  late final AnimationController _ctaPulse;
+  late final AnimationController _cta;
 
   @override
   void initState() {
@@ -78,12 +78,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
     _loop = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 4200),
+      duration: const Duration(milliseconds: 5200),
     )..repeat();
-    _ctaPulse = AnimationController(
+    _cta = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
   }
 
   @override
@@ -91,7 +91,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _page.dispose();
     _index.dispose();
     _loop.dispose();
-    _ctaPulse.dispose();
+    _cta.dispose();
     super.dispose();
   }
 
@@ -117,39 +117,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final size = MediaQuery.sizeOf(context);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Soft ambient wash behind the open hero (no hard card edge).
-          Positioned(
-            top: 72,
-            left: -40,
-            right: -40,
-            height: MediaQuery.sizeOf(context).height * 0.42,
-            child: AnimatedBuilder(
-              animation: _loop,
-              builder: (_, __) {
-                final drift = math.sin(_loop.value * math.pi * 2) * 12;
-                return IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment(0, -0.2 + drift / 80),
-                        radius: 0.95,
-                        colors: [
-                          const Color(0xFF2563EB).withValues(alpha: 0.14),
-                          const Color(0xFF2563EB).withValues(alpha: 0.04),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.45, 1.0],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+          // Full-screen living blur (not clipped into a card).
+          AnimatedBuilder(
+            animation: _loop,
+            builder: (_, __) => _FullScreenBlurField(t: _loop.value, size: size),
           ),
           SafeArea(
             child: Column(
@@ -158,7 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   padding: const EdgeInsets.fromLTRB(16, 6, 8, 0),
                   child: Row(
                     children: [
-                      const CtMark(size: 32),
+                      const CtMark(size: 30),
                       const SizedBox(width: 10),
                       const Text(
                         AppBrand.shortName,
@@ -199,11 +177,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     itemBuilder: (context, i) {
                       final p = _pages[i];
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                        padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
                         child: Column(
                           children: [
                             Expanded(
-                              flex: 11,
+                              flex: 12,
                               child: AnimatedBuilder(
                                 animation: _loop,
                                 builder: (_, __) => _OpenScene(
@@ -216,7 +194,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               flex: 7,
                               child: Column(
                                 children: [
-                                  const SizedBox(height: 8),
                                   Text(
                                     p.title,
                                     textAlign: TextAlign.center,
@@ -277,12 +254,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             }),
                           ),
                           const SizedBox(height: 16),
-                          _SlimCtaButton(
+                          _EmojiCtaButton(
                             label: last ? 'Get started' : 'Continue',
-                            icon: last
-                                ? Icons.arrow_forward_rounded
-                                : Icons.arrow_forward_ios_rounded,
-                            pulse: _ctaPulse,
+                            emoji: last ? '🚀' : '✨',
+                            loop: _cta,
                             onTap: last ? _finish : _next,
                           ),
                         ],
@@ -299,27 +274,91 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-/// Slim animated CTA with icon and soft outer glow (not a heavy block).
-class _SlimCtaButton extends StatelessWidget {
+/// Soft blurred color field that fills the whole screen and slowly drifts.
+class _FullScreenBlurField extends StatelessWidget {
+  final double t;
+  final Size size;
+
+  const _FullScreenBlurField({required this.t, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final a = t * math.pi * 2;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: AppColors.bg),
+        Positioned(
+          left: size.width * 0.05 + math.sin(a) * 36,
+          top: size.height * 0.08 + math.cos(a) * 28,
+          child: _blurBlob(220, const Color(0xFF60A5FA), 0.34),
+        ),
+        Positioned(
+          right: size.width * 0.0 - math.sin(a * 0.9) * 40,
+          top: size.height * 0.28 + math.sin(a) * 22,
+          child: _blurBlob(260, const Color(0xFF2563EB), 0.26),
+        ),
+        Positioned(
+          left: size.width * 0.18 + math.cos(a) * 30,
+          bottom: size.height * 0.18 - math.sin(a) * 24,
+          child: _blurBlob(200, const Color(0xFF93C5FD), 0.3),
+        ),
+        Positioned(
+          right: size.width * 0.12 + math.sin(a * 1.2) * 26,
+          bottom: size.height * 0.08 + math.cos(a * 0.8) * 20,
+          child: _blurBlob(160, const Color(0xFF3B82F6), 0.22),
+        ),
+        // Soft frost veil so content stays readable.
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 0.5, sigmaY: 0.5),
+          child: ColoredBox(
+            color: Colors.white.withValues(alpha: 0.18),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _blurBlob(double size, Color color, double alpha) {
+    return ImageFiltered(
+      imageFilter: ImageFilter.blur(sigmaX: 48, sigmaY: 48),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withValues(alpha: alpha),
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim CTA with a bouncing forward emoji instead of a Material icon.
+class _EmojiCtaButton extends StatelessWidget {
   final String label;
-  final IconData icon;
-  final AnimationController pulse;
+  final String emoji;
+  final AnimationController loop;
   final VoidCallback onTap;
 
-  const _SlimCtaButton({
+  const _EmojiCtaButton({
     required this.label,
-    required this.icon,
-    required this.pulse,
+    required this.emoji,
+    required this.loop,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: pulse,
+      animation: loop,
       builder: (_, __) {
-        final glow = 0.12 + pulse.value * 0.14;
-        final slide = (pulse.value - 0.5) * 3;
+        // Loop: nudge right + soft scale like a tiny GIF.
+        final wave = math.sin(loop.value * math.pi * 2);
+        final dx = 2 + wave * 5;
+        final scale = 1 + wave.abs() * 0.08;
+        final glow = 0.14 + wave.abs() * 0.1;
+
         return PressableScale(
           onTap: onTap,
           child: Container(
@@ -333,58 +372,32 @@ class _SlimCtaButton extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: AppColors.blue.withValues(alpha: glow),
-                  blurRadius: 18,
-                  spreadRadius: 0,
+                  blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
               ],
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Soft shimmer sweep
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Transform.translate(
-                      offset: Offset(
-                        (pulse.value * 2 - 1) *
-                            MediaQuery.sizeOf(context).width *
-                            0.35,
-                        0,
-                      ),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.white.withValues(alpha: 0),
-                              Colors.white.withValues(alpha: 0.18),
-                              Colors.white.withValues(alpha: 0),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    letterSpacing: 0.1,
                   ),
                 ),
-                Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Transform.translate(
-                        offset: Offset(slide, 0),
-                        child: Icon(icon, color: Colors.white, size: 16),
-                      ),
-                    ],
+                const SizedBox(width: 8),
+                Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Text(
+                      emoji,
+                      style: const TextStyle(fontSize: 18, height: 1),
+                    ),
                   ),
                 ),
               ],
@@ -396,7 +409,7 @@ class _SlimCtaButton extends StatelessWidget {
   }
 }
 
-/// Open hero: floating art with soft glow, no bordered card frame.
+/// Borderless floating scene art (no cards / panels).
 class _OpenScene extends StatelessWidget {
   final _SceneKind kind;
   final double t;
@@ -405,65 +418,12 @@ class _OpenScene extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      clipBehavior: Clip.none,
-      children: [
-        _AmbientGlow(t: t),
-        switch (kind) {
-          _SceneKind.welcome => _WelcomeAnim(t: t),
-          _SceneKind.learn => _LearnAnim(t: t),
-          _SceneKind.team => _TeamAnim(t: t),
-          _SceneKind.sync => _SyncAnim(t: t),
-        },
-      ],
-    );
-  }
-}
-
-class _AmbientGlow extends StatelessWidget {
-  final double t;
-
-  const _AmbientGlow({required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    final dx = math.sin(t * math.pi * 2) * 22;
-    final dy = math.cos(t * math.pi * 2) * 14;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned(
-          left: 24 + dx,
-          top: 28 + dy,
-          child: _softOrb(150, const Color(0xFF60A5FA), 0.28),
-        ),
-        Positioned(
-          right: 8 - dx,
-          bottom: 18 - dy,
-          child: _softOrb(170, const Color(0xFF2563EB), 0.22),
-        ),
-        Positioned(
-          right: 72 + dx * 0.4,
-          top: 48,
-          child: _softOrb(70, Colors.white, 0.35),
-        ),
-      ],
-    );
-  }
-
-  Widget _softOrb(double size, Color color, double alpha) {
-    return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color.withValues(alpha: alpha),
-        ),
-      ),
-    );
+    return switch (kind) {
+      _SceneKind.welcome => _WelcomeAnim(t: t),
+      _SceneKind.learn => _LearnAnim(t: t),
+      _SceneKind.team => _TeamAnim(t: t),
+      _SceneKind.sync => _SyncAnim(t: t),
+    };
   }
 }
 
@@ -475,71 +435,77 @@ class _WelcomeAnim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bob = math.sin(t * math.pi * 2) * 10;
-    final ring = 1.0 + 0.04 * math.sin(t * math.pi * 2);
-    final glow = 0.22 + 0.18 * math.sin(t * math.pi * 2);
+    final spark = 0.75 + 0.25 * math.sin(t * math.pi * 2);
 
-    return Transform.translate(
-      offset: Offset(0, bob),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 168,
-            height: 168,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Transform.scale(
-                  scale: ring,
-                  child: Container(
-                    width: 148,
-                    height: 148,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.blue.withValues(alpha: 0.2),
-                        width: 1.2,
-                      ),
+    return Stack(
+      alignment: Alignment.center,
+      clipBehavior: Clip.none,
+      children: [
+        Transform.translate(
+          offset: Offset(0, bob),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 124,
+                height: 124,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.92),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.blue.withValues(alpha: 0.22),
+                      blurRadius: 40,
+                      spreadRadius: 2,
                     ),
-                  ),
+                  ],
                 ),
-                Container(
-                  width: 118,
-                  height: 118,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.blue.withValues(alpha: glow),
-                        blurRadius: 42,
-                        spreadRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.06),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: const CtMark(size: 72),
+                alignment: Alignment.center,
+                child: const CtMark(size: 74),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                AppBrand.tagline,
+                style: TextStyle(
+                  color: AppColors.ink.withValues(alpha: 0.78),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14.5,
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 28,
+          top: 42,
+          child: Opacity(
+            opacity: spark,
+            child: Transform.translate(
+              offset: Offset(0, -bob * 0.4),
+              child: const Text('✨', style: TextStyle(fontSize: 28)),
             ),
           ),
-          const SizedBox(height: 18),
-          Text(
-            AppBrand.tagline,
-            style: TextStyle(
-              color: AppColors.ink.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w700,
-              fontSize: 14.5,
-              letterSpacing: 0.15,
+        ),
+        Positioned(
+          right: 36,
+          top: 64,
+          child: Opacity(
+            opacity: 1.15 - spark,
+            child: Transform.translate(
+              offset: Offset(0, bob * 0.5),
+              child: const Text('💡', style: TextStyle(fontSize: 26)),
             ),
           ),
-        ],
-      ),
+        ),
+        Positioned(
+          right: 48,
+          bottom: 36,
+          child: Transform.translate(
+            offset: Offset(math.sin(t * math.pi * 2) * 6, 0),
+            child: const Text('🚀', style: TextStyle(fontSize: 30)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -551,68 +517,76 @@ class _LearnAnim extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final floatA = math.sin(t * math.pi * 2) * 8;
-    final floatB = math.cos(t * math.pi * 2) * 7;
+    final a = math.sin(t * math.pi * 2) * 10;
+    final b = math.cos(t * math.pi * 2) * 8;
+
     return Stack(
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
         Transform.translate(
-          offset: Offset(-8, floatA),
-          child: _frostPanel(
-            width: 250,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _metricRow('Course progress', '82%', t, 0),
-                const SizedBox(height: 12),
-                _metricRow('AI Study Coach', 'Ready', t, 0.22),
-                const SizedBox(height: 12),
-                _metricRow('Next lecture', 'Widgets', t, 0.44),
-              ],
-            ),
+          offset: Offset(-70, -36 + a),
+          child: const Text('📚', style: TextStyle(fontSize: 64)),
+        ),
+        Transform.translate(
+          offset: Offset(68, -10 + b),
+          child: const Text('🤖', style: TextStyle(fontSize: 58)),
+        ),
+        Transform.translate(
+          offset: Offset(0, 58 + a * 0.4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _floatingStat('Course progress', '82%', t, 0),
+              const SizedBox(height: 10),
+              _floatingStat('AI Study Coach', 'Ready', t, 0.2),
+              const SizedBox(height: 10),
+              _floatingStat('Next lecture', 'Widgets', t, 0.4),
+            ],
           ),
         ),
         Positioned(
-          bottom: 18,
+          left: 24,
+          bottom: 28,
           child: Transform.translate(
-            offset: Offset(0, floatB),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _floatChip(Icons.menu_book_rounded, 'Courses'),
-                const SizedBox(width: 10),
-                _floatChip(Icons.smart_toy_outlined, 'AI Coach'),
-              ],
-            ),
+            offset: Offset(0, -b),
+            child: const Text('🧠', style: TextStyle(fontSize: 28)),
+          ),
+        ),
+        Positioned(
+          right: 22,
+          bottom: 40,
+          child: Transform.translate(
+            offset: Offset(0, a * 0.5),
+            child: const Text('⚡', style: TextStyle(fontSize: 26)),
           ),
         ),
       ],
     );
   }
 
-  Widget _metricRow(String label, String value, double t, double phase) {
-    final on = ((t + phase) % 1.0) < 0.7;
+  Widget _floatingStat(String label, String value, double t, double phase) {
+    final on = ((t + phase) % 1.0) < 0.72;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: AppColors.ink.withValues(alpha: 0.55),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.ink.withValues(alpha: 0.55),
+            fontWeight: FontWeight.w600,
+            fontSize: 13.5,
           ),
         ),
+        const SizedBox(width: 10),
         Opacity(
-          opacity: on ? 1 : 0.4,
+          opacity: on ? 1 : 0.35,
           child: Text(
             value,
             style: const TextStyle(
               color: AppColors.blueDark,
-              fontSize: 13,
               fontWeight: FontWeight.w800,
+              fontSize: 13.5,
             ),
           ),
         ),
@@ -628,7 +602,7 @@ class _TeamAnim extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lift = math.sin(t * math.pi * 2) * 8;
+    final lift = math.sin(t * math.pi * 2) * 9;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -637,21 +611,21 @@ class _TeamAnim extends StatelessWidget {
           children: [
             Transform.translate(
               offset: Offset(0, -lift),
-              child: _roleOrb(Icons.school_rounded, 'Student'),
+              child: _emojiRole('🎓', 'Student'),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 22),
             Transform.translate(
               offset: Offset(0, lift),
-              child: _roleOrb(Icons.cast_for_education_rounded, 'Teacher'),
+              child: _emojiRole('👨‍🏫', 'Teacher'),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 22),
             Transform.translate(
               offset: Offset(0, -lift * 0.55),
-              child: _roleOrb(Icons.rocket_launch_rounded, 'Intern'),
+              child: _emojiRole('🧑‍💻', 'Intern'),
             ),
           ],
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 26),
         Text(
           'One portal. Three journeys.',
           style: TextStyle(
@@ -664,26 +638,11 @@ class _TeamAnim extends StatelessWidget {
     );
   }
 
-  Widget _roleOrb(IconData icon, String label) {
+  Widget _emojiRole(String emoji, String label) {
     return Column(
       children: [
-        Container(
-          width: 78,
-          height: 78,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.blue.withValues(alpha: 0.16),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: AppColors.blueDark, size: 30),
-        ),
-        const SizedBox(height: 10),
+        Text(emoji, style: const TextStyle(fontSize: 52)),
+        const SizedBox(height: 8),
         Text(
           label,
           style: const TextStyle(
@@ -705,144 +664,53 @@ class _SyncAnim extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spin = t * math.pi * 2;
-    final bob = math.sin(t * math.pi * 2) * 6;
+    final bob = math.sin(t * math.pi * 2) * 8;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Transform.translate(
-          offset: Offset(0, bob),
-          child: SizedBox(
-            width: 110,
-            height: 110,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Transform.rotate(
-                  angle: spin,
-                  child: CustomPaint(
-                    size: const Size(110, 110),
-                    painter: _OrbitPainter(
-                      color: AppColors.blue.withValues(alpha: 0.35),
-                    ),
-                  ),
+        SizedBox(
+          width: 160,
+          height: 160,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Transform.rotate(
+                angle: spin,
+                child: const Text('🔄', style: TextStyle(fontSize: 64)),
+              ),
+              Transform.translate(
+                offset: Offset(math.cos(spin) * 58, math.sin(spin) * 58),
+                child: const Text('✅', style: TextStyle(fontSize: 26)),
+              ),
+              Transform.translate(
+                offset: Offset(
+                  math.cos(spin + 2.1) * 58,
+                  math.sin(spin + 2.1) * 58,
                 ),
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.blue.withValues(alpha: 0.2),
-                        blurRadius: 28,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.sync_rounded,
-                    color: AppColors.blueDark,
-                    size: 30,
-                  ),
+                child: const Text('💬', style: TextStyle(fontSize: 26)),
+              ),
+              Transform.translate(
+                offset: Offset(
+                  math.cos(spin + 4.2) * 58,
+                  math.sin(spin + 4.2) * 58,
                 ),
-              ],
-            ),
+                child: const Text('💳', style: TextStyle(fontSize: 26)),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 22),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          alignment: WrapAlignment.center,
-          children: [
-            _floatChip(Icons.fact_check_rounded, 'Attendance'),
-            _floatChip(Icons.payments_outlined, 'Fees'),
-            _floatChip(Icons.task_alt_rounded, 'Tasks'),
-            _floatChip(Icons.chat_bubble_outline_rounded, 'Chat'),
-          ],
+        Transform.translate(
+          offset: Offset(0, bob),
+          child: Text(
+            'Live with the dashboard',
+            style: TextStyle(
+              color: AppColors.ink.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
         ),
       ],
     );
   }
-}
-
-class _OrbitPainter extends CustomPainter {
-  final Color color;
-
-  _OrbitPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 4;
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-    canvas.drawCircle(center, radius, paint);
-    final dot = Paint()..color = AppColors.blueDark;
-    canvas.drawCircle(Offset(center.dx, center.dy - radius), 4.5, dot);
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrbitPainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
-Widget _frostPanel({required double width, required Widget child}) {
-  return ClipRRect(
-    borderRadius: BorderRadius.circular(24),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-      child: Container(
-        width: width,
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.blue.withValues(alpha: 0.1),
-              blurRadius: 28,
-              offset: const Offset(0, 14),
-            ),
-          ],
-        ),
-        child: child,
-      ),
-    ),
-  );
-}
-
-Widget _floatChip(IconData icon, String label) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(100),
-      boxShadow: [
-        BoxShadow(
-          color: AppColors.blue.withValues(alpha: 0.12),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
-        ),
-      ],
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: AppColors.blueDark),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-          ),
-        ),
-      ],
-    ),
-  );
 }
