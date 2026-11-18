@@ -1,4 +1,7 @@
 PODS:
+  - audioplayers_darwin (0.0.1):
+    - Flutter
+    - FlutterMacOS
   - Firebase/CoreOnly (12.19.3):
     - FirebaseCore (~> 12.19.3)
   - Firebase/Messaging (12.19.3):
@@ -86,6 +89,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - audioplayers_darwin (from `.symlinks/plugins/audioplayers_darwin/darwin`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
   - Flutter (from `Flutter`)
@@ -111,6 +115,8 @@ SPEC REPOS:
     - TOCropViewController
 
 EXTERNAL SOURCES:
+  audioplayers_darwin:
+    :path: ".symlinks/plugins/audioplayers_darwin/darwin"
   firebase_core:
     :path: ".symlinks/plugins/firebase_core/ios"
   firebase_messaging:
@@ -133,6 +139,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
 SPEC CHECKSUMS:
+  audioplayers_darwin: 835ced6edd4c9fc8ebb0a7cc9e294a91d99917d5
   Firebase: e3c5ab38229ae085490d02398d97b9f5374bbe6e
   firebase_core: 80d50cac10fc9dff2597c55ed43e296d9a0bc90a
   firebase_messaging: 378a914df459aea513c6642ebb531fe7d7200c94

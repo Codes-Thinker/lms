@@ -23,6 +23,8 @@ class LocalCache {
   static const reportMe = 'report_me';
   static const chatThread = 'chat_thread';
   static const usersRoster = 'users_roster';
+  static const aiHistory = 'ai_history';
+  static const aiStatus = 'ai_status';
 
   static Future<SharedPreferences?> _prefs() async {
     try {
