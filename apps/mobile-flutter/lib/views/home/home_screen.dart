@@ -27,7 +27,6 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   static const _navy = Color(0xFF1A1C2E);
-  static const _softOrange = Color(0xFFFFF4EC);
   static const _softRose = Color(0xFFFFEEF0);
 
   /// Attendance card tone by %: under 20 red, under 50 orange,
