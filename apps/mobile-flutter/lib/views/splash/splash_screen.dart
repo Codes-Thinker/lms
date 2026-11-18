@@ -17,9 +17,11 @@ import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../services/office_location_service.dart';
+import '../../services/onboarding_prefs.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/ct_mark.dart';
 import '../auth/login_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 import '../shell/app_shell.dart';
 
 /// Yango-style branded splash — motion logo, rings, progress (not a plain spinner).
@@ -124,6 +126,11 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
+    // First install only — skip when opened from a push (deep-link).
+    final showOnboarding =
+        !fromNotif && !(await OnboardingPrefs.isCompleted());
+    if (!mounted) return;
+
     if (auth.isAuthenticated) {
       final type = NotificationRouter.pendingType;
       if (type != null) {
@@ -152,14 +159,20 @@ class _SplashScreenState extends State<SplashScreen>
       OfficeLocationService.instance.bind(attendance, userId: userId);
       unawaited(OfficeLocationService.instance.start(userId: userId));
       if (!mounted) return;
+      final shell = const AppShell();
       Navigator.of(context).pushReplacement(
-        AppMotion.fadeSlide(const AppShell()),
+        AppMotion.fadeSlide(
+          showOnboarding ? OnboardingScreen(next: shell) : shell,
+        ),
       );
       return;
     }
 
+    const login = LoginScreen();
     Navigator.of(context).pushReplacement(
-      AppMotion.fadeSlide(const LoginScreen()),
+      AppMotion.fadeSlide(
+        showOnboarding ? const OnboardingScreen(next: login) : login,
+      ),
     );
   }
 
