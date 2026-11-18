@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { readListCache, writeListCache } from "@/lib/list-cache";
@@ -11,12 +11,34 @@ import { useSnackbar } from "@/components/ui/snackbar";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 
-const CACHE_KEY = "lms_cache_staff_v1";
+const CACHE_KEY = "lms_cache_staff_v2";
 
 type TaughtCourse = {
   id: string;
   title: string;
   batch?: string | null;
+  studentCount?: number;
+  topicsTotal?: number;
+  topicsTaught?: number;
+};
+
+type TeachingStudent = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+};
+
+type TeachingStats = {
+  studentCount: number;
+  students: TeachingStudent[];
+  topicsTotal: number;
+  topicsTaught: number;
+  taughtTopicTitles: string[];
+  topicTitles: string[];
+  totalPaid: number;
+  totalFees: number;
+  remainingFees: number;
 };
 
 type StaffRow = {
@@ -28,6 +50,7 @@ type StaffRow = {
   designation?: string | null;
   status: string;
   taughtCourses: TaughtCourse[];
+  teachingStats: TeachingStats;
 };
 
 type TaskChat = {
@@ -77,12 +100,36 @@ function accountStatusBadge(status: string) {
   return <Badge variant="outline">{status}</Badge>;
 }
 
+function money(n: number) {
+  return `Rs ${Math.round(n || 0).toLocaleString()}`;
+}
+
 function mapStaff(u: Record<string, unknown>): StaffRow {
   const taught = ((u.taughtCourses as TaughtCourse[] | undefined) ?? []).map((c) => ({
     id: String(c.id),
     title: String(c.title),
     batch: c.batch ?? null,
+    studentCount: Number(c.studentCount ?? 0),
+    topicsTotal: Number(c.topicsTotal ?? 0),
+    topicsTaught: Number(c.topicsTaught ?? 0),
   }));
+  const rawStats = (u.teachingStats as TeachingStats | undefined) ?? null;
+  const teachingStats: TeachingStats = {
+    studentCount: Number(rawStats?.studentCount ?? 0),
+    students: (rawStats?.students ?? []).map((s) => ({
+      id: String(s.id),
+      name: String(s.name || ""),
+      email: String(s.email || ""),
+      status: String(s.status || ""),
+    })),
+    topicsTotal: Number(rawStats?.topicsTotal ?? 0),
+    topicsTaught: Number(rawStats?.topicsTaught ?? 0),
+    taughtTopicTitles: rawStats?.taughtTopicTitles ?? [],
+    topicTitles: rawStats?.topicTitles ?? [],
+    totalPaid: Number(rawStats?.totalPaid ?? 0),
+    totalFees: Number(rawStats?.totalFees ?? 0),
+    remainingFees: Number(rawStats?.remainingFees ?? 0),
+  };
   return {
     id: String(u.id),
     name: String(u.name || u.fullName || ""),
@@ -92,6 +139,7 @@ function mapStaff(u: Record<string, unknown>): StaffRow {
     designation: (u.designation as string) || null,
     status: String(u.status || "ACTIVE"),
     taughtCourses: taught,
+    teachingStats,
   };
 }
 
@@ -109,6 +157,7 @@ function StaffPageInner() {
   const [editDescription, setEditDescription] = useState("");
   const [chatTask, setChatTask] = useState<TaskRow | null>(null);
   const [chatText, setChatText] = useState("");
+  const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
 
   const staffIds = useMemo(() => new Set(staff.map((s) => s.id)), [staff]);
 
@@ -309,65 +358,171 @@ function StaffPageInner() {
             <tr>
               <th className="px-5 py-3 font-medium">Name</th>
               <th className="px-5 py-3 font-medium">Email / Phone</th>
-              <th className="px-5 py-3 font-medium">Track / Designation</th>
-              <th className="px-5 py-3 font-medium">Taught courses</th>
+              <th className="px-5 py-3 font-medium">Courses</th>
+              <th className="px-5 py-3 font-medium">Students</th>
+              <th className="px-5 py-3 font-medium">Topics taught</th>
+              <th className="px-5 py-3 font-medium">Student fees</th>
               <th className="px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3 font-medium">Chat</th>
             </tr>
           </thead>
           <tbody>
             {staff.map((s) => {
+              const stats = s.teachingStats;
               const courseLine =
                 s.taughtCourses.length > 0
                   ? s.taughtCourses
                       .map((c) => (c.batch ? `${c.title} (${c.batch})` : c.title))
                       .join(", ")
                   : "Not assigned";
-              const trackLine =
-                [s.track, s.designation].filter(Boolean).join(", ") || "Not set";
+              const expanded = expandedTeacherId === s.id;
+              const studentNames =
+                stats.students.length > 0
+                  ? stats.students.map((x) => x.name).join(", ")
+                  : "No students";
+              const taughtLine =
+                stats.taughtTopicTitles.length > 0
+                  ? stats.taughtTopicTitles.slice(0, 8).join(", ")
+                  : "No topics completed yet";
               return (
-                <tr key={s.id} className="border-t border-slate-100">
-                  <td className="px-5 py-3.5">
-                    <Link
-                      href={`/users/${s.id}`}
-                      className="flex items-center gap-2.5 font-semibold hover:text-blue-700"
-                    >
-                      <UserAvatar
-                        name={s.name}
-                        email={s.email}
-                        accountType="STAFF"
-                        size="sm"
-                      />
-                      {s.name}
-                    </Link>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <p className="text-xs">{s.email}</p>
-                    <p className="text-xs text-slate-500">
-                      {s.phone?.trim() || "No phone"}
-                    </p>
-                  </td>
-                  <td className="px-5 py-3.5">{trackLine}</td>
-                  <td
-                    className="max-w-xs px-5 py-3.5 text-xs text-slate-600"
-                    title={courseLine}
-                  >
-                    {courseLine}
-                  </td>
-                  <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
-                  <td className="px-5 py-3.5">
-                    <Button size="sm" variant="secondary" asChild>
-                      <Link href={`/inbox?userId=${encodeURIComponent(s.id)}`}>
-                        Chat
+                <Fragment key={s.id}>
+                  <tr className="border-t border-slate-100">
+                    <td className="px-5 py-3.5">
+                      <Link
+                        href={`/users/${s.id}`}
+                        className="flex items-center gap-2.5 font-semibold hover:text-blue-700"
+                      >
+                        <UserAvatar
+                          name={s.name}
+                          email={s.email}
+                          accountType="STAFF"
+                          size="sm"
+                        />
+                        {s.name}
                       </Link>
-                    </Button>
-                  </td>
-                </tr>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {[s.track, s.designation].filter(Boolean).join(" · ") ||
+                          "No track"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <p className="text-xs">{s.email}</p>
+                      <p className="text-xs text-slate-500">
+                        {s.phone?.trim() || "No phone"}
+                      </p>
+                    </td>
+                    <td
+                      className="max-w-[180px] px-5 py-3.5 text-xs text-slate-600"
+                      title={courseLine}
+                    >
+                      {courseLine}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <button
+                        type="button"
+                        className="text-left"
+                        onClick={() =>
+                          setExpandedTeacherId(expanded ? null : s.id)
+                        }
+                      >
+                        <p className="font-semibold text-slate-900">
+                          {stats.studentCount}
+                        </p>
+                        <p className="line-clamp-2 max-w-[160px] text-[11px] text-slate-500">
+                          {studentNames}
+                        </p>
+                      </button>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <p className="font-semibold text-slate-900">
+                        {stats.topicsTaught}/{stats.topicsTotal}
+                      </p>
+                      <p
+                        className="line-clamp-2 max-w-[180px] text-[11px] text-slate-500"
+                        title={taughtLine}
+                      >
+                        {taughtLine}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs">
+                      <p className="font-semibold text-slate-900">
+                        Paid {money(stats.totalPaid)}
+                      </p>
+                      <p className="text-slate-500">
+                        Total {money(stats.totalFees)}
+                      </p>
+                      <p className="text-slate-500">
+                        Left {money(stats.remainingFees)}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
+                    <td className="px-5 py-3.5">
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link href={`/inbox?userId=${encodeURIComponent(s.id)}`}>
+                          Chat
+                        </Link>
+                      </Button>
+                    </td>
+                  </tr>
+                  {expanded ? (
+                    <tr className="bg-slate-50/70">
+                      <td colSpan={8} className="px-5 py-4">
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Students ({stats.studentCount})
+                            </p>
+                            <ul className="space-y-1 text-xs text-slate-700">
+                              {stats.students.map((st) => (
+                                <li key={st.id}>
+                                  <Link
+                                    href={`/users/${st.id}`}
+                                    className="font-medium hover:text-blue-700"
+                                  >
+                                    {st.name}
+                                  </Link>
+                                  <span className="text-slate-400">
+                                    {" "}
+                                    · {st.email}
+                                  </span>
+                                </li>
+                              ))}
+                              {stats.students.length === 0 ? (
+                                <li className="text-slate-400">None enrolled</li>
+                              ) : null}
+                            </ul>
+                          </div>
+                          <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Topics taught ({stats.topicsTaught})
+                            </p>
+                            <p className="text-xs leading-relaxed text-slate-700">
+                              {stats.taughtTopicTitles.length
+                                ? stats.taughtTopicTitles.join(", ")
+                                : "No student has completed a topic yet"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Fee summary
+                            </p>
+                            <p className="text-xs text-slate-700">
+                              Students under this teacher have paid{" "}
+                              <strong>{money(stats.totalPaid)}</strong> of{" "}
+                              <strong>{money(stats.totalFees)}</strong>. Remaining{" "}
+                              <strong>{money(stats.remainingFees)}</strong>.
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               );
             })}
             {staff.length === 0 && !loading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-5 py-8 text-center text-slate-500">
                   No teachers yet. Add from Users as Teacher.
                 </td>
               </tr>

@@ -144,7 +144,36 @@ export class UsersService {
             select: { id: true, courseId: true, status: true },
           },
           instructedCourses: {
-            select: { id: true, title: true, batchLabel: true },
+            select: {
+              id: true,
+              title: true,
+              batchLabel: true,
+              totalFee: true,
+              sections: {
+                select: {
+                  id: true,
+                  title: true,
+                  topics: { select: { id: true, title: true } },
+                },
+                orderBy: { sortOrder: "asc" },
+              },
+              enrollments: {
+                select: {
+                  paidAmount: true,
+                  userId: true,
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      email: true,
+                      totalCourseFee: true,
+                      monthlyFee: true,
+                      status: true,
+                    },
+                  },
+                },
+              },
+            },
           },
           projects: {
             select: {
@@ -162,6 +191,16 @@ export class UsersService {
 
     const userIds = items.map((u) => u.id);
     const completedByUser = new Map<string, Set<string>>();
+    const studentIdsForTeachers = new Set<string>();
+    const topicIdsForTeachers = new Set<string>();
+    for (const u of items) {
+      for (const c of u.instructedCourses) {
+        for (const e of c.enrollments) studentIdsForTeachers.add(e.userId);
+        for (const s of c.sections) {
+          for (const t of s.topics) topicIdsForTeachers.add(t.id);
+        }
+      }
+    }
     if (userIds.length) {
       const progressRows = await this.prisma.topicProgress.findMany({
         where: { userId: { in: userIds }, completed: true },
@@ -175,6 +214,20 @@ export class UsersService {
         }
         set.add(row.topicId);
       }
+    }
+
+    /** Topics completed by students in teacher courses (at least one student done). */
+    const taughtTopicHits = new Set<string>();
+    if (studentIdsForTeachers.size && topicIdsForTeachers.size) {
+      const studentProgress = await this.prisma.topicProgress.findMany({
+        where: {
+          userId: { in: [...studentIdsForTeachers] },
+          topicId: { in: [...topicIdsForTeachers] },
+          completed: true,
+        },
+        select: { topicId: true },
+      });
+      for (const row of studentProgress) taughtTopicHits.add(row.topicId);
     }
 
     return {
@@ -205,6 +258,45 @@ export class UsersService {
                 courses.reduce((s, c) => s + c.progressPercent, 0) /
                   courses.length
               );
+
+        const studentMap = new Map<
+          string,
+          { id: string; name: string; email: string; status: string }
+        >();
+        let totalPaid = 0;
+        let totalFees = 0;
+        const topicTitles: string[] = [];
+        const taughtTopicTitles: string[] = [];
+        let topicsTotal = 0;
+        let topicsTaught = 0;
+
+        for (const c of u.instructedCourses) {
+          for (const e of c.enrollments) {
+            totalPaid += e.paidAmount ?? 0;
+            totalFees +=
+              e.user.totalCourseFee ?? c.totalFee ?? e.user.monthlyFee ?? 0;
+            if (!studentMap.has(e.user.id)) {
+              studentMap.set(e.user.id, {
+                id: e.user.id,
+                name: e.user.fullName,
+                email: e.user.email,
+                status: e.user.status,
+              });
+            }
+          }
+          for (const s of c.sections) {
+            for (const t of s.topics) {
+              topicsTotal += 1;
+              topicTitles.push(t.title);
+              if (taughtTopicHits.has(t.id)) {
+                topicsTaught += 1;
+                taughtTopicTitles.push(t.title);
+              }
+            }
+          }
+        }
+
+        const students = [...studentMap.values()];
 
         return {
           id: u.id,
@@ -245,7 +337,25 @@ export class UsersService {
             id: c.id,
             title: c.title,
             batch: c.batchLabel,
+            studentCount: c.enrollments.length,
+            topicsTotal: c.sections.reduce((n, s) => n + s.topics.length, 0),
+            topicsTaught: c.sections.reduce(
+              (n, s) =>
+                n + s.topics.filter((t) => taughtTopicHits.has(t.id)).length,
+              0
+            ),
           })),
+          teachingStats: {
+            studentCount: students.length,
+            students,
+            topicsTotal,
+            topicsTaught,
+            taughtTopicTitles: taughtTopicTitles.slice(0, 40),
+            topicTitles: topicTitles.slice(0, 40),
+            totalPaid,
+            totalFees,
+            remainingFees: Math.max(0, totalFees - totalPaid),
+          },
           projects: u.projects,
           invitedAt: u.invitedAt,
           activatedAt: u.activatedAt,

@@ -77,7 +77,10 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
       return;
     }
 
-    final tab = NotificationRouter.tabForType(type);
+    final tab = NotificationRouter.tabForType(
+      type,
+      event: NotificationRouter.pendingEvent,
+    );
     _ui.setNavIndex(tab);
 
     final handler = NotificationRouter.shellHandler;

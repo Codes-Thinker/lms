@@ -78,6 +78,8 @@ class _AppShellState extends State<AppShell> {
       type: type,
       taskId: NotificationRouter.pendingTaskId,
       feeCaseId: NotificationRouter.pendingFeeCaseId,
+      courseId: NotificationRouter.pendingCourseId,
+      event: NotificationRouter.pendingEvent,
       isStaff: auth.isStaff,
       goToTab: _goTo,
     ).whenComplete(NotificationRouter.clear);

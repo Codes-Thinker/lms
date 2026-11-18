@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../views/certificates/certificates_screen.dart';
+import '../views/course/course_detail_screen.dart';
 import '../views/fees/fee_chat_screen.dart';
+import '../views/fees/fees_screen.dart';
 import '../views/help/admin_chat_screen.dart';
 import '../views/quizzes/quizzes_screen.dart';
 import '../views/tasks/task_detail_screen.dart';
@@ -16,6 +18,8 @@ class NotificationRouter {
   static String? pendingNotificationId;
   static String? pendingTaskId;
   static String? pendingFeeCaseId;
+  static String? pendingCourseId;
+  static String? pendingEvent;
   static bool launchedFromNotification = false;
   static bool openAdminChat = false;
 
@@ -27,6 +31,8 @@ class NotificationRouter {
     String? notificationId,
     String? taskId,
     String? feeCaseId,
+    String? courseId,
+    String? event,
     bool fromLaunch = false,
   }) {
     pendingType = type;
@@ -36,6 +42,12 @@ class NotificationRouter {
     }
     if (feeCaseId != null && feeCaseId.isNotEmpty) {
       pendingFeeCaseId = feeCaseId;
+    }
+    if (courseId != null && courseId.isNotEmpty) {
+      pendingCourseId = courseId;
+    }
+    if (event != null && event.isNotEmpty) {
+      pendingEvent = event;
     }
     if ((type ?? '').toUpperCase() == 'CHAT') {
       openAdminChat = true;
@@ -48,6 +60,8 @@ class NotificationRouter {
     pendingNotificationId = null;
     pendingTaskId = null;
     pendingFeeCaseId = null;
+    pendingCourseId = null;
+    pendingEvent = null;
     launchedFromNotification = false;
     // openAdminChat cleared via takeOpenAdminChat after consume
   }
@@ -70,16 +84,26 @@ class NotificationRouter {
     return id;
   }
 
+  static String? takePendingCourseId() {
+    final id = pendingCourseId;
+    pendingCourseId = null;
+    return id;
+  }
+
   static bool get hasPendingDeepLink =>
       openAdminChat ||
       (pendingTaskId != null && pendingTaskId!.isNotEmpty) ||
       (pendingFeeCaseId != null && pendingFeeCaseId!.isNotEmpty) ||
+      (pendingCourseId != null && pendingCourseId!.isNotEmpty) ||
       (pendingType != null && pendingType!.isNotEmpty);
 
   /// Shell tab for notification type.
   /// 0 Home · 1 Tasks · 2 Attend · 3 Fees/Help · 4 Profile
-  static int tabForType(String? type) {
-    switch ((type ?? '').toUpperCase()) {
+  static int tabForType(String? type, {String? event}) {
+    final upper = (type ?? '').toUpperCase();
+    final ev = (event ?? pendingEvent ?? '').toLowerCase();
+    if (ev == 'course_updated' || upper == 'COURSE') return 0;
+    switch (upper) {
       case 'TASK':
         return 1;
       case 'ATTENDANCE':
@@ -89,6 +113,8 @@ class NotificationRouter {
         return 3;
       case 'QUIZ':
       case 'CERTIFICATE':
+      case 'GENERAL':
+      case 'SYSTEM':
         return 0;
       default:
         return 0;
@@ -112,6 +138,7 @@ class NotificationRouter {
       case 'SYSTEM':
         return 'System';
       case 'GENERAL':
+      case 'COURSE':
         return 'Update';
       default:
         return 'Alert';
@@ -124,24 +151,26 @@ class NotificationRouter {
     required String? type,
     String? taskId,
     String? feeCaseId,
+    String? courseId,
+    String? event,
     required bool isStaff,
     required void Function(int tab) goToTab,
   }) async {
     final upper = (type ?? '').toUpperCase();
+    final ev = (event ?? pendingEvent ?? '').toLowerCase();
     final nav = Navigator.of(context, rootNavigator: true);
     final chat = takeOpenAdminChat() || upper == 'CHAT';
     final resolvedTask = taskId ?? takePendingTaskId();
     final resolvedFee = feeCaseId ?? takePendingFeeCaseId();
-    final tab = tabForType(upper);
+    final resolvedCourse = courseId ?? takePendingCourseId();
+    final tab = tabForType(upper, event: ev);
 
     void setTabUnderCover() {
-      // After cover is on screen — user never sees Fees/Help flash.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) goToTab(tab);
       });
     }
 
-    // Instant cover first (no delay / fade). Avoids 1s glitch.
     if (chat) {
       nav.push(AppMotion.cover(const AdminChatScreen()));
       setTabUnderCover();
@@ -167,7 +196,8 @@ class NotificationRouter {
         nav.push(AppMotion.cover(FeeChatScreen(caseId: resolvedFee)));
         setTabUnderCover();
       } else {
-        goToTab(tab);
+        nav.push(AppMotion.cover(const FeesScreen()));
+        setTabUnderCover();
       }
       return;
     }
@@ -186,6 +216,19 @@ class NotificationRouter {
     if (upper == 'CERTIFICATE') {
       nav.push(AppMotion.cover(const CertificatesScreen()));
       setTabUnderCover();
+      return;
+    }
+
+    // Course updates (GENERAL + event) or explicit COURSE type.
+    if (upper == 'COURSE' ||
+        ev == 'course_updated' ||
+        (resolvedCourse != null && resolvedCourse.isNotEmpty)) {
+      if (resolvedCourse != null && resolvedCourse.isNotEmpty) {
+        nav.push(AppMotion.cover(CourseDetailScreen(courseId: resolvedCourse)));
+        setTabUnderCover();
+      } else {
+        goToTab(0);
+      }
       return;
     }
 

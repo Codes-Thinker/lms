@@ -3,17 +3,10 @@ import '../../widgets/app_loader.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_brand.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_motion.dart';
 import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/ui_provider.dart';
-import '../help/admin_chat_screen.dart';
-import '../fees/fees_screen.dart';
-import '../tasks/task_detail_screen.dart';
-import '../tasks/tasks_screen.dart';
-import '../attendance/attendance_screen.dart';
-import '../teacher/assignment_chat_screen.dart';
 import '../../providers/auth_provider.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -61,47 +54,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     await context.read<NotificationProvider>().markRead(n.id);
     if (!mounted) return;
     final type = n.type.toUpperCase();
-    final taskId = n.data?['taskId']?.toString();
+    final data = n.data ?? const <String, dynamic>{};
+    final taskId = data['taskId']?.toString();
+    final feeCaseId =
+        data['feeCaseId']?.toString() ?? data['caseId']?.toString();
+    final courseId = data['courseId']?.toString();
+    final event = data['event']?.toString();
     final isStaff = context.read<AuthProvider>().isStaff;
 
-    if (type == 'CHAT') {
-      Navigator.of(context).push(
-        AppMotion.fadeSlide(const AdminChatScreen()),
-      );
-      return;
-    }
-    if (type == 'FEE') {
-      Navigator.of(context).push(AppMotion.fadeSlide(const FeesScreen()));
-      return;
-    }
-    if (type == 'TASK') {
-      if (taskId != null && taskId.isNotEmpty && !isStaff) {
-        Navigator.of(context).push(
-          AppMotion.fadeSlide(TaskDetailScreen(taskId: taskId)),
-        );
-        return;
-      }
-      if (isStaff && taskId != null && taskId.isNotEmpty) {
-        Navigator.of(context).push(
-          AppMotion.fadeSlide(AssignmentChatScreen(taskId: taskId)),
-        );
-        return;
-      }
-      if (taskId != null && taskId.isNotEmpty) {
-        Navigator.of(context).push(
-          AppMotion.fadeSlide(TaskDetailScreen(taskId: taskId)),
-        );
-        return;
-      }
-      Navigator.of(context).push(AppMotion.fadeSlide(const TasksScreen()));
-      return;
-    }
-    if (type == 'ATTENDANCE') {
-      Navigator.of(context).push(AppMotion.fadeSlide(const AttendanceScreen()));
-      return;
-    }
-    context.read<UiProvider>().setNavIndex(NotificationRouter.tabForType(type));
-    Navigator.of(context).pop();
+    NotificationRouter.setPending(
+      type: type,
+      notificationId: n.id,
+      taskId: taskId,
+      feeCaseId: feeCaseId,
+      courseId: courseId,
+      event: event,
+    );
+
+    await NotificationRouter.openDeepLink(
+      context,
+      type: type,
+      taskId: taskId,
+      feeCaseId: feeCaseId,
+      courseId: courseId,
+      event: event,
+      isStaff: isStaff,
+      goToTab: (tab) => context.read<UiProvider>().setNavIndex(tab),
+    );
+    NotificationRouter.clear();
   }
 
   @override

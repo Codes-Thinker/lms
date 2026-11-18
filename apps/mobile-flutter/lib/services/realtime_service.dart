@@ -199,6 +199,8 @@ class RealtimeService {
           type: type,
           taskId: taskId,
           feeCaseId: feeCaseId,
+          courseId: dataMap['courseId']?.toString(),
+          event: dataMap['event']?.toString(),
           notificationId: map['id']?.toString(),
         );
         _onOpen?.call(type, taskId: taskId);

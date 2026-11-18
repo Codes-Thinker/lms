@@ -210,12 +210,19 @@ class PushNotificationService {
   }
 
   Map<String, String?> _extractMeta(Map<String, dynamic> data) {
+    final nested = data['data'];
+    final nestedMap = nested is Map
+        ? Map<String, dynamic>.from(nested)
+        : const <String, dynamic>{};
+    String? pick(String key) =>
+        data[key]?.toString() ?? nestedMap[key]?.toString();
     return {
-      'type': (data['type'] ?? 'GENERAL').toString(),
-      'taskId': data['taskId']?.toString(),
-      'feeCaseId':
-          data['feeCaseId']?.toString() ?? data['caseId']?.toString(),
-      'notificationId': data['notificationId']?.toString(),
+      'type': (data['type'] ?? nestedMap['type'] ?? 'GENERAL').toString(),
+      'taskId': pick('taskId'),
+      'feeCaseId': pick('feeCaseId') ?? pick('caseId') ?? pick('feeId'),
+      'courseId': pick('courseId'),
+      'event': pick('event'),
+      'notificationId': pick('notificationId'),
     };
   }
 
@@ -254,6 +261,8 @@ class PushNotificationService {
           type: type,
           taskId: meta['taskId'],
           feeCaseId: meta['feeCaseId'],
+          courseId: meta['courseId'],
+          event: meta['event'],
           notificationId: meta['notificationId'],
         );
         _onOpenInApp?.call(type);
@@ -269,6 +278,8 @@ class PushNotificationService {
       notificationId: meta['notificationId'],
       taskId: meta['taskId'],
       feeCaseId: meta['feeCaseId'],
+      courseId: meta['courseId'],
+      event: meta['event'],
       fromLaunch: fromLaunch,
     );
     // Cold start: Splash/AppShell consumes pending — don't navigate yet.
@@ -287,6 +298,8 @@ class PushNotificationService {
         notificationId: meta['notificationId'],
         taskId: meta['taskId'],
         feeCaseId: meta['feeCaseId'],
+        courseId: meta['courseId'],
+        event: meta['event'],
         fromLaunch: false,
       );
       if (fromTap) _onOpenInApp?.call(meta['type']!);
