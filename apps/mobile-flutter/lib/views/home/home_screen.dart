@@ -27,23 +27,8 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   static const _navy = Color(0xFF1A1C2E);
-  static const _softRose = Color(0xFFFFEEF0);
-
-  /// Attendance card tone by %: under 20 red, under 50 orange,
-  /// under 75 amber, 75+ green.
-  static ({Color bg, Color accent}) _attendanceTone(double percent) {
-    final p = percent.isNaN ? 0.0 : percent.clamp(0, 100);
-    if (p < 20) {
-      return (bg: const Color(0xFFFFEEF0), accent: const Color(0xFFDC2626));
-    }
-    if (p < 50) {
-      return (bg: const Color(0xFFFFF4EC), accent: const Color(0xFFEA580C));
-    }
-    if (p < 75) {
-      return (bg: const Color(0xFFFFFBEB), accent: const Color(0xFFD97706));
-    }
-    return (bg: const Color(0xFFECFDF5), accent: const Color(0xFF059669));
-  }
+  /// Same soft blue family as Continue Learning.
+  static const _statAccent = AppColors.blueDark;
 
   @override
   Widget build(BuildContext context) {
@@ -413,15 +398,12 @@ class HomeScreen extends StatelessWidget {
                     }
 
                     final attendancePct = courses.overallAttendance;
-                    final attendanceTone = _attendanceTone(attendancePct);
 
                     final tiles = <Widget>[
                       _pastelStat(
                         icon: CupertinoIcons.book_fill,
                         label: 'Courses',
                         value: '${courses.enrolledCourses.length}',
-                        bg: AppColors.softBlue,
-                        accent: AppColors.blueDark,
                         onTap: () {
                           Navigator.of(context).push(
                             AppMotion.fadeSlide(const AllCoursesScreen()),
@@ -432,17 +414,13 @@ class HomeScreen extends StatelessWidget {
                         icon: CupertinoIcons.chart_pie_fill,
                         label: 'Attendance',
                         value: '${attendancePct.toStringAsFixed(0)}%',
-                        bg: attendanceTone.bg,
-                        accent: attendanceTone.accent,
                         onTap: () =>
                             context.read<UiProvider>().setNavIndex(2),
                       ),
                       _pastelStat(
                         icon: CupertinoIcons.creditcard_fill,
-                        label: 'Due Fee',
+                        label: 'Pending',
                         value: 'Rs ${courses.totalFeeDue}',
-                        bg: _softRose,
-                        accent: const Color(0xFFDC2626),
                         onTap: () =>
                             context.read<UiProvider>().setNavIndex(3),
                       ),
@@ -454,16 +432,12 @@ class HomeScreen extends StatelessWidget {
                         value: lecturesTotal == 0
                             ? '—'
                             : '$lecturesDone/$lecturesTotal',
-                        bg: AppColors.softBlue,
-                        accent: AppColors.blueDark,
                         onTap: openContinueCourse,
                       ),
                       _pastelStat(
                         icon: CupertinoIcons.checkmark_seal_fill,
                         label: doneTasks > 0 ? '$doneTasks done' : 'Tasks',
                         value: '$openTasks open',
-                        bg: const Color(0xFFECFDF5),
-                        accent: const Color(0xFF059669),
                         onTap: () =>
                             context.read<UiProvider>().setNavIndex(1),
                       ),
@@ -471,8 +445,6 @@ class HomeScreen extends StatelessWidget {
                         icon: CupertinoIcons.money_dollar_circle_fill,
                         label: 'Installments',
                         value: installments > 0 ? '$installments×' : '—',
-                        bg: _softRose,
-                        accent: const Color(0xFFDC2626),
                         onTap: () =>
                             context.read<UiProvider>().setNavIndex(3),
                       ),
@@ -743,46 +715,58 @@ class HomeScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     required String value,
-    required Color bg,
-    required Color accent,
     VoidCallback? onTap,
   }) {
     return Material(
-      color: bg,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 15, color: accent),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: accent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  height: 1.1,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.line),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFFEFF6FF),
+                Color(0xFFDBEAFE),
+              ],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 15, color: _statAccent),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    height: 1.1,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: accent.withValues(alpha: 0.85),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: _statAccent.withValues(alpha: 0.9),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
