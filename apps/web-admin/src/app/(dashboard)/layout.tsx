@@ -14,8 +14,8 @@ import {
   MessageSquare,
   ClipboardList,
   Wallet,
-  UserRoundCog,
-  Settings2,
+  Users,
+  Settings,
   Search,
   LogOut,
   Menu,
@@ -23,9 +23,13 @@ import {
   PanelLeftClose,
   PanelLeft,
   Sparkles,
+  Award,
+  MessageCircleWarning,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isNavItemActive } from "@/lib/nav-active";
+import { pageTitleForPath } from "@/lib/page-titles";
 import { clearSession, getAdminUser, getToken } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { PageEnter } from "@/components/ui/page-enter";
@@ -39,22 +43,48 @@ import {
 } from "@/components/ui/admin-activity-provider";
 import { useNotifications } from "@/components/ui/notifications-provider";
 
-const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/users", label: "Users", icon: UserRoundCog },
-  { href: "/students", label: "Students", icon: GraduationCap },
-  { href: "/interns", label: "Interns", icon: FolderKanban },
-  { href: "/staff", label: "Teachers", icon: BriefcaseBusiness },
-  { href: "/fees", label: "Student fees", icon: Wallet },
-  { href: "/attendance", label: "Attendance", icon: CalendarCheck },
-  { href: "/courses", label: "Courses", icon: BookOpen },
-  { href: "/courses/requests", label: "Enrollments", icon: UsersRound },
-  { href: "/quizzes", label: "Quizzes", icon: ClipboardList },
-  { href: "/certificates", label: "Certificates", icon: GraduationCap },
-  { href: "/ai", label: "AI coach", icon: Sparkles },
-  { href: "/inbox", label: "Chat inbox", icon: MessageSquare },
-  { href: "/feedback", label: "Feedback", icon: ClipboardList },
-  { href: "/system", label: "System", icon: Settings2 },
+type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavGroup = { label?: string; items: NavItem[] };
+
+/** Grouped nav — clearer hierarchy, less “long random list” vibe. */
+const navGroups: NavGroup[] = [
+  {
+    items: [{ href: "/", label: "Dashboard", icon: LayoutDashboard }],
+  },
+  {
+    label: "People",
+    items: [
+      { href: "/users", label: "Users", icon: Users },
+      { href: "/students", label: "Students", icon: GraduationCap },
+      { href: "/interns", label: "Interns", icon: FolderKanban },
+      { href: "/staff", label: "Teachers", icon: BriefcaseBusiness },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { href: "/fees", label: "Student fees", icon: Wallet },
+      { href: "/attendance", label: "Attendance", icon: CalendarCheck },
+      { href: "/courses", label: "Courses", icon: BookOpen },
+      { href: "/courses/requests", label: "Enrollments", icon: UsersRound },
+    ],
+  },
+  {
+    label: "Learning",
+    items: [
+      { href: "/quizzes", label: "Quizzes", icon: ClipboardList },
+      { href: "/certificates", label: "Certificates", icon: Award },
+      { href: "/ai", label: "AI coach", icon: Sparkles },
+    ],
+  },
+  {
+    label: "Support",
+    items: [
+      { href: "/inbox", label: "Chat inbox", icon: MessageSquare },
+      { href: "/feedback", label: "Feedback", icon: MessageCircleWarning },
+      { href: "/system", label: "Settings", icon: Settings },
+    ],
+  },
 ];
 
 const SIDEBAR_COLLAPSED_KEY = "lms_sidebar_collapsed";
@@ -81,47 +111,58 @@ function NavLinks({
   };
 
   return (
-    <nav className="sidebar-scroll flex-1 space-y-1 pr-0.5">
-      {nav.map((item) => {
-        const active = isNavItemActive(pathname, item.href);
-        const Icon = item.icon;
-        const count = badgeFor(item.href);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={collapsed ? item.label : undefined}
-            onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "nav-link relative flex items-center rounded-xl py-2.5 text-sm font-medium",
-              collapsed ? "justify-center px-2" : "gap-3 px-3",
-              active
-                ? "bg-[#2563EB] text-white"
-                : "bg-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {!collapsed ? (
-              <>
-                <span className="flex-1 truncate">{item.label}</span>
-                {count > 0 ? (
-                  <span
-                    className={cn(
-                      "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
-                      active ? "bg-white text-blue-700" : "bg-blue-600 text-white"
-                    )}
-                  >
-                    {count > 99 ? "99+" : count}
-                  </span>
+    <nav className="sidebar-scroll flex-1 space-y-4 pr-0.5">
+      {navGroups.map((group, gi) => (
+        <div key={group.label ?? `g-${gi}`} className="space-y-1">
+          {group.label && !collapsed ? (
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">
+              {group.label}
+            </p>
+          ) : null}
+          {group.items.map((item) => {
+            const active = isNavItemActive(pathname, item.href);
+            const Icon = item.icon;
+            const count = badgeFor(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={collapsed ? item.label : undefined}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "nav-link relative flex items-center rounded-lg py-2 text-[13px] font-semibold transition-colors",
+                  collapsed ? "justify-center px-2" : "gap-3 px-3",
+                  active
+                    ? "bg-slate-900 text-white"
+                    : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                )}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+                {!collapsed ? (
+                  <>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {count > 0 ? (
+                      <span
+                        className={cn(
+                          "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
+                          active
+                            ? "bg-white text-slate-900"
+                            : "bg-slate-900 text-white"
+                        )}
+                      >
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    ) : null}
+                  </>
+                ) : count > 0 ? (
+                  <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
                 ) : null}
-              </>
-            ) : count > 0 ? (
-              <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white" />
-            ) : null}
-          </Link>
-        );
-      })}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
     </nav>
   );
 }
@@ -191,10 +232,12 @@ function SidebarBody({
         />
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-slate-900">
-              Code&apos;s Thinker LMS
+            <p className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+              Code&apos;s Thinker
             </p>
-            <p className="text-[11px] font-medium text-slate-500">Admin</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              LMS Admin
+            </p>
           </div>
         ) : null}
       </div>
@@ -210,46 +253,53 @@ function SidebarBody({
           <button
             type="button"
             className={cn(
-              "flex w-full items-center rounded-xl border border-slate-200 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50",
+              "flex w-full items-center rounded-lg py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800",
               collapsed ? "justify-center px-2" : "gap-2 px-3"
             )}
             onClick={onToggleCollapse}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-4 w-4" strokeWidth={2} />
             ) : (
               <>
-                <PanelLeftClose className="h-4 w-4 shrink-0" />
+                <PanelLeftClose className="h-4 w-4 shrink-0" strokeWidth={2} />
                 <span>Collapse</span>
               </>
             )}
           </button>
         ) : null}
-        <div
-          className={cn(
-            "flex items-center px-2",
-            collapsed ? "flex-col gap-2" : "gap-3"
-          )}
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700">
-            {initials}
-          </div>
-          {!collapsed ? (
+        {!collapsed ? (
+          <div className="flex items-center gap-3 px-2 py-1">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+              {initials}
+            </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
+              <p className="truncate text-sm font-semibold text-slate-900">
+                {name}
+              </p>
               <p className="truncate text-xs text-slate-500">Super Admin</p>
             </div>
-          ) : null}
-          <button
-            type="button"
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            title="Sign out"
-            onClick={onLogout}
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className="flex justify-center py-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+              {initials}
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className={cn(
+            "flex w-full items-center rounded-lg py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50",
+            collapsed ? "justify-center px-2" : "gap-3 px-3"
+          )}
+          title="Sign out"
+          onClick={onLogout}
+        >
+          <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
+          {!collapsed ? <span>Logout</span> : null}
+        </button>
       </div>
     </>
   );
@@ -350,7 +400,7 @@ export default function DashboardLayout({
             {/* Desktop sidebar */}
             <aside
               className={cn(
-                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-slate-200 bg-white px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
+                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-slate-200 bg-[#F3F4F6] px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
                 sidebarCollapsed ? "w-[72px]" : "w-[250px]"
               )}
             >
@@ -372,7 +422,7 @@ export default function DashboardLayout({
                   aria-label="Close menu"
                   onClick={() => setMobileOpen(false)}
                 />
-                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-slate-200 bg-white px-3 py-4">
+                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-slate-200 bg-[#F3F4F6] px-3 py-4">
                   <div className="mb-2 flex justify-end px-1">
                     <button
                       type="button"
@@ -398,26 +448,28 @@ export default function DashboardLayout({
                 sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[250px]"
               )}
             >
-              <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-slate-200 bg-white/95 px-3 animate-fade-in sm:h-16 sm:gap-3 sm:px-4 md:px-6">
+              <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-3 animate-fade-in sm:h-16 sm:gap-4 sm:px-5 md:px-6">
                 <button
                   type="button"
-                  className="rounded-xl border border-slate-200 p-2 text-slate-700 lg:hidden"
+                  className="rounded-lg border border-slate-200 p-2 text-slate-700 lg:hidden"
                   aria-label="Open menu"
                   onClick={() => setMobileOpen(true)}
                 >
-                  <Menu className="h-5 w-5" />
+                  <Menu className="h-5 w-5" strokeWidth={2} />
                 </button>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/brand/ct_mark.png"
-                  alt=""
-                  className="h-8 w-8 rounded-lg object-cover lg:hidden"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/brand/app_icon.png";
-                  }}
-                />
-                <div className="relative min-w-0 flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <div className="hidden min-w-0 lg:block">
+                  <p className="truncate text-sm font-bold text-slate-900">
+                    {pageTitleForPath(pathname).title}
+                  </p>
+                  <p className="truncate text-[11px] font-medium text-slate-400">
+                    Admin Overview
+                  </p>
+                </div>
+                <div className="relative min-w-0 flex-1 lg:max-w-md lg:flex-none lg:ml-auto">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    strokeWidth={2}
+                  />
                   <Input
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
@@ -430,13 +482,13 @@ export default function DashboardLayout({
                         runHeaderSearch(searchQ);
                       }
                     }}
-                    placeholder="Search students, interns, staff..."
-                    className="h-10 w-full rounded-full border-slate-200 bg-white pl-9 pr-9"
+                    placeholder="Search records..."
+                    className="h-10 w-full rounded-lg border-slate-200 bg-slate-50 pl-9 pr-9"
                   />
                   {searchQ.trim() ? (
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                       aria-label="Clear search"
                       onClick={() => setSearchQ("")}
                     >
@@ -445,11 +497,22 @@ export default function DashboardLayout({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-                  <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-500 sm:flex">
-                    <UsersRound className="h-3.5 w-3.5" />
-                    Live
-                  </div>
                   <NotificationsBell />
+                  <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 sm:flex">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                      {(name.split(" ").map((p) => p[0]).join("").slice(0, 2) ||
+                        "AA"
+                      ).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 leading-tight">
+                      <p className="truncate text-xs font-semibold text-slate-900">
+                        {name.split(" ")[0] || "Admin"}
+                      </p>
+                      <p className="truncate text-[10px] font-medium text-slate-400">
+                        Super Admin
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </header>
               <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6">

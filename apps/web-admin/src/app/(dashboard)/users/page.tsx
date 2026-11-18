@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Users } from "lucide-react";
 import { api } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
+import { PageHeader, PageMetaPill } from "@/components/ui/page-header";
 import { cacheGet, cacheGetSync, cacheSet } from "@/lib/local-db";
 
 const USERS_CACHE_KEY = "lms_cache_users_v1";
@@ -342,14 +344,12 @@ function UsersPageInner() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card space-y-3 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Users</h2>
-            <p className="text-sm text-slate-500">
-              Add Student, Intern, or Teacher. Tap a name for full profile.
-            </p>
-          </div>
+      <PageHeader
+        title="Users"
+        description="Live user directory with admin-side filters. Add Student, Intern, or Teacher."
+        icon={Users}
+        meta={<PageMetaPill label="Total" value={items.length} />}
+        actions={
           <form
             className="flex w-full max-w-md gap-2 sm:w-auto"
             onSubmit={(e) => {
@@ -360,24 +360,24 @@ function UsersPageInner() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, email, phone…"
-              className="h-10"
+              placeholder="Search name, email or phone"
+              className="h-10 rounded-lg bg-white"
             />
             <Button type="submit" variant="secondary">
               Search
             </Button>
           </form>
-        </div>
-        {error ? (
-          <p className="mt-2 text-sm text-red-600">
-            {error}
-            {error.toLowerCase().includes("unauthorized") ||
-            error.toLowerCase().includes("session")
-              ? " Sign in again from /login."
-              : null}
-          </p>
-        ) : null}
-      </div>
+        }
+      />
+      {error ? (
+        <p className="text-sm text-red-600">
+          {error}
+          {error.toLowerCase().includes("unauthorized") ||
+          error.toLowerCase().includes("session")
+            ? " Sign in again from /login."
+            : null}
+        </p>
+      ) : null}
 
       <form
         onSubmit={onCreate}

@@ -214,41 +214,27 @@ export default function DashboardPage() {
 
   return (
     <div className="page-enter space-y-6">
-      {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-blue-100 bg-gradient-to-br from-[#EFF6FF] via-white to-[#F0FDFA] p-6 sm:p-7 animate-fade-up">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-400/15 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 left-10 h-48 w-48 rounded-full bg-teal-300/20 blur-3xl"
-        />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-blue-700/80">Dashboard</p>
-            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
-              Welcome, {name}
-            </h2>
-            <p className="mt-1.5 max-w-xl text-sm text-slate-500">
-              People, attendance, ratings, and live support at a glance.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="success" className="gap-1">
-              <Radio className="h-3 w-3" />
-              Live
-            </Badge>
-            <Badge variant="default">{unread} alerts</Badge>
-            {unreadMessages > 0 ? (
-              <Badge variant="warning">{unreadMessages} chat</Badge>
-            ) : null}
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
+            Welcome, {name}
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-500">
+            People, attendance, ratings, and live support at a glance.
+          </p>
         </div>
-        {error ? (
-          <p className="relative mt-3 text-sm text-red-600">{error}</p>
-        ) : null}
-      </section>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="success" className="gap-1">
+            <Radio className="h-3 w-3" />
+            Live
+          </Badge>
+          <Badge variant="default">{unread} alerts</Badge>
+          {unreadMessages > 0 ? (
+            <Badge variant="warning">{unreadMessages} chat</Badge>
+          ) : null}
+        </div>
+      </div>
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       {/* All users + rings */}
       <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">

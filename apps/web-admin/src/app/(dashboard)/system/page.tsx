@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { FolderTree, MapPin, Settings, Smartphone } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/ui/page-header";
 import { useSnackbar } from "@/components/ui/snackbar";
 
 type Version = {
@@ -94,15 +96,24 @@ export default function SystemPage() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card p-5">
-        <h2 className="text-lg font-semibold">System</h2>
-        <p className="text-sm text-slate-500">
-          Force-update, office geofence &amp; role shift times
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Manage system preferences, office rules, and app updates"
+        icon={Settings}
+      />
 
-      <div className="glass-card max-w-xl space-y-3 p-5">
-        <h3 className="font-semibold">Course categories (student tabs)</h3>
+      <div className="glass-card max-w-2xl space-y-3 p-5">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+            <FolderTree className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <h3 className="text-base font-bold text-slate-900">
+            Course categories
+          </h3>
+        </div>
+        <p className="text-sm text-slate-500">
+          These names appear under All courses on the student home.
+        </p>
         <p className="text-xs text-slate-500">
           These names appear under All courses on the student home: All,
           Flutter, Frontend, Dot Net, and more.
@@ -188,9 +199,16 @@ export default function SystemPage() {
         </ul>
       </div>
 
-      <div className="glass-card max-w-xl space-y-3 p-5">
-        <h3 className="font-semibold">Office attendance (Port Singer)</h3>
-        <p className="text-xs text-slate-500">
+      <div className="glass-card max-w-2xl space-y-3 p-5">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+            <MapPin className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <h3 className="text-base font-bold text-slate-900">
+            Office attendance
+          </h3>
+        </div>
+        <p className="text-sm text-slate-500">
           Static pin, check-in only inside radius, once/day arrival reminder,
           auto check-out at shift end
         </p>
@@ -266,8 +284,15 @@ export default function SystemPage() {
         </Button>
       </div>
 
-      <div className="glass-card max-w-xl space-y-3 p-5">
-        <h3 className="font-semibold">Android force-update</h3>
+      <div className="glass-card max-w-2xl space-y-3 p-5">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+            <Smartphone className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <h3 className="text-base font-bold text-slate-900">
+            Android force-update
+          </h3>
+        </div>
         <div className="space-y-1.5">
           <Label>Minimum version</Label>
           <Input
