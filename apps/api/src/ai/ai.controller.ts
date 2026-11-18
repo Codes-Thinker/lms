@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
@@ -52,5 +53,21 @@ export class AiController {
   @Roles("SUPER_ADMIN", "STAFF")
   usage() {
     return this.ai.usageSummary();
+  }
+
+  @Get("admin/transcripts")
+  @Roles("SUPER_ADMIN", "STAFF")
+  transcripts(@Query("take") take?: string) {
+    return this.ai.adminTranscripts(take ? Number(take) : 60);
+  }
+
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post("admin/assist")
+  @Roles("SUPER_ADMIN", "STAFF")
+  adminAssist(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { message?: string }
+  ) {
+    return this.ai.adminAssist(user.sub, body.message ?? "");
   }
 }
