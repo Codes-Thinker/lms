@@ -27,7 +27,7 @@ export function PageHeader({
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
           {Icon ? (
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/30">
               <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
             </span>
           ) : null}

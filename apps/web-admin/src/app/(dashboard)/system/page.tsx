@@ -104,7 +104,7 @@ export default function SystemPage() {
 
       <div className="glass-card max-w-2xl space-y-3 p-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-600/30">
             <FolderTree className="h-4 w-4" strokeWidth={2} />
           </span>
           <h3 className="text-base font-bold text-slate-900">
@@ -201,7 +201,7 @@ export default function SystemPage() {
 
       <div className="glass-card max-w-2xl space-y-3 p-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-600/30">
             <MapPin className="h-4 w-4" strokeWidth={2} />
           </span>
           <h3 className="text-base font-bold text-slate-900">
@@ -286,7 +286,7 @@ export default function SystemPage() {
 
       <div className="glass-card max-w-2xl space-y-3 p-5">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-600/30">
             <Smartphone className="h-4 w-4" strokeWidth={2} />
           </span>
           <h3 className="text-base font-bold text-slate-900">

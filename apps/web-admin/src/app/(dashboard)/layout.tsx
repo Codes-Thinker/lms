@@ -134,8 +134,8 @@ function NavLinks({
                   "nav-link relative flex items-center rounded-lg py-2 text-[13px] font-semibold transition-colors",
                   collapsed ? "justify-center px-2" : "gap-3 px-3",
                   active
-                    ? "bg-slate-900 text-white"
-                    : "bg-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-[#2563EB] text-white shadow-sm shadow-blue-600/25"
+                    : "bg-transparent text-slate-500 hover:bg-blue-50 hover:text-blue-700"
                 )}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
@@ -147,8 +147,8 @@ function NavLinks({
                         className={cn(
                           "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
                           active
-                            ? "bg-white text-slate-900"
-                            : "bg-slate-900 text-white"
+                            ? "bg-white text-blue-700"
+                            : "bg-blue-600 text-white"
                         )}
                       >
                         {count > 99 ? "99+" : count}
@@ -271,7 +271,7 @@ function SidebarBody({
         ) : null}
         {!collapsed ? (
           <div className="flex items-center gap-3 px-2 py-1">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
@@ -283,7 +283,7 @@ function SidebarBody({
           </div>
         ) : (
           <div className="flex justify-center py-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
               {initials}
             </div>
           </div>
@@ -396,11 +396,11 @@ export default function DashboardLayout({
         <AdminActivityProvider>
           <RealtimeBridge />
           <SectionReadOnVisit />
-          <div className="dashboard-shell flex min-h-screen bg-[#F8FAFC]">
+          <div className="dashboard-shell flex min-h-screen bg-[#F4F8FF]">
             {/* Desktop sidebar */}
             <aside
               className={cn(
-                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-slate-200 bg-[#F3F4F6] px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
+                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-blue-100/80 bg-white px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
                 sidebarCollapsed ? "w-[72px]" : "w-[250px]"
               )}
             >
@@ -422,7 +422,7 @@ export default function DashboardLayout({
                   aria-label="Close menu"
                   onClick={() => setMobileOpen(false)}
                 />
-                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-slate-200 bg-[#F3F4F6] px-3 py-4">
+                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-blue-100/80 bg-white px-3 py-4">
                   <div className="mb-2 flex justify-end px-1">
                     <button
                       type="button"
@@ -499,7 +499,7 @@ export default function DashboardLayout({
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <NotificationsBell />
                   <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 sm:flex">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[10px] font-bold text-white">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
                       {(name.split(" ").map((p) => p[0]).join("").slice(0, 2) ||
                         "AA"
                       ).toUpperCase()}

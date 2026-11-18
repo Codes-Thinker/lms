@@ -48,7 +48,7 @@
 }
 
 .dashboard-shell {
-  background: #F8FAFC;
+  background: #F4F8FF;
 }
 
 /* Tables scroll on small screens instead of breaking the shell */
@@ -65,12 +65,13 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Flat cards — FastRide-like admin panels */
+/* Luxury containers — crisp white + soft blue edge (no gray wash / no blur) */
 .glass-card {
-  @apply rounded-xl border border-slate-200 bg-white shadow-none;
-  box-shadow: none !important;
+  @apply rounded-2xl border border-blue-100/90 bg-white;
+  box-shadow: 0 8px 28px -18px rgba(37, 99, 235, 0.35);
   filter: none !important;
   backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* Table header weight like product admin UIs */
@@ -78,36 +79,34 @@
   @apply text-[11px] font-bold uppercase tracking-wide text-slate-500;
 }
 
-/* Softer table separators (no heavy dashed lines) */
+/* Softer table separators */
 .dashboard-shell table tbody tr,
 .dashboard-shell table tbody td,
 .dashboard-shell table tbody th {
-  border-color: rgb(248 250 252) !important;
+  border-color: rgb(239 246 255) !important;
 }
 .dashboard-shell table thead {
-  border-bottom: 1px solid rgb(241 245 249);
-}
-.dashboard-shell .border-t,
-.dashboard-shell .border-b,
-.dashboard-shell .border-slate-100,
-.dashboard-shell .border-slate-200 {
-  border-color: rgb(241 245 249) !important;
-}
-.dashboard-shell hr,
-.dashboard-shell .border-dashed {
-  border-style: solid !important;
-  border-color: rgb(241 245 249) !important;
+  border-bottom: 1px solid rgb(219 234 254);
 }
 
-/* Kill leftover soft shadows / blur across admin */
-.dashboard-shell *,
-.dashboard-shell *::before,
-.dashboard-shell *::after {
-  box-shadow: none !important;
-  text-shadow: none !important;
-  filter: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+/* Soft shimmer for loading rows */
+@keyframes lux-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+.lux-skeleton {
+  background: linear-gradient(
+    90deg,
+    #eff6ff 0%,
+    #dbeafe 45%,
+    #eff6ff 90%
+  );
+  background-size: 200% 100%;
+  animation: lux-shimmer 1.25s ease-in-out infinite;
 }
 
 @keyframes fade-up {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { GraduationCap } from "lucide-react";
 import { api } from "@/lib/api";
 import { readListCache, writeListCache } from "@/lib/list-cache";
 import { FeeStatusBadge } from "@/lib/fee-display";
@@ -13,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
+import { PageHeader, PageMetaPill } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const CACHE_KEY = "lms_cache_students_v2";
 const PAGE_SIZE = 25;
@@ -220,28 +223,27 @@ function StudentsPageInner() {
     courseParam === "all" ? "/fees" : `/fees?course=${encodeURIComponent(courseParam)}`;
 
   return (
-    <div className="space-y-6">
-      <div className="glass-card flex flex-wrap items-start justify-between gap-3 p-5">
-        <div>
-          <h2 className="text-lg font-semibold">Students</h2>
-          <p className="text-sm text-slate-500">
-            Filter by course, then open a student for the full profile
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="secondary" asChild>
-            <Link href={feesHref}>Open fees</Link>
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={loading}
-            onClick={() => refresh().catch((e) => show(String(e)))}
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Students"
+        description="Filter by course, then open a student for the full profile"
+        icon={GraduationCap}
+        meta={<PageMetaPill label="Total" value={loading && !total ? "…" : total} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" asChild>
+              <Link href={feesHref}>Open fees</Link>
+            </Button>
+            <Button
+              size="sm"
+              disabled={loading}
+              onClick={() => refresh().catch((e) => show(String(e)))}
+            >
+              {loading ? "Refreshing…" : "Refresh"}
+            </Button>
+          </div>
+        }
+      />
 
       {error ? (
         <div className="glass-card border border-rose-100 bg-rose-50/50 p-4 text-sm text-rose-700">
@@ -254,7 +256,7 @@ function StudentsPageInner() {
           placeholder="Search name, email, or phone…"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="max-w-md"
+          className="max-w-md rounded-xl border-blue-100 bg-[#F8FBFF]"
         />
         <div className="flex flex-wrap gap-2">
           {tabs.map((t) => {
@@ -265,10 +267,10 @@ function StudentsPageInner() {
                 type="button"
                 onClick={() => selectCourse(t.id)}
                 className={cn(
-                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
+                  "rounded-full px-3.5 py-1.5 text-sm font-semibold transition",
                   active
-                    ? "bg-[#2563EB] text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "bg-[#2563EB] text-white shadow-sm shadow-blue-600/25"
+                    : "border border-blue-100 bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700"
                 )}
               >
                 {t.id === "all" ? t.title : tabLabel(t)}
@@ -279,16 +281,18 @@ function StudentsPageInner() {
       </div>
 
       <div className="glass-card table-scroll overflow-hidden">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h3 className="font-semibold">Student roster</h3>
+        <div className="border-b border-blue-50 px-5 py-4">
+          <h3 className="font-bold text-slate-900">Student roster</h3>
           <p className="text-xs text-slate-500">
-            {loading ? "Loading…" : `${total} student${total === 1 ? "" : "s"}`}
+            {loading && list.length === 0
+              ? "Loading roster…"
+              : `${total} student${total === 1 ? "" : "s"}`}
             {qFromUrl ? `, matching "${qFromUrl}"` : null}
           </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50/80 text-slate-500">
+            <thead className="bg-blue-50/60 text-slate-500">
               <tr>
                 <th className="px-5 py-3 font-medium">Student</th>
                 <th className="px-5 py-3 font-medium">Contact</th>
@@ -302,11 +306,22 @@ function StudentsPageInner() {
             </thead>
             <tbody>
               {loading && list.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-slate-500">
-                    Loading students…
-                  </td>
-                </tr>
+                <>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={`sk-${i}`} className="border-t border-blue-50">
+                      <td className="px-5 py-4" colSpan={8}>
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-9 w-9 rounded-full" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-3.5 w-1/3" />
+                            <Skeleton className="h-3 w-1/2" />
+                          </div>
+                          <Skeleton className="h-6 w-16 rounded-full" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </>
               ) : null}
               {!loading && list.length === 0 ? (
                 <tr>
@@ -326,7 +341,7 @@ function StudentsPageInner() {
                 return (
                   <Fragment key={s.id}>
                     <tr
-                      className="cursor-pointer border-t border-slate-100 hover:bg-slate-50/60"
+                      className="cursor-pointer border-t border-blue-50 hover:bg-blue-50/50"
                       onClick={() => setExpandedId(open ? null : s.id)}
                     >
                       <td className="px-5 py-3.5">
