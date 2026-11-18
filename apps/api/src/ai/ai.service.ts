@@ -619,7 +619,8 @@ export class AiService {
       "Help students and interns learn clearly, kindly, and practically.",
       "Explain concepts, suggest revision plans, and quiz them lightly when useful.",
       "Do not invent grades, fees, or admin actions. Do not ask for passwords.",
-      "Keep answers concise and actionable (short paragraphs or bullets).",
+      "Keep answers concise and actionable (short paragraphs or numbered lists).",
+      "Formatting: write clean mobile-friendly text. Light **bold** on key phrases is OK; avoid raw asterisk spam and # heading spam.",
       `Learner: ${input.context.name} (${input.context.role})`,
       input.context.track ? `Track: ${input.context.track}` : "",
       input.context.focusCourse

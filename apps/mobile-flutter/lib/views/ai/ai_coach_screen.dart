@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
 import '../../core/api_errors.dart';
 import '../../core/constants/app_brand.dart';
@@ -412,30 +414,122 @@ class _ChatBubble extends StatelessWidget {
 
   const _ChatBubble({super.key, required this.mine, required this.text});
 
+  /// Clipboard-friendly plain text (no raw markdown markers).
+  static String plainCopy(String raw) {
+    var s = raw;
+    s = s.replaceAllMapped(
+      RegExp(r'\*\*([^*]+)\*\*'),
+      (m) => m.group(1) ?? '',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'__([^_]+)__'),
+      (m) => m.group(1) ?? '',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'(^|\s)\*([^*\n]+)\*(?=\s|$)'),
+      (m) => '${m.group(1) ?? ''}${m.group(2) ?? ''}',
+    );
+    s = s.replaceAllMapped(
+      RegExp(r'^#{1,6}\s*', multiLine: true),
+      (_) => '',
+    );
+    s = s.replaceAll(RegExp(r'`+'), '');
+    return s.trim();
+  }
+
+  Future<void> _copy(BuildContext context) async {
+    await Clipboard.setData(ClipboardData(text: plainCopy(text)));
+    if (!context.mounted) return;
+    context.read<UiProvider>().showSnack('Message copied');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final baseStyle = TextStyle(
+      color: mine ? Colors.white : AppColors.ink,
+      height: 1.4,
+      fontSize: 14.5,
+    );
+
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        constraints: const BoxConstraints(maxWidth: 320),
-        decoration: BoxDecoration(
-          color: mine ? AppColors.blue : Colors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(mine ? 16 : 4),
-            bottomRight: Radius.circular(mine ? 4 : 16),
+      child: GestureDetector(
+        onLongPress: () => _copy(context),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          constraints: const BoxConstraints(maxWidth: 320),
+          decoration: BoxDecoration(
+            color: mine ? AppColors.blue : Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(16),
+              topRight: const Radius.circular(16),
+              bottomLeft: Radius.circular(mine ? 16 : 4),
+              bottomRight: Radius.circular(mine ? 4 : 16),
+            ),
+            border: mine ? null : Border.all(color: AppColors.line),
           ),
-          border: mine ? null : Border.all(color: AppColors.line),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            color: mine ? Colors.white : AppColors.ink,
-            height: 1.4,
-            fontSize: 14.5,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (mine)
+                SelectableText(text, style: baseStyle)
+              else
+                MarkdownBody(
+                  data: text,
+                  selectable: true,
+                  softLineBreak: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: baseStyle,
+                    strong: baseStyle.copyWith(fontWeight: FontWeight.w800),
+                    em: baseStyle.copyWith(fontStyle: FontStyle.italic),
+                    listBullet: baseStyle,
+                    unorderedListAlign: WrapAlignment.start,
+                    orderedListAlign: WrapAlignment.start,
+                    h1: baseStyle.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    h2: baseStyle.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    h3: baseStyle.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    blockquote: baseStyle.copyWith(color: AppColors.muted),
+                    code: baseStyle.copyWith(
+                      fontFamily: 'monospace',
+                      backgroundColor: AppColors.softBlue,
+                    ),
+                    a: baseStyle.copyWith(
+                      color: AppColors.blueDark,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'Copy',
+                  onPressed: () => _copy(context),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 28,
+                    minHeight: 28,
+                  ),
+                  icon: Icon(
+                    Icons.copy_rounded,
+                    size: 15,
+                    color: mine
+                        ? Colors.white.withValues(alpha: 0.85)
+                        : AppColors.muted,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
