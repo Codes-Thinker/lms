@@ -11,7 +11,7 @@ import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 import { CoursesModule } from "./courses/courses.module";
 import { FeesModule } from "./fees/fees.module";
-import { HealthController } from "./health.controller";
+import { HealthController, RootController } from "./health.controller";
 import { MailModule } from "./mail/mail.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { OpsModule } from "./ops/ops.module";
@@ -45,7 +45,7 @@ import { UsersModule } from "./users/users.module";
     AssessmentsModule,
     AiModule,
   ],
-  controllers: [HealthController],
+  controllers: [RootController, HealthController],
   providers: [
     JwtAuthGuard,
     RolesGuard,
