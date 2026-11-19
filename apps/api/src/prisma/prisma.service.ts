@@ -9,8 +9,20 @@ export class PrismaService
   private readonly log = new Logger(PrismaService.name);
 
   async onModuleInit() {
+    this.logDbTarget();
     // Non-blocking: API can boot even if Supabase/IPv6 is briefly unreachable.
     void this.connectWithRetry();
+  }
+
+  /** Log host only (no password) so EC2 misconfig is obvious in pm2 logs. */
+  private logDbTarget() {
+    const raw = process.env.DATABASE_URL ?? "";
+    try {
+      const u = new URL(raw);
+      this.log.log(`DB target ${u.hostname}:${u.port || "5432"} user=${u.username}`);
+    } catch {
+      this.log.warn("DATABASE_URL missing or invalid");
+    }
   }
 
   private async connectWithRetry() {
