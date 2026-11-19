@@ -1,6 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as admin from "firebase-admin";
+import {
+  cert,
+  getApps,
+  initializeApp,
+  type ServiceAccount,
+} from "firebase-admin/app";
+import { getMessaging } from "firebase-admin/messaging";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -23,8 +29,8 @@ export class PushService implements OnModuleInit {
     }
     try {
       const cred = this.parseServiceAccount(raw);
-      if (!admin.apps.length) {
-        admin.initializeApp({ credential: admin.credential.cert(cred) });
+      if (!getApps().length) {
+        initializeApp({ credential: cert(cred) });
       }
       this.ready = true;
       this.log.log("Firebase Admin ready for FCM");
@@ -36,7 +42,7 @@ export class PushService implements OnModuleInit {
   }
 
   /** Tolerate Render paste quirks: quotes, double-encoding, KEY=value paste. */
-  private parseServiceAccount(raw: string): admin.ServiceAccount {
+  private parseServiceAccount(raw: string): ServiceAccount {
     let s = raw.trim().replace(/^\uFEFF/, "");
     if (s.startsWith("FIREBASE_SERVICE_ACCOUNT_JSON=")) {
       s = s.slice("FIREBASE_SERVICE_ACCOUNT_JSON=".length).trim();
@@ -54,7 +60,7 @@ export class PushService implements OnModuleInit {
     if (!parsed || typeof parsed !== "object") {
       throw new Error("service account JSON must be an object");
     }
-    return parsed as admin.ServiceAccount;
+    return parsed as ServiceAccount;
   }
 
   async registerDevice(userId: string, token: string, platform = "android") {
@@ -101,7 +107,7 @@ export class PushService implements OnModuleInit {
           payload.type === "CHAT" || /admin/i.test(payload.title)
             ? "Code's Thinker"
             : payload.title;
-        await admin.messaging().send({
+        await getMessaging().send({
           token: d.token,
           notification: {
             title,
