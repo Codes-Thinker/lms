@@ -6,11 +6,14 @@ import {
 } from "./cors";
 
 describe("cors allowlist", () => {
-  it("includes the live Vercel admin host by default", () => {
+  it("includes the live Vercel and codesthinkerlms admin hosts by default", () => {
     const allowed = parseAllowedOrigins();
     assert.notEqual(allowed, true);
     if (allowed !== true) {
       assert.ok(allowed.includes("https://lms-nu-sepia.vercel.app"));
+      assert.ok(allowed.includes("https://www.codesthinkerlms.site"));
+      assert.ok(allowed.includes("https://codesthinkerlms.site"));
+      assert.ok(allowed.includes("http://localhost:3000"));
     }
   });
 
