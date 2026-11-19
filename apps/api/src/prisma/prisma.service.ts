@@ -8,6 +8,11 @@ export class PrismaService
 {
   private readonly log = new Logger(PrismaService.name);
 
+  constructor() {
+    const url = process.env.DATABASE_URL;
+    super(url ? { datasources: { db: { url } } } : undefined);
+  }
+
   async onModuleInit() {
     this.logDbTarget();
     // Non-blocking: API can boot even if Supabase/IPv6 is briefly unreachable.
