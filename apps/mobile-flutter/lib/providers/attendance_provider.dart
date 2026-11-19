@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 import '../services/local_cache.dart';
@@ -88,9 +90,13 @@ class AttendanceProvider extends ChangeNotifier {
   double? _officeLat;
   double? _officeLng;
   int _geofenceRadius = 50;
-  /// Hysteresis: require N consecutive outside readings before flipping inside→outside.
+  /// Hysteresis streaks to absorb GPS jitter at the boundary.
   int _outsideStreak = 0;
-  static const _outsideFlipThreshold = 3;
+  int _insideStreak = 0;
+  static const _outsideFlipThreshold = 4;
+  static const _insideFlipThreshold = 2;
+  /// Extra meters beyond radius before we treat a sample as "left".
+  static const _leaveBufferMeters = 28;
 
   bool get insideGeofence => _insideGeofence;
   int get distanceFromOffice => _distanceFromOffice;
@@ -99,6 +105,112 @@ class AttendanceProvider extends ChangeNotifier {
   int get geofenceRadius => _geofenceRadius;
   double? get officeLat => _officeLat;
   double? get officeLng => _officeLng;
+
+  static double haversineMeters(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    const r = 6371000.0;
+    double toRad(double d) => d * math.pi / 180;
+    final dLat = toRad(lat2 - lat1);
+    final dLon = toRad(lon2 - lon1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(toRad(lat1)) *
+            math.cos(toRad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  /// Pull admin office pin once so UI works without waiting on every verify.
+  Future<void> loadOfficeConfig() async {
+    if (_officeLat != null && _officeLng != null) return;
+    try {
+      final data = await ApiClient.instance.get('/system/office-config');
+      if (data is Map<String, dynamic>) {
+        _officeLat = (data['latitude'] as num?)?.toDouble();
+        _officeLng = (data['longitude'] as num?)?.toDouble();
+        _geofenceRadius = (data['radiusMeters'] as num?)?.toInt() ?? 50;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Office config load failed: $e');
+    }
+  }
+
+  void _applyHysteresis(bool rawInside) {
+    if (rawInside) {
+      _outsideStreak = 0;
+      if (_insideGeofence) {
+        _insideStreak = 0;
+        return;
+      }
+      _insideStreak += 1;
+      // First GPS fix can enter immediately; later edges need 2 samples.
+      final need = _hasGpsFix ? _insideFlipThreshold : 1;
+      if (_insideStreak >= need) {
+        _insideGeofence = true;
+        _insideStreak = 0;
+      }
+    } else {
+      _insideStreak = 0;
+      if (_insideGeofence) {
+        _outsideStreak += 1;
+        if (_outsideStreak >= _outsideFlipThreshold) {
+          _insideGeofence = false;
+          _outsideStreak = 0;
+        }
+      } else {
+        _outsideStreak = 0;
+      }
+    }
+  }
+
+  /// Local geofence update (stable UI). Optionally sync with backend.
+  Future<void> applyGpsSample(
+    double lat,
+    double lng, {
+    double? accuracyMeters,
+    bool silent = true,
+    bool syncApi = true,
+  }) async {
+    if (_officeLat == null || _officeLng == null) {
+      await loadOfficeConfig();
+    }
+
+    if (_officeLat != null && _officeLng != null) {
+      final dist = haversineMeters(lat, lng, _officeLat!, _officeLng!);
+      final accuracy = (accuracyMeters ?? 15).clamp(8, 45);
+      // Soft enter: allow GPS error so indoor users near the pin count as inside.
+      final enterLimit = _geofenceRadius + accuracy;
+      final leaveLimit = _geofenceRadius + _leaveBufferMeters + accuracy * 0.5;
+      final rawInside = _insideGeofence ? dist <= leaveLimit : dist <= enterLimit;
+
+      final prevInside = _insideGeofence;
+      final prevDist = _distanceFromOffice;
+      _applyHysteresis(rawInside);
+      _distanceFromOffice = dist.round();
+      _hasGpsFix = true;
+
+      if (!silent ||
+          prevInside != _insideGeofence ||
+          prevDist != _distanceFromOffice) {
+        notifyListeners();
+      }
+    } else if (!silent) {
+      _checkingLocation = true;
+      notifyListeners();
+    }
+
+    if (syncApi) {
+      await verifyLocation(lat, lng, silent: true, updateHysteresis: false);
+    } else if (!silent) {
+      _checkingLocation = false;
+      notifyListeners();
+    }
+  }
 
   List<AttendanceMark> get today => List.unmodifiable(_today);
   List<AttendanceMark> get history => List.unmodifiable(_history);
@@ -204,12 +316,14 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   /// Verify geofence location — calls backend to check distance.
-  /// [silent] skips loading flicker + keeps last good fix on network blips
-  /// (stops Attend tab blinking Outside/GPS error).
+  /// [silent] skips loading flicker + keeps last good fix on network blips.
+  /// When [updateHysteresis] is false, only refreshes office pin/radius cache
+  /// (local [applyGpsSample] already owns inside/outside state).
   Future<void> verifyLocation(
     double lat,
     double lng, {
     bool silent = false,
+    bool updateHysteresis = true,
   }) async {
     if (!silent) {
       _checkingLocation = true;
@@ -224,45 +338,23 @@ class AttendanceProvider extends ChangeNotifier {
       final officeLng = (data['officeLng'] as num?)?.toDouble();
       final radius = (data['radius'] as num?)?.toInt() ?? 50;
 
-      // Hysteresis: entering is instant; leaving needs a few outside samples.
-      bool nextInside = _insideGeofence;
-      if (rawInside) {
-        _outsideStreak = 0;
-        nextInside = true;
-      } else if (_insideGeofence) {
-        _outsideStreak += 1;
-        if (_outsideStreak >= _outsideFlipThreshold) {
-          nextInside = false;
-          _outsideStreak = 0;
-        }
-      } else {
-        _outsideStreak = 0;
-        nextInside = false;
+      _officeLat = officeLat ?? _officeLat;
+      _officeLng = officeLng ?? _officeLng;
+      _geofenceRadius = radius;
+      if (dist >= 0) _distanceFromOffice = dist;
+      _hasGpsFix = true;
+
+      if (updateHysteresis) {
+        _applyHysteresis(rawInside);
       }
 
-      final changed = nextInside != _insideGeofence ||
-          dist != _distanceFromOffice ||
-          radius != _geofenceRadius ||
-          officeLat != _officeLat ||
-          officeLng != _officeLng ||
-          !_hasGpsFix;
-      _insideGeofence = nextInside;
-      _distanceFromOffice = dist;
-      _officeLat = officeLat;
-      _officeLng = officeLng;
-      _geofenceRadius = radius;
-      _hasGpsFix = true;
       if (!silent) _checkingLocation = false;
-      if (changed || !silent) notifyListeners();
+      notifyListeners();
     } catch (e) {
       debugPrint('Location verify failed: $e');
       // Keep last good geofence state on silent/network errors — no flicker.
       if (!silent) {
         _checkingLocation = false;
-        if (!_hasGpsFix) {
-          _insideGeofence = false;
-          _distanceFromOffice = -1;
-        }
         notifyListeners();
       }
     }

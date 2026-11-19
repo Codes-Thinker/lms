@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
 import '../../widgets/ct_mark.dart';
 import '../shell/app_shell.dart';
@@ -84,6 +87,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (auth.isStaff) teaching.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
+      // Start office geofence immediately — do not wait for Attend tab.
+      final userId = auth.user?.id;
+      OfficeLocationService.instance.bind(attendance, userId: userId);
+      unawaited(OfficeLocationService.instance.start(userId: userId));
       if (!context.mounted) return;
       final pendingType = NotificationRouter.pendingType;
       ui.setNavIndex(

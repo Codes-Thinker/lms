@@ -215,13 +215,37 @@ export default function SystemPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Latitude</Label>
-            <Input value={office.latitude} readOnly className="bg-slate-50" />
+            <Input
+              type="number"
+              step="any"
+              value={office.latitude}
+              onChange={(e) =>
+                setOffice({
+                  ...office,
+                  latitude: Number(e.target.value) || office.latitude,
+                })
+              }
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Longitude</Label>
-            <Input value={office.longitude} readOnly className="bg-slate-50" />
+            <Input
+              type="number"
+              step="any"
+              value={office.longitude}
+              onChange={(e) =>
+                setOffice({
+                  ...office,
+                  longitude: Number(e.target.value) || office.longitude,
+                })
+              }
+            />
           </div>
         </div>
+        <p className="text-xs text-slate-500">
+          Use the real office coordinates. App geofence and check-in use these
+          values live after save.
+        </p>
         <div className="space-y-1.5">
           <Label>Geofence radius (meters)</Label>
           <Input

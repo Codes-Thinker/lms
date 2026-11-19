@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,9 +7,11 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/notification_router.dart';
 import '../../core/responsive.dart';
+import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/ui_provider.dart';
+import '../../services/office_location_service.dart';
 import '../../widgets/ai_coach_fab.dart';
 import '../../widgets/app_liquid_nav_bar.dart';
 import '../home/home_screen.dart';
@@ -39,8 +43,19 @@ class _AppShellState extends State<AppShell> {
     _pageController = PageController(initialPage: start);
     NotificationRouter.shellHandler = _onNotificationOpen;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureOfficeTracking();
       _consumePendingNotification();
     });
+  }
+
+  void _ensureOfficeTracking() {
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated) return;
+    final attendance = context.read<AttendanceProvider>();
+    final userId = auth.user?.id;
+    OfficeLocationService.instance.bind(attendance, userId: userId);
+    unawaited(OfficeLocationService.instance.start(userId: userId));
   }
 
   @override

@@ -467,8 +467,8 @@ export class AttendanceService implements OnModuleInit {
 
     await this.notifications.notifyUser({
       userId,
-      title: "Attendance reminder",
-      body: "You are at the office. Check in now — you can mark attendance from the Attend tab.",
+      title: "Office Attendance Reminder",
+      body: "You are at the office. Please mark your attendance.",
       type: "ATTENDANCE",
       data: { event: "arrival_reminder" },
     });

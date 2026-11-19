@@ -46,9 +46,8 @@ class _AttendanceScreenState extends State<AttendanceScreen>
     final att = context.read<AttendanceProvider>();
     final userId = context.read<AuthProvider>().user?.id;
     OfficeLocationService.instance.bind(att, userId: userId);
-    setState(() => _locBusy = true);
+    // Do not freeze the status card while the stream starts — avoids blank/green flicker.
     await OfficeLocationService.instance.start(userId: userId);
-    if (mounted) setState(() => _locBusy = false);
   }
 
   String _fmt(DateTime dt) => TimeUtils.formatTimePrecise(dt.toLocal());
@@ -71,7 +70,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
       );
       return;
     }
-    await att.verifyLocation(pos.latitude, pos.longitude);
+    await att.applyGpsSample(
+      pos.latitude,
+      pos.longitude,
+      accuracyMeters: pos.accuracy,
+      silent: false,
+      syncApi: true,
+    );
     if (!mounted) return;
     if (!att.insideGeofence) {
       setState(() => _locBusy = false);
@@ -181,13 +186,13 @@ class _AttendanceScreenState extends State<AttendanceScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _locBusy || attendance.checkingLocation
-                            ? 'Checking location…'
-                            : !attendance.hasGpsFix
-                                ? 'Waiting for GPS…'
-                                : attendance.insideGeofence
-                                    ? 'Inside office zone'
-                                    : 'Outside office zone',
+                        attendance.hasGpsFix
+                            ? (attendance.insideGeofence
+                                ? 'Inside office zone'
+                                : 'Outside office zone')
+                            : (_locBusy || attendance.checkingLocation
+                                ? 'Checking location…'
+                                : 'Waiting for GPS…'),
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,

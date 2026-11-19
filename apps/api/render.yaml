@@ -46,3 +46,22 @@ services:
         value: "gpt-4o-mini"
       - key: AI_DAILY_LIMIT_PER_USER
         value: "40"
+
+  # Keep auto-checkout reliable when the web dyno sleeps.
+  - type: cron
+    name: codes-thinker-auto-checkout
+    runtime: node
+    rootDir: apps/api
+    plan: starter
+    region: oregon
+    schedule: "*/5 * * * *"
+    buildCommand: npm install
+    startCommand: >-
+      node -e "fetch(process.env.API_URL.replace(/\\/\$/,'')+'/ops/cron/auto-checkout',{method:'POST',headers:{Authorization:'Bearer '+(process.env.CRON_SECRET||'')}}).then(async r=>{const t=await r.text();console.log(r.status,t);if(!r.ok)process.exit(1)}).catch(e=>{console.error(e);process.exit(1)})"
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: API_URL
+        sync: false
+      - key: CRON_SECRET
+        sync: false
