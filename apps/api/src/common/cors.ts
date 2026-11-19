@@ -19,6 +19,8 @@ export function parseAllowedOrigins(): string[] | true {
     process.env.APP_URL,
     process.env.API_URL,
     "https://lms-nu-sepia.vercel.app",
+    "https://www.codesthinkerlms.site",
+    "https://codesthinkerlms.site",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
