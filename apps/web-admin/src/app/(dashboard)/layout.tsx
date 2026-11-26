@@ -178,6 +178,7 @@ function SectionReadOnVisit() {
       [
         "/feedback",
         "/fees",
+        "/leave",
         "/inbox",
         "/attendance",
         "/staff",
