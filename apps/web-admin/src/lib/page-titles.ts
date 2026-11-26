@@ -29,6 +29,12 @@ export function pageTitleForPath(pathname: string): {
   if (path.startsWith("/fees")) {
     return { title: "Student fees", description: "Dues, screenshots, and reviews" };
   }
+  if (path.startsWith("/leave")) {
+    return {
+      title: "Leave management",
+      description: "Student leave requests, approvals, and balances",
+    };
+  }
   if (path.startsWith("/attendance")) {
     return { title: "Attendance", description: "Office check-ins and status" };
   }

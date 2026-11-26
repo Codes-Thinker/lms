@@ -13,6 +13,7 @@ import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
+import '../../providers/leave_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
@@ -82,6 +83,8 @@ class _LoginScreenState extends State<LoginScreen> {
         courses.fetchAll(),
         tasks.load(),
         fees.load(),
+        if (auth.isStudent || auth.isIntern)
+          context.read<LeaveProvider>().load(silent: true),
         attendance.loadMine(),
         notes.load(),
         if (auth.isStaff) teaching.load(),
@@ -94,7 +97,12 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!context.mounted) return;
       final pendingType = NotificationRouter.pendingType;
       ui.setNavIndex(
-        pendingType != null ? NotificationRouter.tabForType(pendingType) : 0,
+        pendingType != null
+            ? NotificationRouter.tabForType(
+                pendingType,
+                isStudent: auth.isStudent,
+              )
+            : 0,
       );
       ui.showSnack(
         'Welcome ${auth.user?.firstName ?? ''}, ${auth.user?.roleLabel}',

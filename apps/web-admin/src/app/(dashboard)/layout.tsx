@@ -64,6 +64,7 @@ const navGroups: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "/fees", label: "Student fees", icon: Wallet },
+      { href: "/leave", label: "Leave", icon: ClipboardList },
       { href: "/attendance", label: "Attendance", icon: CalendarCheck },
       { href: "/courses", label: "Courses", icon: BookOpen },
       { href: "/courses/requests", label: "Enrollments", icon: UsersRound },

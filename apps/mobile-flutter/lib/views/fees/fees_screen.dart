@@ -39,6 +39,78 @@ class FeesScreen extends StatelessWidget {
       body: ListView(
         padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom),
         children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'FEE OVERVIEW',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _overviewMetric(
+                        'Total',
+                        'Rs ${fees.totalFeeAmount}',
+                      ),
+                    ),
+                    Expanded(
+                      child: _overviewMetric(
+                        'Paid',
+                        'Rs ${fees.totalPaidAmount}',
+                      ),
+                    ),
+                    Expanded(
+                      child: _overviewMetric(
+                        'Pending',
+                        'Rs ${fees.remainingAmount}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: LinearProgressIndicator(
+                    value: fees.totalFeeAmount <= 0
+                        ? 0
+                        : (fees.totalPaidAmount / fees.totalFeeAmount)
+                            .clamp(0.0, 1.0),
+                    minHeight: 6,
+                    backgroundColor: AppColors.line,
+                    color: fees.remainingAmount <= 0
+                        ? _paidGreen
+                        : AppColors.blueDark,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Status: ${fees.feeStatusLabel}'
+                  '${fees.nextDueCase?.dueDate != null ? ' · Next due ${fees.nextDueCase!.dueDate}' : ''}',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
           const Text(
             'PENDING AMOUNT',
             style: TextStyle(
@@ -370,6 +442,33 @@ class FeesScreen extends StatelessWidget {
             }),
         ],
       ),
+    );
+  }
+
+  Widget _overviewMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: AppColors.ink,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

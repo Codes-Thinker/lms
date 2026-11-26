@@ -32,7 +32,10 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
     final courses = context.watch<CourseProvider>();
     final auth = context.watch<AuthProvider>();
     final pad = AppResponsive.pagePad(context);
-    final bottom = AppResponsive.pageBottom(context);
+    final pushed = ModalRoute.of(context)?.canPop ?? false;
+    final bottom = pushed
+        ? AppResponsive.pageBottom(context)
+        : AppResponsive.shellBottom(context);
 
     var allCourses = courses.allCourses;
 

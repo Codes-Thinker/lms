@@ -206,6 +206,7 @@ export interface AppNotification {
     | "report"
     | "complain"
     | "survey"
+    | "leave"
     | "general";
   createdAt: string;
   read: boolean;

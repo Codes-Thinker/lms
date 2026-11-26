@@ -52,6 +52,7 @@ function mapType(raw: string, data?: Record<string, string> | null): AppNotifica
   if (t === "FEE" || kind === "FEE") return "fee";
   if (t === "ATTENDANCE") return "attendance";
   if (t === "TASK") return "task";
+  if (t === "LEAVE") return "leave";
   if (t === "CERTIFICATE" || t === "QUIZ") return "general";
   if (kind === "REPORT" || t === "REPORT") return "report";
   if (kind === "COMPLAIN" || t === "COMPLAIN") return "complain";
@@ -63,6 +64,7 @@ function mapType(raw: string, data?: Record<string, string> | null): AppNotifica
 const SECTION_TYPES: Record<string, AppNotification["type"][]> = {
   "/feedback": ["report", "complain", "survey", "general"],
   "/fees": ["fee"],
+  "/leave": ["leave"],
   "/inbox": ["chat"],
   "/attendance": ["attendance"],
   "/staff": ["task"],
@@ -104,6 +106,8 @@ export function hrefForNotification(n: AppNotification): string {
       return "/attendance";
     case "fee":
       return "/fees";
+    case "leave":
+      return "/leave";
     case "chat":
       return "/inbox";
     case "report":

@@ -16,6 +16,7 @@ import '../../widgets/ai_coach_fab.dart';
 import '../../widgets/app_liquid_nav_bar.dart';
 import '../home/home_screen.dart';
 import '../attendance/attendance_screen.dart';
+import '../course/all_courses_screen.dart';
 import '../fees/fees_screen.dart';
 import '../help/help_hub_screen.dart';
 import '../profile/profile_screen.dart';
@@ -96,6 +97,7 @@ class _AppShellState extends State<AppShell> {
       courseId: NotificationRouter.pendingCourseId,
       event: NotificationRouter.pendingEvent,
       isStaff: auth.isStaff,
+      isStudent: auth.isStudent,
       goToTab: _goTo,
     ).whenComplete(NotificationRouter.clear);
   }
@@ -145,31 +147,46 @@ class _AppShellState extends State<AppShell> {
       });
     }
 
+    // Student: Dashboard · Assignments · Fees · All Courses · Profile
+    // Staff/Intern keep Attend + Help (existing workflows).
     final pages = <Widget>[
       if (auth.isStaff) const TeacherHomeScreen() else const HomeScreen(),
       const TasksScreen(),
-      const AttendanceScreen(),
-      if (auth.isStudent) const FeesScreen() else const HelpHubScreen(),
+      if (auth.isStudent) const FeesScreen() else const AttendanceScreen(),
+      if (auth.isStudent) const AllCoursesScreen() else const HelpHubScreen(),
       const ProfileScreen(),
     ];
 
     final items = <AppLiquidNavItem>[
-      const AppLiquidNavItem(label: 'Home', useBrandMark: true),
+      AppLiquidNavItem(
+        label: auth.isStudent ? 'Dashboard' : 'Home',
+        useBrandMark: true,
+      ),
       AppLiquidNavItem(
         icon: CupertinoIcons.checkmark_seal_fill,
         label: auth.isIntern
             ? 'Projects'
             : auth.isStaff
                 ? 'Staff'
-                : 'Tasks',
+                : 'Assignments',
       ),
-      const AppLiquidNavItem(icon: Icons.fingerprint, label: 'Attend'),
-      AppLiquidNavItem(
-        icon: auth.isStudent
-            ? CupertinoIcons.creditcard_fill
-            : CupertinoIcons.chat_bubble_2_fill,
-        label: auth.isStudent ? 'Fees' : 'Help',
-      ),
+      if (auth.isStudent)
+        const AppLiquidNavItem(
+          icon: CupertinoIcons.creditcard_fill,
+          label: 'Fees',
+        )
+      else
+        const AppLiquidNavItem(icon: Icons.fingerprint, label: 'Attend'),
+      if (auth.isStudent)
+        const AppLiquidNavItem(
+          icon: CupertinoIcons.book_fill,
+          label: 'Courses',
+        )
+      else
+        const AppLiquidNavItem(
+          icon: CupertinoIcons.chat_bubble_2_fill,
+          label: 'Help',
+        ),
       const AppLiquidNavItem(icon: CupertinoIcons.person_fill, label: 'Profile'),
     ];
 
@@ -208,11 +225,17 @@ class _AppShellState extends State<AppShell> {
                 },
               ),
             ),
-            // Floating AI coach — smaller bubble, tail toward navbar.
+            // AI coach only on Home tab — hide on Tasks/Attend/Fees/Profile.
             Positioned(
               right: 10,
               bottom: AppResponsive.shellBottom(context) - 8,
-              child: const AiCoachFab(),
+              child: ValueListenableBuilder<int>(
+                valueListenable: _index,
+                builder: (_, index, __) {
+                  if (index != 0) return const SizedBox.shrink();
+                  return const AiCoachFab();
+                },
+              ),
             ),
           ],
         ),

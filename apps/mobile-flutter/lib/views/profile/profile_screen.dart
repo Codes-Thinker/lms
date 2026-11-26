@@ -19,13 +19,16 @@ import '../../services/push_notification_service.dart';
 import '../ai/ai_coach_screen.dart';
 import '../auth/login_screen.dart';
 import '../certificates/certificates_screen.dart';
+import '../attendance/attendance_screen.dart';
 import '../fees/fees_screen.dart';
 import '../help/admin_chat_screen.dart';
 import '../help/complain_screen.dart';
 import '../help/report_issue_screen.dart';
 import '../help/survey_screen.dart';
+import '../leave/leave_screen.dart';
 import '../quizzes/quizzes_screen.dart';
 import '../report/report_screen.dart';
+import '../../providers/leave_provider.dart';
 
 /// Profile — AppColors only, consistent spacing & alignment with Home.
 class ProfileScreen extends StatelessWidget {
@@ -210,6 +213,7 @@ class ProfileScreen extends StatelessWidget {
     context.read<TaskProvider>().clearMemory();
     context.read<ProjectProvider>().clear();
     context.read<FeeProvider>().clearMemory();
+    context.read<LeaveProvider>().clearMemory();
     context.read<AttendanceProvider>().clearMemory();
     context.read<NotificationProvider>().clearMemory();
     final auth = context.read<AuthProvider>();
@@ -428,6 +432,160 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
 
+          // —— Batch & course (moved from Dashboard) ——
+          if (auth.isStudent) ...[
+            const SizedBox(height: 24),
+            const _SectionLabel('BATCH & COURSE'),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Column(
+                children: [
+                  _infoRow(
+                    icon: CupertinoIcons.person_3_fill,
+                    label: 'Batch',
+                    value: (courses.reportBatch ?? batch),
+                  ),
+                  const _RowDivider(),
+                  _infoRow(
+                    icon: CupertinoIcons.book_fill,
+                    label: 'Course',
+                    value: courses.continueCourse?.title ??
+                        (courses.enrolledCourses.isNotEmpty
+                            ? courses.enrolledCourses.first.title
+                            : '—'),
+                  ),
+                  const _RowDivider(),
+                  _infoRow(
+                    icon: CupertinoIcons.person_crop_rectangle,
+                    label: 'Instructor',
+                    value: courses.continueCourse?.instructorName?.trim().isNotEmpty ==
+                            true
+                        ? courses.continueCourse!.instructorName!
+                        : '—',
+                  ),
+                  const _RowDivider(),
+                  _infoRow(
+                    icon: CupertinoIcons.chart_bar_fill,
+                    label: 'Progress',
+                    value:
+                        '${(courses.continueCourse?.progressPercent ?? 0).toStringAsFixed(0)}%',
+                  ),
+                  const _RowDivider(),
+                  _infoRow(
+                    icon: CupertinoIcons.calendar,
+                    label: 'Admission',
+                    value: () {
+                      final raw = courses.reportCreatedAt;
+                      if (raw == null || raw.isEmpty) return '—';
+                      final d = DateTime.tryParse(raw);
+                      if (d == null) {
+                        return raw.length >= 10 ? raw.substring(0, 10) : raw;
+                      }
+                      return '${d.day}/${d.month}/${d.year}';
+                    }(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const _SectionLabel('LEAVE MANAGEMENT'),
+            const SizedBox(height: 10),
+            Material(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  Navigator.of(context).push(
+                    AppMotion.fadeSlide(const LeaveScreen()),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(CupertinoIcons.calendar_badge_minus,
+                          color: AppColors.blue),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Request & track leave',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '2 days per month · pending / approved / rejected',
+                              style: TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Material(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  Navigator.of(context).push(
+                    AppMotion.fadeSlide(const AttendanceScreen()),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.fingerprint, color: AppColors.blue),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Attendance',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+
           // —— Account details ——
           const SizedBox(height: 24),
           const _SectionLabel('ACCOUNT'),
@@ -448,15 +606,18 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const _RowDivider(),
                   _infoRow(
-                    icon: CupertinoIcons.person_3_fill,
-                    label: 'Batch',
-                    value: batch,
+                    icon: CupertinoIcons.phone_fill,
+                    label: 'Phone',
+                    value: (courses.reportPhone ?? auth.user?.phone)?.trim().isNotEmpty ==
+                            true
+                        ? (courses.reportPhone ?? auth.user!.phone!)
+                        : 'Not set',
                   ),
                   const _RowDivider(),
                   _infoRow(
-                    icon: CupertinoIcons.book_fill,
-                    label: 'Enrolled courses',
-                    value: '$enrolledCount',
+                    icon: CupertinoIcons.mail_solid,
+                    label: 'Email',
+                    value: email.isNotEmpty ? email : 'Not set',
                   ),
                 ] else ...[
                   _infoRow(

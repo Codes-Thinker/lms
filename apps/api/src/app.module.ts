@@ -12,6 +12,7 @@ import { RolesGuard } from "./common/guards/roles.guard";
 import { CoursesModule } from "./courses/courses.module";
 import { FeesModule } from "./fees/fees.module";
 import { HealthController, RootController } from "./health.controller";
+import { LeaveModule } from "./leave/leave.module";
 import { MailModule } from "./mail/mail.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { OpsModule } from "./ops/ops.module";
@@ -36,6 +37,7 @@ import { UsersModule } from "./users/users.module";
     CoursesModule,
     AttendanceModule,
     FeesModule,
+    LeaveModule,
     TasksModule,
     SupportModule,
     NotificationsModule,

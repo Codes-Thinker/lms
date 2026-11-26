@@ -7,6 +7,7 @@ import '../core/constants/api_config.dart';
 import '../core/notification_router.dart';
 import '../providers/course_provider.dart';
 import '../providers/fee_provider.dart';
+import '../providers/leave_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
@@ -32,6 +33,7 @@ class RealtimeService {
   TeachingProvider? _teaching;
   CourseProvider? _courses;
   FeeProvider? _fees;
+  LeaveProvider? _leave;
   RealtimeOpenHandler? _onOpen;
 
   void bind({
@@ -42,6 +44,7 @@ class RealtimeService {
     required TeachingProvider teaching,
     required CourseProvider courses,
     FeeProvider? fees,
+    LeaveProvider? leave,
     required RealtimeOpenHandler onOpen,
   }) {
     _ui = ui;
@@ -51,6 +54,7 @@ class RealtimeService {
     _teaching = teaching;
     _courses = courses;
     _fees = fees;
+    _leave = leave;
     _onOpen = onOpen;
   }
 
@@ -186,6 +190,10 @@ class RealtimeService {
       final fees = _fees;
       if (fees != null) unawaited(fees.load());
       unawaited(_courses?.fetchReportStats() ?? Future.value());
+    }
+    if (type == 'LEAVE') {
+      final leave = _leave;
+      if (leave != null) unawaited(leave.load(silent: true));
     }
     final event = (dataMap['event'] ?? '').toString().toLowerCase();
     if (event == 'course_updated') {

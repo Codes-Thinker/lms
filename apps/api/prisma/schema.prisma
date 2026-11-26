@@ -87,6 +87,13 @@ enum NotificationType {
   CHAT
   CERTIFICATE
   QUIZ
+  LEAVE
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum QuizStatus {
@@ -192,6 +199,8 @@ model User {
   certificates        Certificate[]
   aiMessages          AiMessage[]
   aiUsageLogs         AiUsageLog[]
+  leaveRequests       LeaveRequest[]       @relation("LeaveStudent")
+  reviewedLeaves      LeaveRequest[]       @relation("LeaveReviewer")
 
   profileImage    String?
   monthlyFee      Int?
@@ -790,4 +799,25 @@ model AiUsageLog {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/** Student leave request — 2 days allowance per calendar month (server-enforced). */
+model LeaveRequest {
+  id              String      @id @default(cuid())
+  studentId       String
+  student         User        @relation("LeaveStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  leaveDate       DateTime    @db.Date
+  durationDays    Float
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  rejectionReason String?
+  reviewedById    String?
+  reviewedBy      User?       @relation("LeaveReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([studentId, leaveDate])
+  @@index([status, createdAt])
+  @@index([studentId, status])
 }

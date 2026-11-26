@@ -7,6 +7,7 @@ import 'providers/attendance_provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/course_provider.dart';
 import 'providers/fee_provider.dart';
+import 'providers/leave_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/progress_provider.dart';
 import 'providers/support_provider.dart';
@@ -80,6 +81,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
     final tab = NotificationRouter.tabForType(
       type,
       event: NotificationRouter.pendingEvent,
+      isStudent: _auth.isStudent,
     );
     _ui.setNavIndex(tab);
 
@@ -104,6 +106,7 @@ class _CodesThinkerAppState extends State<CodesThinkerApp> {
         ChangeNotifierProvider(create: (_) => ProjectProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
         ChangeNotifierProvider(create: (_) => FeeProvider()),
+        ChangeNotifierProvider(create: (_) => LeaveProvider()),
         ChangeNotifierProvider(create: (_) => SupportProvider()),
         ChangeNotifierProvider(create: (_) => TeachingProvider()),
         ChangeNotifierProvider(create: (_) => NotificationProvider()),

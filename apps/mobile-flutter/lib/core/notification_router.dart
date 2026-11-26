@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../views/attendance/attendance_screen.dart';
 import '../views/certificates/certificates_screen.dart';
 import '../views/course/course_detail_screen.dart';
 import '../views/fees/fee_chat_screen.dart';
 import '../views/fees/fees_screen.dart';
 import '../views/help/admin_chat_screen.dart';
+import '../views/leave/leave_screen.dart';
 import '../views/quizzes/quizzes_screen.dart';
 import '../views/tasks/task_detail_screen.dart';
 import '../views/teacher/assignment_chat_screen.dart';
@@ -98,19 +100,25 @@ class NotificationRouter {
       (pendingType != null && pendingType!.isNotEmpty);
 
   /// Shell tab for notification type.
-  /// 0 Home · 1 Tasks · 2 Attend · 3 Fees/Help · 4 Profile
-  static int tabForType(String? type, {String? event}) {
+  /// Student: 0 Dashboard · 1 Assignments · 2 Fees · 3 Courses · 4 Profile
+  /// Staff/Intern: 0 Home · 1 Tasks · 2 Attend · 3 Help · 4 Profile
+  static int tabForType(String? type, {String? event, bool isStudent = true}) {
     final upper = (type ?? '').toUpperCase();
     final ev = (event ?? pendingEvent ?? '').toLowerCase();
-    if (ev == 'course_updated' || upper == 'COURSE') return 0;
+    if (ev == 'course_updated' || upper == 'COURSE') {
+      return isStudent ? 3 : 0;
+    }
     switch (upper) {
       case 'TASK':
         return 1;
       case 'ATTENDANCE':
-        return 2;
+        return isStudent ? 4 : 2;
       case 'FEE':
+        return isStudent ? 2 : 3;
       case 'CHAT':
-        return 3;
+        return isStudent ? 4 : 3;
+      case 'LEAVE':
+        return 4;
       case 'QUIZ':
       case 'CERTIFICATE':
       case 'GENERAL':
@@ -129,6 +137,8 @@ class NotificationRouter {
         return 'Fee';
       case 'ATTENDANCE':
         return 'Attendance';
+      case 'LEAVE':
+        return 'Leave';
       case 'CHAT':
         return 'Chat';
       case 'QUIZ':
@@ -154,6 +164,7 @@ class NotificationRouter {
     String? courseId,
     String? event,
     required bool isStaff,
+    bool isStudent = false,
     required void Function(int tab) goToTab,
   }) async {
     final upper = (type ?? '').toUpperCase();
@@ -163,7 +174,7 @@ class NotificationRouter {
     final resolvedTask = taskId ?? takePendingTaskId();
     final resolvedFee = feeCaseId ?? takePendingFeeCaseId();
     final resolvedCourse = courseId ?? takePendingCourseId();
-    final tab = tabForType(upper, event: ev);
+    final tab = tabForType(upper, event: ev, isStudent: isStudent && !isStaff);
 
     void setTabUnderCover() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -203,7 +214,18 @@ class NotificationRouter {
     }
 
     if (upper == 'ATTENDANCE') {
-      goToTab(tab);
+      if (isStudent && !isStaff) {
+        nav.push(AppMotion.cover(const AttendanceScreen()));
+        setTabUnderCover();
+      } else {
+        goToTab(tab);
+      }
+      return;
+    }
+
+    if (upper == 'LEAVE') {
+      nav.push(AppMotion.cover(const LeaveScreen()));
+      setTabUnderCover();
       return;
     }
 

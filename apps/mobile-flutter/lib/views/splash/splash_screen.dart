@@ -11,6 +11,7 @@ import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
 import '../../providers/fee_provider.dart';
+import '../../providers/leave_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/project_provider.dart';
 import '../../providers/task_provider.dart';
@@ -57,15 +58,15 @@ class _SplashScreenState extends State<SplashScreen>
 
     _intro = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 700),
     );
     _pulse = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: 1800),
     )..repeat();
     _progress = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1200),
     )..repeat();
 
     _markScale = TweenSequence<double>([
@@ -113,15 +114,15 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _boot() async {
     final fromNotif = NotificationRouter.launchedFromNotification;
     if (!fromNotif) {
-      // Let the brand intro play before navigating.
-      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      // Short brand beat — do not block on full data load.
+      await Future<void>.delayed(const Duration(milliseconds: 350));
     }
 
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
 
-    for (var i = 0; i < 40 && !auth.hydrated; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
+    for (var i = 0; i < 20 && !auth.hydrated; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 40));
     }
 
     if (!mounted) return;
@@ -145,16 +146,19 @@ class _SplashScreenState extends State<SplashScreen>
       final notes = context.read<NotificationProvider>();
       final teaching = context.read<TeachingProvider>();
       final projects = context.read<ProjectProvider>();
-      await Future.wait([
+      // Prefetch in background so splash exits immediately.
+      unawaited(Future.wait([
         courses.fetchAll(),
         tasks.load(),
         fees.load(),
+        if (auth.isStudent || auth.isIntern)
+          context.read<LeaveProvider>().load(silent: true),
         attendance.loadMine(),
         notes.load(),
         if (auth.isStaff) teaching.load(),
         if (auth.isIntern) projects.load(),
-      ]);
-      await PushNotificationService.instance.registerWithBackend();
+      ]));
+      unawaited(PushNotificationService.instance.registerWithBackend());
       final userId = auth.user?.id;
       OfficeLocationService.instance.bind(attendance, userId: userId);
       unawaited(OfficeLocationService.instance.start(userId: userId));
