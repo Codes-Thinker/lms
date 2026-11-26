@@ -111,11 +111,11 @@ function NavLinks({
   };
 
   return (
-    <nav className="sidebar-scroll flex-1 space-y-4 pr-0.5">
+    <nav className="sidebar-scroll flex-1 space-y-5 pr-0.5">
       {navGroups.map((group, gi) => (
         <div key={group.label ?? `g-${gi}`} className="space-y-1">
           {group.label && !collapsed ? (
-            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">
+            <p className="px-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/40">
               {group.label}
             </p>
           ) : null}
@@ -131,11 +131,11 @@ function NavLinks({
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "nav-link relative flex items-center rounded-lg py-2 text-[13px] font-semibold transition-colors",
+                  "nav-link relative flex items-center rounded-2xl py-2.5 text-[13px] font-semibold transition-colors",
                   collapsed ? "justify-center px-2" : "gap-3 px-3",
                   active
-                    ? "bg-[#2563EB] text-white shadow-sm shadow-blue-600/25"
-                    : "bg-transparent text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                    ? "bg-white text-[#1C1410] shadow-[0_10px_28px_-16px_rgba(0,0,0,0.55)]"
+                    : "bg-transparent text-white/72 hover:bg-white/10 hover:text-white"
                 )}
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
@@ -147,8 +147,10 @@ function NavLinks({
                         className={cn(
                           "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
                           active
-                            ? "bg-white text-blue-700"
-                            : "bg-blue-600 text-white"
+                            ? "bg-[#1C1410] text-white"
+                            : count > 0 && item.href === "/inbox"
+                              ? "bg-white/90 text-[#1C1410]"
+                              : "bg-rose-500 text-white"
                         )}
                       >
                         {count > 99 ? "99+" : count}
@@ -156,7 +158,7 @@ function NavLinks({
                     ) : null}
                   </>
                 ) : count > 0 ? (
-                  <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
+                  <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white/30" />
                 ) : null}
               </Link>
             );
@@ -217,7 +219,7 @@ function SidebarBody({
     <>
       <div
         className={cn(
-          "mb-6 flex items-center px-2",
+          "mb-7 flex items-center px-2",
           collapsed ? "justify-center" : "gap-2.5"
         )}
       >
@@ -225,17 +227,17 @@ function SidebarBody({
         <img
           src="/brand/app_icon.png"
           alt="Code's Thinker LMS"
-          className="h-10 w-10 shrink-0 rounded-xl object-cover"
+          className="h-10 w-10 shrink-0 rounded-2xl object-cover ring-1 ring-white/20"
           onError={(e) => {
             (e.target as HTMLImageElement).src = "/brand/ct_mark.png";
           }}
         />
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+            <p className="truncate text-[15px] font-bold tracking-tight text-white">
               Code&apos;s Thinker
             </p>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-white/45">
               LMS Admin
             </p>
           </div>
@@ -248,12 +250,12 @@ function SidebarBody({
         onNavigate={onNavigate}
       />
 
-      <div className="mt-auto space-y-2 border-t border-slate-200 pt-3">
+      <div className="mt-auto space-y-2 border-t border-white/10 pt-3">
         {onToggleCollapse ? (
           <button
             type="button"
             className={cn(
-              "flex w-full items-center rounded-lg py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800",
+              "flex w-full items-center rounded-2xl py-2 text-xs font-semibold text-white/55 hover:bg-white/10 hover:text-white",
               collapsed ? "justify-center px-2" : "gap-2 px-3"
             )}
             onClick={onToggleCollapse}
@@ -271,19 +273,19 @@ function SidebarBody({
         ) : null}
         {!collapsed ? (
           <div className="flex items-center gap-3 px-2 py-1">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-white ring-1 ring-white/25">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">
+              <p className="truncate text-sm font-semibold text-white">
                 {name}
               </p>
-              <p className="truncate text-xs text-slate-500">Super Admin</p>
+              <p className="truncate text-xs text-white/45">Super Admin</p>
             </div>
           </div>
         ) : (
           <div className="flex justify-center py-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-white ring-1 ring-white/25">
               {initials}
             </div>
           </div>
@@ -291,7 +293,7 @@ function SidebarBody({
         <button
           type="button"
           className={cn(
-            "flex w-full items-center rounded-lg py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50",
+            "flex w-full items-center rounded-2xl py-2.5 text-[13px] font-semibold text-rose-300 hover:bg-rose-500/15 hover:text-rose-200",
             collapsed ? "justify-center px-2" : "gap-3 px-3"
           )}
           title="Sign out"
@@ -379,7 +381,7 @@ export default function DashboardLayout({
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
+      <div className="dashboard-shell flex min-h-screen items-center justify-center text-sm text-white/70">
         Checking session…
       </div>
     );
@@ -396,12 +398,12 @@ export default function DashboardLayout({
         <AdminActivityProvider>
           <RealtimeBridge />
           <SectionReadOnVisit />
-          <div className="dashboard-shell flex min-h-screen bg-[#F4F8FF]">
+          <div className="dashboard-shell flex min-h-screen">
             {/* Desktop sidebar */}
             <aside
               className={cn(
-                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-blue-100/80 bg-white px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
-                sidebarCollapsed ? "w-[72px]" : "w-[250px]"
+                "glass-sidebar fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden px-3 py-5 transition-[width] duration-300 ease-out lg:flex",
+                sidebarCollapsed ? "w-[76px]" : "w-[260px]"
               )}
             >
               <SidebarBody
@@ -418,15 +420,15 @@ export default function DashboardLayout({
               <div className="fixed inset-0 z-40 lg:hidden">
                 <button
                   type="button"
-                  className="absolute inset-0 bg-slate-900/40"
+                  className="absolute inset-0 bg-[#1C1410]/50 backdrop-blur-sm"
                   aria-label="Close menu"
                   onClick={() => setMobileOpen(false)}
                 />
-                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-blue-100/80 bg-white px-3 py-4">
+                <aside className="glass-sidebar absolute inset-y-0 left-0 flex w-[min(290px,88vw)] flex-col px-3 py-5">
                   <div className="mb-2 flex justify-end px-1">
                     <button
                       type="button"
-                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-50"
+                      className="rounded-xl p-2 text-white/70 hover:bg-white/10 hover:text-white"
                       onClick={() => setMobileOpen(false)}
                     >
                       <X className="h-5 w-5" />
@@ -445,29 +447,29 @@ export default function DashboardLayout({
             <div
               className={cn(
                 "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-200",
-                sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[250px]"
+                sidebarCollapsed ? "lg:ml-[76px]" : "lg:ml-[260px]"
               )}
             >
-              <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-3 animate-fade-in sm:h-16 sm:gap-4 sm:px-5 md:px-6">
+              <header className="glass-header sticky top-0 z-20 flex h-14 items-center gap-3 px-3 animate-fade-in sm:h-16 sm:gap-4 sm:px-5 md:px-6">
                 <button
                   type="button"
-                  className="rounded-lg border border-slate-200 p-2 text-slate-700 lg:hidden"
+                  className="rounded-2xl border border-white/30 bg-white/20 p-2 text-[#1C1410] lg:hidden"
                   aria-label="Open menu"
                   onClick={() => setMobileOpen(true)}
                 >
                   <Menu className="h-5 w-5" strokeWidth={2} />
                 </button>
                 <div className="hidden min-w-0 lg:block">
-                  <p className="truncate text-sm font-bold text-slate-900">
+                  <p className="truncate text-sm font-bold text-[#1C1410]">
                     {pageTitleForPath(pathname).title}
                   </p>
-                  <p className="truncate text-[11px] font-medium text-slate-400">
+                  <p className="truncate text-[11px] font-medium text-[#1C1410]/55">
                     Admin Overview
                   </p>
                 </div>
                 <div className="relative min-w-0 flex-1 lg:max-w-md lg:flex-none lg:ml-auto">
                   <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1C1410]/45"
                     strokeWidth={2}
                   />
                   <Input
@@ -483,12 +485,12 @@ export default function DashboardLayout({
                       }
                     }}
                     placeholder="Search records..."
-                    className="h-10 w-full rounded-lg border-slate-200 bg-slate-50 pl-9 pr-9"
+                    className="h-10 w-full rounded-full border-white/35 bg-white/35 pl-9 pr-9 text-[#1C1410] placeholder:text-[#1C1410]/45 shadow-none backdrop-blur-md"
                   />
                   {searchQ.trim() ? (
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#1C1410]/45 hover:bg-white/40 hover:text-[#1C1410]"
                       aria-label="Clear search"
                       onClick={() => setSearchQ("")}
                     >
@@ -498,17 +500,17 @@ export default function DashboardLayout({
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <NotificationsBell />
-                  <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 sm:flex">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
+                  <div className="glass-chip hidden items-center gap-2 rounded-full px-2.5 py-1.5 sm:flex">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1C1410]/10 text-[10px] font-bold text-[#1C1410] ring-1 ring-white/40">
                       {(name.split(" ").map((p) => p[0]).join("").slice(0, 2) ||
                         "AA"
                       ).toUpperCase()}
                     </div>
                     <div className="min-w-0 leading-tight">
-                      <p className="truncate text-xs font-semibold text-slate-900">
+                      <p className="truncate text-xs font-semibold text-[#1C1410]">
                         {name.split(" ")[0] || "Admin"}
                       </p>
-                      <p className="truncate text-[10px] font-medium text-slate-400">
+                      <p className="truncate text-[10px] font-medium text-[#1C1410]/55">
                         Super Admin
                       </p>
                     </div>

@@ -3,6 +3,6 @@ class ApiConfig {
   /// --dart-define=API_BASE=http://192.168.1.24:4000
   static const String baseUrl = String.fromEnvironment(
     'API_BASE',
-    defaultValue: 'https://lms-lkza.onrender.com',
+    defaultValue: 'https://api.codesthinkerlms.site',
   );
 }
