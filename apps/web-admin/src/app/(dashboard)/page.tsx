@@ -294,28 +294,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1C1410]/50">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/90 drop-shadow-sm">
             Luxury glass console
           </p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-[#1C1410] sm:text-[34px]">
+          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-white drop-shadow-sm sm:text-[32px]">
             Welcome, {name}
           </h1>
-          <p className="mt-1.5 max-w-xl text-sm text-[#1C1410]/65">
-            Live LMS pulse — people, fees, attendance, and support in one frosted view.
+          <p className="mt-1 max-w-xl text-sm font-medium text-white/85 drop-shadow-sm">
+            Live LMS pulse — people, fees, attendance, and support at a glance.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="gap-1 border-white/40 bg-white/35 text-[#1C1410] backdrop-blur-md">
+          <Badge className="gap-1 border-black/5 bg-white text-[#1a120e] shadow-sm">
             <Radio className="h-3 w-3 text-emerald-600" />
             Live
           </Badge>
-          <Badge className="border-white/40 bg-white/35 text-[#1C1410] backdrop-blur-md">
+          <Badge className="border-black/5 bg-white text-[#1a120e] shadow-sm">
             {unread} alerts
           </Badge>
           {unreadMessages > 0 ? (
-            <Badge className="border-rose-300/50 bg-rose-500/20 text-rose-900 backdrop-blur-md">
+            <Badge className="border-rose-200 bg-rose-50 text-rose-800 shadow-sm">
               {unreadMessages} chat
             </Badge>
           ) : null}
