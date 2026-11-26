@@ -394,15 +394,15 @@ function UsersPageInner() {
 
       <form
         onSubmit={onCreate}
-        className="glass-card space-y-5 p-5"
+        className="glass-card relative space-y-4 overflow-hidden p-5"
         autoComplete="off"
         data-lpignore="true"
         data-1p-ignore="true"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold">Add new user</h3>
-            <p className="text-sm text-slate-500">
+            <h3 className="font-semibold text-[#1C1410]">Add new user</h3>
+            <p className="text-sm text-[#1C1410]/55">
               Empty form: enter the new person&apos;s details only
             </p>
           </div>
@@ -416,27 +416,13 @@ function UsersPageInner() {
           </Button>
         </div>
 
-        {/* Honeypot-style decoys so browsers don't dump admin login here */}
-        <input
-          type="text"
-          name="username"
-          autoComplete="username"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="pointer-events-none absolute h-0 w-0 opacity-0"
-          defaultValue=""
-        />
-        <input
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          tabIndex={-1}
-          aria-hidden="true"
-          className="pointer-events-none absolute h-0 w-0 opacity-0"
-          defaultValue=""
-        />
+        {/* Honeypots stay out of space-y flow so they don't create empty gaps */}
+        <div className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
+          <input type="text" name="username" autoComplete="username" tabIndex={-1} defaultValue="" />
+          <input type="password" name="password" autoComplete="current-password" tabIndex={-1} defaultValue="" />
+        </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="new-user-name">Full name</Label>
             <Input
@@ -488,7 +474,7 @@ function UsersPageInner() {
           <div className="space-y-1.5">
             <Label htmlFor="new-user-password">
               Password{" "}
-              <span className="font-normal text-slate-400">(optional)</span>
+              <span className="font-normal text-[#1C1410]/45">(optional)</span>
             </Label>
             <div className="flex gap-2">
               <Input
@@ -510,13 +496,13 @@ function UsersPageInner() {
                 {showPassword ? "Hide" : "Show"}
               </Button>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-[#1C1410]/50">
               Blank password = invitation email. Set password for instant login.
             </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-user-track">
-              Track <span className="font-normal text-slate-400">(optional)</span>
+              Track <span className="font-normal text-[#1C1410]/45">(optional)</span>
             </Label>
             <Input
               id="new-user-track"
@@ -529,7 +515,7 @@ function UsersPageInner() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-user-phone">
-              Phone <span className="font-normal text-slate-400">(optional)</span>
+              Phone <span className="font-normal text-[#1C1410]/45">(optional)</span>
             </Label>
             <Input
               id="new-user-phone"
@@ -544,10 +530,10 @@ function UsersPageInner() {
         </div>
 
         {form.accountType === "STUDENT" ? (
-          <div className="space-y-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+          <div className="space-y-3 rounded-2xl border border-white/35 bg-white/25 p-4">
             <div className="space-y-1">
-              <h4 className="font-semibold text-slate-800">Enrollment &amp; fees</h4>
-              <p className="text-xs text-slate-500">
+              <h4 className="font-semibold text-[#1C1410]">Enrollment &amp; fees</h4>
+              <p className="text-xs text-[#1C1410]/55">
                 Optional: configure course access and payment plan at signup
               </p>
             </div>

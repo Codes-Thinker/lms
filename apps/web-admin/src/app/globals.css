@@ -299,25 +299,22 @@
 }
 
 .page-enter {
-  animation: page-pop 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) both;
-  transform-origin: 50% 12%;
+  animation: page-pop 0.45s cubic-bezier(0.22, 1.25, 0.36, 1) both;
+  transform-origin: 50% 8%;
 }
 
 @keyframes page-pop {
   0% {
     opacity: 0;
-    transform: translateY(28px) scale(0.9);
-    filter: blur(6px);
+    transform: translateY(16px) scale(0.96);
   }
-  65% {
+  70% {
     opacity: 1;
-    transform: translateY(-4px) scale(1.02);
-    filter: blur(0);
+    transform: translateY(-2px) scale(1.01);
   }
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
-    filter: blur(0);
   }
 }
 
