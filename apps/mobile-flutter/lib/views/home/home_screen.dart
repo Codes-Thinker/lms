@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
@@ -8,8 +9,10 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_motion.dart';
 import '../../core/responsive.dart';
 import '../../models/course.dart';
+import '../../models/task.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/course_provider.dart';
+import '../../providers/fee_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/ui_provider.dart';
@@ -23,27 +26,128 @@ import '../tasks/task_detail_screen.dart';
 import '../tasks/tasks_screen.dart';
 
 /// Premium student home — navbar stays in AppShell (unchanged).
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _navy = Color(0xFF1A1C2E);
-  /// Same soft blue family as Continue Learning.
   static const _statAccent = AppColors.blueDark;
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshDashboard());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshDashboard(silent: true));
+    }
+  }
+
+  Future<void> _refreshDashboard({bool silent = false}) async {
+    if (!mounted || _refreshing) return;
+    final auth = context.read<AuthProvider>();
+    if (!auth.isAuthenticated || auth.isStaff) return;
+    _refreshing = true;
+    if (!silent && mounted) setState(() {});
+    try {
+      final courses = context.read<CourseProvider>();
+      final fees = context.read<FeeProvider>();
+      final tasks = context.read<TaskProvider>();
+      final notes = context.read<NotificationProvider>();
+      await Future.wait([
+        courses.fetchEnrolledCourses(),
+        courses.fetchReportStats(),
+        fees.load(),
+        tasks.load(silent: true),
+        notes.load(),
+      ]);
+    } catch (_) {
+      // Keep last good UI; errors surface via empty/loading states.
+    } finally {
+      _refreshing = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  String _fmtMoney(int n) {
+    if (n >= 100000) return '${(n / 1000).round()}k';
+    return '$n';
+  }
+
+  String _fmtDate(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso.length >= 10 ? iso.substring(0, 10) : iso;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
+  }
+
+  String _taskStatusLabel(String status) {
+    switch (status) {
+      case 'DONE':
+        return 'Completed';
+      case 'REVIEWED':
+        return 'Reviewed';
+      case 'SUBMITTED':
+        return 'Submitted';
+      case 'IN_PROGRESS':
+        return 'In progress';
+      case 'PENDING':
+      case 'ASSIGNED':
+        return 'Pending';
+      default:
+        return status;
+    }
+  }
+
+  Color _taskStatusColor(String status, {bool late = false}) {
+    if (late) return const Color(0xFFDC2626);
+    switch (status) {
+      case 'DONE':
+      case 'REVIEWED':
+        return const Color(0xFF059669);
+      case 'SUBMITTED':
+        return const Color(0xFF2563EB);
+      case 'IN_PROGRESS':
+        return const Color(0xFFD97706);
+      default:
+        return AppColors.muted;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
     final tasks = context.watch<TaskProvider>();
+    final fees = context.watch<FeeProvider>();
     final notes = context.watch<NotificationProvider>();
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
-    final myTasks = tasks.tasksForUser(auth.user?.id ?? '');
+    final userId = auth.user?.id ?? '';
+    final myTasks = tasks.tasksForUser(userId);
     final previewTasks = myTasks.take(3).toList();
     final continueCourse = courses.continueCourse;
     final nextTopic = continueCourse?.nextTopic;
     final filtered = courses.filteredCourses;
-    // Home shows 3 course tiles when the catalog has them.
     final homeCourses = () {
       if (filtered.length >= 3) return filtered.take(3).toList();
       if (filtered.isEmpty) return courses.courses.take(3).toList();
@@ -55,6 +159,8 @@ class HomeScreen extends StatelessWidget {
         ? auth.user!.name.trim()
         : 'Student';
     final batch = () {
+      final fromReport = courses.reportBatch?.trim() ?? '';
+      if (fromReport.isNotEmpty) return fromReport;
       final fromCourse = continueCourse?.batch.trim() ?? '';
       if (fromCourse.isNotEmpty) return fromCourse;
       final fromUserBatch = auth.user?.batch?.trim() ?? '';
@@ -64,6 +170,39 @@ class HomeScreen extends StatelessWidget {
       return auth.user?.roleLabel ?? '';
     }();
     final unread = notes.unreadCount;
+    final totalAssigned = myTasks.length;
+    final completed = tasks.completedCountFor(userId);
+    final pending = tasks.pendingCountFor(userId);
+    final inProgress = tasks.inProgressCountFor(userId);
+    final lateCount = tasks.lateCountFor(userId);
+    final submitted = tasks.submittedCountFor(userId);
+    final reviewed = tasks.reviewedCountFor(userId);
+    final assignProgress = tasks.progressPercentFor(userId);
+    final feeDue = fees.cases.isNotEmpty
+        ? fees.remainingAmount
+        : (courses.reportFeesPending > 0
+            ? courses.reportFeesPending
+            : courses.totalFeeDue);
+    final feePaid = fees.cases.isNotEmpty
+        ? fees.totalPaidAmount
+        : courses.reportFeesPaid;
+    final feeTotal = fees.cases.isNotEmpty
+        ? fees.totalFeeAmount
+        : (feePaid + feeDue);
+    final nextDue = fees.nextDueCase;
+    final reminders = fees.recentReminders;
+    final overallProgress = () {
+      final enrolled = courses.enrolledCourses;
+      if (enrolled.isEmpty) return continueCourse?.progressPercent ?? 0.0;
+      final sum = enrolled
+          .map((c) => c.progressPercent)
+          .fold<double>(0, (a, b) => a + b);
+      return sum / enrolled.length;
+    }();
+    final instructor = continueCourse?.instructorName?.trim();
+    final admission = _fmtDate(courses.reportCreatedAt);
+    final contact = (courses.reportPhone ?? auth.user?.phone)?.trim();
+    final avatar = auth.avatarImage;
 
     if (courses.loading && courses.courses.isEmpty) {
       return const Scaffold(
@@ -75,526 +214,686 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // Top bar
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    const BrandMark(size: 36),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text(
-                        AppBrand.shortName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Search courses',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          AppMotion.fadeSlide(const AllCoursesScreen()),
-                        );
-                      },
-                      icon: const Icon(
-                        CupertinoIcons.search,
-                        color: AppColors.ink,
-                        size: 22,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Messages',
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          AppMotion.fadeSlide(const NotificationsScreen()),
-                        );
-                      },
-                      icon: Badge(
-                        isLabelVisible: unread > 0,
-                        label: Text(
-                          unread > 9 ? '9+' : '$unread',
-                          style: const TextStyle(fontSize: 10),
-                        ),
-                        backgroundColor: AppColors.danger,
-                        child: const Icon(
-                          Icons.notifications_none_rounded,
-                          color: AppColors.ink,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        child: RefreshIndicator(
+          color: AppColors.blue,
+          onRefresh: () => _refreshDashboard(),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
             ),
-
-            // Name + batch (tighter under top bar)
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 8, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
-                          letterSpacing: -0.5,
-                          height: 1.1,
-                        ),
-                      ),
-                    ),
-                    if (batch.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEEF1F6),
-                          borderRadius: BorderRadius.circular(100),
-                        ),
-                        child: Text(
-                          batch,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Continue learning — brand blue + blurred CT logo watermark
-            if (continueCourse != null)
+            slivers: [
+              // Top bar — search removed; notifications + balanced header
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+                padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
                 sliver: SliverToBoxAdapter(
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        courses.selectCourse(continueCourse);
-                        Navigator.of(context).push(
-                          AppMotion.fadeSlide(
-                            CourseDetailScreen(courseId: continueCourse.id),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(18),
-                      child: Ink(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.line),
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFFEFF6FF),
-                              Color(0xFFDBEAFE),
-                              Color(0xFFBFDBFE),
-                            ],
+                  child: Row(
+                    children: [
+                      const BrandMark(size: 36),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          AppBrand.shortName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                            letterSpacing: -0.2,
                           ),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(18),
-                          child: Stack(
-                            children: [
-                              Positioned(
-                                right: -18,
-                                bottom: -22,
-                                child: Opacity(
-                                  opacity: 0.14,
-                                  child: ImageFiltered(
-                                    imageFilter: ImageFilter.blur(
-                                      sigmaX: 10,
-                                      sigmaY: 10,
-                                    ),
-                                    child: Image.asset(
-                                      AppBrand.markHdAsset,
-                                      width: 128,
-                                      height: 128,
-                                      fit: BoxFit.contain,
-                                      filterQuality: FilterQuality.high,
-                                      errorBuilder: (_, __, ___) =>
-                                          Image.asset(
-                                        AppBrand.markAsset,
+                      ),
+                      IconButton(
+                        tooltip: 'Messages',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            AppMotion.fadeSlide(const NotificationsScreen()),
+                          );
+                        },
+                        icon: Badge(
+                          isLabelVisible: unread > 0,
+                          label: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          backgroundColor: AppColors.danger,
+                          child: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: AppColors.ink,
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Name + batch + avatar
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 8, pad, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: const Color(0xFFEEF1F6),
+                        backgroundImage: avatar,
+                        child: avatar == null
+                            ? Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'S',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.ink,
+                                ),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ink,
+                                letterSpacing: -0.5,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              [
+                                if (batch.isNotEmpty) batch,
+                                if (contact != null && contact.isNotEmpty)
+                                  contact,
+                              ].join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (batch.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(left: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF1F6),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(
+                            batch,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Continue learning
+              if (continueCourse != null)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          courses.selectCourse(continueCourse);
+                          Navigator.of(context).push(
+                            AppMotion.fadeSlide(
+                              CourseDetailScreen(courseId: continueCourse.id),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppColors.line),
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFFEFF6FF),
+                                Color(0xFFDBEAFE),
+                                Color(0xFFBFDBFE),
+                              ],
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  right: -18,
+                                  bottom: -22,
+                                  child: Opacity(
+                                    opacity: 0.14,
+                                    child: ImageFiltered(
+                                      imageFilter: ImageFilter.blur(
+                                        sigmaX: 10,
+                                        sigmaY: 10,
+                                      ),
+                                      child: Image.asset(
+                                        AppBrand.markHdAsset,
                                         width: 128,
                                         height: 128,
                                         fit: BoxFit.contain,
+                                        filterQuality: FilterQuality.high,
+                                        errorBuilder: (_, __, ___) =>
+                                            Image.asset(
+                                          AppBrand.markAsset,
+                                          width: 128,
+                                          height: 128,
+                                          fit: BoxFit.contain,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                left: -28,
-                                top: -36,
-                                child: Opacity(
-                                  opacity: 0.08,
-                                  child: ImageFiltered(
-                                    imageFilter: ImageFilter.blur(
-                                      sigmaX: 14,
-                                      sigmaY: 14,
-                                    ),
-                                    child: Image.asset(
-                                      AppBrand.logoAsset,
-                                      width: 160,
-                                      height: 80,
-                                      fit: BoxFit.contain,
-                                      filterQuality: FilterQuality.high,
+                                Positioned(
+                                  left: -28,
+                                  top: -36,
+                                  child: Opacity(
+                                    opacity: 0.08,
+                                    child: ImageFiltered(
+                                      imageFilter: ImageFilter.blur(
+                                        sigmaX: 14,
+                                        sigmaY: 14,
+                                      ),
+                                      child: Image.asset(
+                                        AppBrand.logoAsset,
+                                        width: 160,
+                                        height: 80,
+                                        fit: BoxFit.contain,
+                                        filterQuality: FilterQuality.high,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'CONTINUE LEARNING',
-                                      style: TextStyle(
-                                        color: AppColors.blueDark,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 0.7,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                continueCourse.title,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: AppColors.ink,
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w800,
-                                                  height: 1.2,
-                                                  letterSpacing: -0.2,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                nextTopic != null
-                                                    ? 'Next: ${nextTopic.title}'
-                                                    : '${continueCourse.progressPercent.toStringAsFixed(0)}% completed',
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  color: AppColors.muted,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    12,
+                                    12,
+                                    12,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'CONTINUE LEARNING',
+                                        style: TextStyle(
+                                          color: AppColors.blueDark,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.7,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          width: 36,
-                                          height: 36,
-                                          decoration: const BoxDecoration(
-                                            color: AppColors.blue,
-                                            shape: BoxShape.circle,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  continueCourse.title,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: AppColors.ink,
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w800,
+                                                    height: 1.2,
+                                                    letterSpacing: -0.2,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 3),
+                                                Text(
+                                                  nextTopic != null
+                                                      ? 'Next: ${nextTopic.title}'
+                                                      : '${continueCourse.progressPercent.toStringAsFixed(0)}% completed',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: AppColors.muted,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                          child: const Icon(
-                                            CupertinoIcons.play_fill,
-                                            color: Colors.white,
-                                            size: 16,
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.blue,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              CupertinoIcons.play_fill,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
                                           ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      ClipRRect(
+                                        borderRadius:
+                                            BorderRadius.circular(100),
+                                        child: LinearProgressIndicator(
+                                          value: (continueCourse
+                                                      .progressPercent /
+                                                  100)
+                                              .clamp(0.0, 1.0),
+                                          minHeight: 4,
+                                          backgroundColor: Colors.white
+                                              .withValues(alpha: 0.7),
+                                          color: AppColors.blueDark,
                                         ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(100),
-                                      child: LinearProgressIndicator(
-                                        value: (continueCourse.progressPercent /
-                                                100)
-                                            .clamp(0.0, 1.0),
-                                        minHeight: 4,
-                                        backgroundColor: Colors.white
-                                            .withValues(alpha: 0.7),
-                                        color: AppColors.blueDark,
                                       ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      '${continueCourse.progressPercent.toStringAsFixed(0)}% Completed',
-                                      style: const TextStyle(
-                                        color: AppColors.blueDark,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
+                                      const SizedBox(height: 5),
+                                      Text(
+                                        '${continueCourse.progressPercent.toStringAsFixed(0)}% Completed',
+                                        style: const TextStyle(
+                                          color: AppColors.blueDark,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Summary stats (2×3)
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Builder(
+                    builder: (context) {
+                      final attendancePct = courses.overallAttendance;
+                      final tiles = <Widget>[
+                        _pastelStat(
+                          icon: CupertinoIcons.doc_on_clipboard_fill,
+                          label: 'Assignments',
+                          value: '$totalAssigned',
+                          onTap: () =>
+                              context.read<UiProvider>().setNavIndex(1),
+                        ),
+                        _pastelStat(
+                          icon: CupertinoIcons.checkmark_seal_fill,
+                          label: 'Completed',
+                          value: '$completed',
+                          onTap: () =>
+                              context.read<UiProvider>().setNavIndex(1),
+                        ),
+                        _pastelStat(
+                          icon: CupertinoIcons.clock_fill,
+                          label: pending > 0 ? 'Pending' : 'Active',
+                          value: pending > 0
+                              ? '$pending'
+                              : '$inProgress',
+                          onTap: () =>
+                              context.read<UiProvider>().setNavIndex(1),
+                        ),
+                        _pastelStat(
+                          icon: CupertinoIcons.creditcard_fill,
+                          label: fees.feeStatusLabel,
+                          value: feeDue <= 0
+                              ? 'Clear'
+                              : 'Rs ${_fmtMoney(feeDue)}',
+                          onTap: () =>
+                              context.read<UiProvider>().setNavIndex(3),
+                        ),
+                        _pastelStat(
+                          icon: CupertinoIcons.person_3_fill,
+                          label: 'Batch',
+                          value: batch.isNotEmpty ? batch : '—',
+                          onTap: () {
+                            if (continueCourse != null) {
+                              courses.selectCourse(continueCourse);
+                              Navigator.of(context).push(
+                                AppMotion.fadeSlide(
+                                  CourseDetailScreen(
+                                    courseId: continueCourse.id,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        _pastelStat(
+                          icon: CupertinoIcons.chart_bar_fill,
+                          label: 'Progress',
+                          value: '${overallProgress.toStringAsFixed(0)}%',
+                          onTap: () {
+                            if (continueCourse != null) {
+                              courses.selectCourse(continueCourse);
+                              Navigator.of(context).push(
+                                AppMotion.fadeSlide(
+                                  CourseDetailScreen(
+                                    courseId: continueCourse.id,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ];
+
+                      return Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: tiles[0]),
+                              const SizedBox(width: 8),
+                              Expanded(child: tiles[1]),
+                              const SizedBox(width: 8),
+                              Expanded(child: tiles[2]),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(child: tiles[3]),
+                              const SizedBox(width: 8),
+                              Expanded(child: tiles[4]),
+                              const SizedBox(width: 8),
+                              Expanded(child: tiles[5]),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          // Soft secondary line so attendance still visible
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Attendance ${attendancePct.toStringAsFixed(0)}%'
+                                '${admission != '—' ? ' · Joined $admission' : ''}',
+                                style: const TextStyle(
+                                  color: AppColors.muted,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // Assignment progress
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 16, pad, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _sectionCard(
+                    title: 'ASSIGNMENT PROGRESS',
+                    trailing: GestureDetector(
+                      onTap: () =>
+                          context.read<UiProvider>().setNavIndex(1),
+                      child: const Text(
+                        'Open',
+                        style: TextStyle(
+                          color: AppColors.blueDark,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    child: totalAssigned == 0
+                        ? const Text(
+                            'No assignments assigned yet.',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 13,
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(100),
+                                child: LinearProgressIndicator(
+                                  value: (assignProgress / 100).clamp(0.0, 1.0),
+                                  minHeight: 8,
+                                  backgroundColor: AppColors.line,
+                                  color: AppColors.blue,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${assignProgress.toStringAsFixed(0)}% complete · $completed of $totalAssigned',
+                                style: const TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _statusChip('Pending', pending),
+                                  _statusChip('In progress', inProgress),
+                                  _statusChip('Submitted', submitted),
+                                  _statusChip('Reviewed', reviewed),
+                                  if (lateCount > 0)
+                                    _statusChip(
+                                      'Late',
+                                      lateCount,
+                                      tone: const Color(0xFFDC2626),
+                                    ),
+                                ],
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                 ),
               ),
 
-            // Compact 6 tappable stats (2×3) — less vertical space
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 10, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Builder(
-                  builder: (context) {
-                    final openTasks =
-                        myTasks.where((t) => t.status != 'DONE').length;
-                    final doneTasks =
-                        myTasks.where((t) => t.status == 'DONE').length;
-                    final lecturesDone = continueCourse?.topicsDone ?? 0;
-                    final lecturesTotal = continueCourse?.topicsTotal ?? 0;
-                    final lecturesLeft = continueCourse?.topicsRemaining ?? 0;
-                    final installments =
-                        continueCourse?.installmentCount ?? 0;
-
-                    void openContinueCourse() {
-                      if (continueCourse == null) {
-                        Navigator.of(context).push(
-                          AppMotion.fadeSlide(const AllCoursesScreen()),
-                        );
-                        return;
-                      }
-                      Navigator.of(context).push(
-                        AppMotion.fadeSlide(
-                          CourseDetailScreen(courseId: continueCourse.id),
-                        ),
-                      );
-                    }
-
-                    final attendancePct = courses.overallAttendance;
-
-                    final tiles = <Widget>[
-                      _pastelStat(
-                        icon: CupertinoIcons.book_fill,
-                        label: 'Courses',
-                        value: '${courses.enrolledCourses.length}',
-                        onTap: () {
-                          Navigator.of(context).push(
-                            AppMotion.fadeSlide(const AllCoursesScreen()),
-                          );
-                        },
-                      ),
-                      _pastelStat(
-                        icon: CupertinoIcons.chart_pie_fill,
-                        label: 'Attendance',
-                        value: '${attendancePct.toStringAsFixed(0)}%',
-                        onTap: () =>
-                            context.read<UiProvider>().setNavIndex(2),
-                      ),
-                      _pastelStat(
-                        icon: CupertinoIcons.creditcard_fill,
-                        label: 'Pending',
-                        value: 'Rs ${courses.totalFeeDue}',
-                        onTap: () =>
-                            context.read<UiProvider>().setNavIndex(3),
-                      ),
-                      _pastelStat(
-                        icon: CupertinoIcons.play_rectangle_fill,
-                        label: lecturesLeft > 0
-                            ? '$lecturesLeft left'
-                            : 'Lectures',
-                        value: lecturesTotal == 0
-                            ? '—'
-                            : '$lecturesDone/$lecturesTotal',
-                        onTap: openContinueCourse,
-                      ),
-                      _pastelStat(
-                        icon: CupertinoIcons.checkmark_seal_fill,
-                        label: doneTasks > 0 ? '$doneTasks done' : 'Tasks',
-                        value: '$openTasks open',
-                        onTap: () =>
-                            context.read<UiProvider>().setNavIndex(1),
-                      ),
-                      _pastelStat(
-                        icon: CupertinoIcons.money_dollar_circle_fill,
-                        label: 'Installments',
-                        value: installments > 0 ? '$installments×' : '—',
-                        onTap: () =>
-                            context.read<UiProvider>().setNavIndex(3),
-                      ),
-                    ];
-
-                    return Column(
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: tiles[0]),
-                            const SizedBox(width: 8),
-                            Expanded(child: tiles[1]),
-                            const SizedBox(width: 8),
-                            Expanded(child: tiles[2]),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(child: tiles[3]),
-                            const SizedBox(width: 8),
-                            Expanded(child: tiles[4]),
-                            const SizedBox(width: 8),
-                            Expanded(child: tiles[5]),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-
-            // All courses header + chips
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'ALL COURSES',
-                            style: TextStyle(
-                              color: AppColors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              AppMotion.fadeSlide(const AllCoursesScreen()),
-                            );
-                          },
-                          child: Text(
-                            'View all (${filtered.length})',
-                            style: const TextStyle(
-                              color: AppColors.blueDark,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 38,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: courses.categoryNames.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final name = courses.categoryNames[index];
-                          final selected = courses.selectedCategory == name;
-                          return GestureDetector(
-                            onTap: () => courses.setCategory(name),
-                            child: AnimatedContainer(
-                              duration: AppMotion.fast,
-                              curve: AppMotion.curve,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selected ? _navy : Colors.white,
-                                borderRadius: BorderRadius.circular(100),
-                                border: Border.all(
-                                  color:
-                                      selected ? _navy : AppColors.line,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  name,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: selected
-                                        ? Colors.white
-                                        : AppColors.ink,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            if (homeCourses.isEmpty)
-              SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
-                sliver: const SliverToBoxAdapter(
-                  child: Text(
-                    'No courses in this category',
-                    style: TextStyle(color: AppColors.muted),
-                  ),
-                ),
-              )
-            else
+              // Fee overview
               SliverPadding(
                 padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final course = homeCourses[index];
-                      return Padding(
-                        padding: EdgeInsets.only(
-                          bottom: index == homeCourses.length - 1 ? 0 : 10,
+                sliver: SliverToBoxAdapter(
+                  child: _sectionCard(
+                    title: 'FEE OVERVIEW',
+                    trailing: GestureDetector(
+                      onTap: () =>
+                          context.read<UiProvider>().setNavIndex(3),
+                      child: const Text(
+                        'Details',
+                        style: TextStyle(
+                          color: AppColors.blueDark,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
-                        child: _courseCard(context, course, courses),
-                      );
-                    },
-                    childCount: homeCourses.length,
+                      ),
+                    ),
+                    child: fees.cases.isEmpty && feeTotal == 0
+                        ? const Text(
+                            'No fee records yet.',
+                            style: TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 13,
+                            ),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _feeMetric(
+                                      'Total',
+                                      'Rs ${_fmtMoney(feeTotal)}',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _feeMetric(
+                                      'Paid',
+                                      'Rs ${_fmtMoney(feePaid)}',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _feeMetric(
+                                      'Remaining',
+                                      'Rs ${_fmtMoney(feeDue)}',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(100),
+                                child: LinearProgressIndicator(
+                                  value: feeTotal <= 0
+                                      ? 0
+                                      : (feePaid / feeTotal).clamp(0.0, 1.0),
+                                  minHeight: 6,
+                                  backgroundColor: AppColors.line,
+                                  color: feeDue <= 0
+                                      ? const Color(0xFF059669)
+                                      : AppColors.blueDark,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  _statusChip(
+                                    fees.feeStatusLabel,
+                                    null,
+                                    tone: feeDue <= 0
+                                        ? const Color(0xFF059669)
+                                        : const Color(0xFFD97706),
+                                  ),
+                                  _statusChip('Paid', fees.paidCount),
+                                  _statusChip('Due', fees.dueCount),
+                                  if (fees.partialCount > 0)
+                                    _statusChip(
+                                      'Partial',
+                                      fees.partialCount,
+                                    ),
+                                ],
+                              ),
+                              if (nextDue != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  'Next due: ${_fmtDate(nextDue.dueDate)} · ${nextDue.courseTitle.isNotEmpty ? nextDue.courseTitle : nextDue.month}',
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                              if (reminders.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Last reminder: ${reminders.first.kind == 'FINAL' ? 'Final' : 'First'} · ${_fmtDate(reminders.first.sentAt)}',
+                                  style: const TextStyle(
+                                    color: AppColors.blueDark,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                   ),
                 ),
               ),
 
-            if (previewTasks.isNotEmpty)
+              // Batch & course
               SliverPadding(
-                padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
+                padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _sectionCard(
+                    title: 'BATCH & COURSE',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _infoRow('Batch', batch.isNotEmpty ? batch : 'Unassigned'),
+                        _infoRow(
+                          'Course',
+                          continueCourse?.title ??
+                              (courses.enrolledCourses.isNotEmpty
+                                  ? courses.enrolledCourses.first.title
+                                  : '—'),
+                        ),
+                        _infoRow(
+                          'Instructor',
+                          (instructor != null && instructor.isNotEmpty)
+                              ? instructor
+                              : '—',
+                        ),
+                        _infoRow(
+                          'Progress',
+                          '${overallProgress.toStringAsFixed(0)}%',
+                        ),
+                        if (continueCourse?.nextClassAt != null)
+                          _infoRow(
+                            'Next class',
+                            _fmtDate(
+                              continueCourse!.nextClassAt!.toIso8601String(),
+                            ),
+                          ),
+                        _infoRow('Admission', admission),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // All courses header + chips
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
                 sliver: SliverToBoxAdapter(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,7 +902,7 @@ class HomeScreen extends StatelessWidget {
                         children: [
                           const Expanded(
                             child: Text(
-                              'TASKS',
+                              'ALL COURSES',
                               style: TextStyle(
                                 color: AppColors.ink,
                                 fontSize: 13,
@@ -612,100 +911,346 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (myTasks.length > 3)
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  AppMotion.fadeSlide(const TasksScreen()),
-                                );
-                              },
-                              child: const Text(
-                                'See all',
-                                style: TextStyle(
-                                  color: AppColors.blueDark,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      ...previewTasks.map((task) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Material(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: () {
-                                Navigator.of(context).push(
-                                  AppMotion.fadeSlide(
-                                    TaskDetailScreen(taskId: task.id),
-                                  ),
-                                );
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 14,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      task.status == 'DONE'
-                                          ? Icons.check_circle_rounded
-                                          : Icons.radio_button_unchecked,
-                                      color: task.status == 'DONE'
-                                          ? AppColors.blue
-                                          : AppColors.muted,
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            task.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            '${task.status}, ${(task.spentSeconds / 60).floor()}m worked',
-                                            style: const TextStyle(
-                                              color: AppColors.muted,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Icon(
-                                      Icons.chevron_right_rounded,
-                                      color: AppColors.muted,
-                                    ),
-                                  ],
-                                ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                AppMotion.fadeSlide(const AllCoursesScreen()),
+                              );
+                            },
+                            child: Text(
+                              'View all (${filtered.length})',
+                              style: const TextStyle(
+                                color: AppColors.blueDark,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
                           ),
-                        );
-                      }),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 38,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: courses.categoryNames.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final name = courses.categoryNames[index];
+                            final selected = courses.selectedCategory == name;
+                            return GestureDetector(
+                              onTap: () => courses.setCategory(name),
+                              child: AnimatedContainer(
+                                duration: AppMotion.fast,
+                                curve: AppMotion.curve,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected ? _navy : Colors.white,
+                                  borderRadius: BorderRadius.circular(100),
+                                  border: Border.all(
+                                    color:
+                                        selected ? _navy : AppColors.line,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: selected
+                                          ? Colors.white
+                                          : AppColors.ink,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
 
-            SliverToBoxAdapter(child: SizedBox(height: bottom + 12)),
-          ],
+              if (homeCourses.isEmpty)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(pad, 20, pad, 0),
+                  sliver: const SliverToBoxAdapter(
+                    child: Text(
+                      'No courses in this category',
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final course = homeCourses[index];
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == homeCourses.length - 1 ? 0 : 10,
+                          ),
+                          child: _courseCard(context, course, courses),
+                        );
+                      },
+                      childCount: homeCourses.length,
+                    ),
+                  ),
+                ),
+
+              if (previewTasks.isNotEmpty)
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(pad, 24, pad, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'ACTIVE WORK',
+                                style: TextStyle(
+                                  color: AppColors.ink,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ),
+                            if (myTasks.length > 3)
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    AppMotion.fadeSlide(const TasksScreen()),
+                                  );
+                                },
+                                child: const Text(
+                                  'See all',
+                                  style: TextStyle(
+                                    color: AppColors.blueDark,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...previewTasks.map((task) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _taskTile(context, task),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+
+              SliverToBoxAdapter(child: SizedBox(height: bottom + 12)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _taskTile(BuildContext context, AssignedTask task) {
+    final late = task.status != 'DONE' &&
+        task.status != 'REVIEWED' &&
+        task.dueAt.isBefore(DateTime.now());
+    final color = _taskStatusColor(task.status, late: late);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).push(
+            AppMotion.fadeSlide(TaskDetailScreen(taskId: task.id)),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                task.status == 'DONE' || task.status == 'REVIEWED'
+                    ? Icons.check_circle_rounded
+                    : late
+                        ? Icons.warning_amber_rounded
+                        : Icons.radio_button_unchecked,
+                color: color,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${late ? 'Late · ' : ''}${_taskStatusLabel(task.status)} · Due ${_fmtDate(task.dueAt.toIso8601String())}',
+                      style: TextStyle(
+                        color: late ? color : AppColors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  late ? 'Late' : _taskStatusLabel(task.status),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionCard({
+    required String title,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.ink,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _feeMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.ink,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 88,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusChip(String label, int? count, {Color? tone}) {
+    final c = tone ?? AppColors.blueDark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(100),
+      ),
+      child: Text(
+        count == null ? label : '$label · $count',
+        style: TextStyle(
+          color: c,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

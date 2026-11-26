@@ -103,7 +103,19 @@ class CourseProvider extends ChangeNotifier {
 
   /// Office / report attendance % (not per-course placeholder).
   double _reportAttendancePercent = 0;
+  int _reportFeesPending = 0;
+  int _reportFeesPaid = 0;
+  String? _reportBatch;
+  String? _reportCreatedAt;
+  String? _reportPhone;
+  String? _reportProfileImage;
   double get reportAttendancePercent => _reportAttendancePercent;
+  int get reportFeesPending => _reportFeesPending;
+  int get reportFeesPaid => _reportFeesPaid;
+  String? get reportBatch => _reportBatch;
+  String? get reportCreatedAt => _reportCreatedAt;
+  String? get reportPhone => _reportPhone;
+  String? get reportProfileImage => _reportProfileImage;
 
   double get overallAttendance {
     if (_reportAttendancePercent > 0) return _reportAttendancePercent;
@@ -174,13 +186,22 @@ class CourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pull real attendance % from /reports/me (office + history based).
+  /// Pull real attendance / fee / profile snapshot from /reports/me.
   Future<void> fetchReportStats() async {
     try {
       final data =
           await ApiClient.instance.get('/reports/me') as Map<String, dynamic>;
       _reportAttendancePercent =
           (data['attendancePercent'] as num?)?.toDouble() ?? 0;
+      _reportFeesPending = (data['feesPending'] as num?)?.toInt() ?? 0;
+      _reportFeesPaid = (data['feesPaid'] as num?)?.toInt() ?? 0;
+      final user = data['user'];
+      if (user is Map) {
+        _reportBatch = user['batch'] as String?;
+        _reportCreatedAt = user['createdAt'] as String?;
+        _reportPhone = user['phone'] as String?;
+        _reportProfileImage = user['profileImage'] as String?;
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('Report stats fetch failed: $e');

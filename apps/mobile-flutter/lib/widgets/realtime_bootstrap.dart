@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../providers/course_provider.dart';
+import '../providers/fee_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
@@ -40,6 +41,7 @@ class _RealtimeBootstrapState extends State<RealtimeBootstrap> {
 
     final notes = context.read<NotificationProvider>();
     final courses = context.read<CourseProvider>();
+    final fees = context.read<FeeProvider>();
     RealtimeService.instance.bind(
       ui: context.read<UiProvider>(),
       notes: notes,
@@ -47,14 +49,17 @@ class _RealtimeBootstrapState extends State<RealtimeBootstrap> {
       tasks: context.read<TaskProvider>(),
       teaching: context.read<TeachingProvider>(),
       courses: courses,
+      fees: fees,
       onOpen: widget.onOpen,
     );
     final tasks = context.read<TaskProvider>();
     final teaching = context.read<TeachingProvider>();
     PushNotificationService.instance.setOnForegroundRefresh(() {
-      // Keep inbox + courses + teacher/staff dashboards live while app is open.
+      // Keep inbox + courses + fees + dashboards live while app is open.
       unawaited(notes.load());
       unawaited(courses.fetchEnrolledCourses());
+      unawaited(courses.fetchReportStats());
+      unawaited(fees.load());
       unawaited(tasks.load(silent: true));
       unawaited(teaching.load(silent: true));
     });

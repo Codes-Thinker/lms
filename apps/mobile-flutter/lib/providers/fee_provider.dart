@@ -20,7 +20,60 @@ class FeeProvider extends ChangeNotifier {
   List<FeePaymentCase> get cases => List.unmodifiable(_cases);
   int get pendingAmount => _cases
       .where((c) => c.status != 'APPROVED' && c.status != 'PAID')
-      .fold(0, (s, c) => s + c.amount);
+      .fold(0, (s, c) => s + (c.amount - c.amountPaid).clamp(0, c.amount));
+
+  int get totalFeeAmount =>
+      _cases.fold(0, (s, c) => s + c.amount);
+  int get totalPaidAmount => _cases.fold(0, (s, c) {
+        if (c.status == 'APPROVED' || c.status == 'PAID') {
+          return s + (c.amountPaid > 0 ? c.amountPaid : c.amount);
+        }
+        return s + c.amountPaid;
+      });
+  int get remainingAmount =>
+      (totalFeeAmount - totalPaidAmount).clamp(0, totalFeeAmount);
+  int get dueCount => _cases
+      .where((c) => c.status == 'DUE' || c.status == 'SENT')
+      .length;
+  int get partialCount => _cases
+      .where((c) =>
+          c.status == 'PARTIAL' ||
+          (c.amountPaid > 0 &&
+              c.status != 'APPROVED' &&
+              c.status != 'PAID'))
+      .length;
+  int get paidCount => _cases
+      .where((c) => c.status == 'APPROVED' || c.status == 'PAID')
+      .length;
+
+  int get reminderCount =>
+      _cases.fold(0, (s, c) => s + c.reminders.length);
+
+  List<FeeReminderLog> get recentReminders {
+    final all = _cases.expand((c) => c.reminders).toList();
+    all.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+    return all;
+  }
+
+  String get feeStatusLabel {
+    if (_cases.isEmpty) return 'No fees';
+    if (remainingAmount <= 0) return 'Cleared';
+    if (partialCount > 0 || totalPaidAmount > 0) return 'Partial';
+    return 'Due';
+  }
+
+  FeePaymentCase? get nextDueCase {
+    final open = _cases
+        .where((c) => c.status != 'APPROVED' && c.status != 'PAID')
+        .toList();
+    if (open.isEmpty) return null;
+    open.sort((a, b) {
+      final ad = a.dueDate ?? '';
+      final bd = b.dueDate ?? '';
+      return ad.compareTo(bd);
+    });
+    return open.first;
+  }
 
   FeePaymentCase? byId(String id) {
     try {
@@ -50,6 +103,17 @@ class FeeProvider extends ChangeNotifier {
     }).toList();
   }
 
+  List<FeeReminderLog> _mapReminders(List? raw) {
+    return (raw ?? const []).map((r) {
+      final m = Map<String, dynamic>.from(r as Map);
+      return FeeReminderLog(
+        id: m['id'] as String? ?? '',
+        kind: m['kind'] as String? ?? 'FIRST',
+        sentAt: m['sentAt'] as String? ?? '',
+      );
+    }).toList();
+  }
+
   List<FeePaymentCase> _mapCases(List<dynamic> data) {
     return data.map((e) {
       final j = Map<String, dynamic>.from(e as Map);
@@ -64,6 +128,7 @@ class FeeProvider extends ChangeNotifier {
         dueDate: j['dueDate'] as String? ?? j['nextPaymentDate'] as String?,
         chat: _mapChat(j['chat'] as List?),
         paymentScreenshotData: j['paymentScreenshotData'] as String?,
+        reminders: _mapReminders(j['reminders'] as List?),
       );
     }).toList();
   }

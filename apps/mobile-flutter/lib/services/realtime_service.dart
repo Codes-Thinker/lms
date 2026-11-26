@@ -6,6 +6,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../core/constants/api_config.dart';
 import '../core/notification_router.dart';
 import '../providers/course_provider.dart';
+import '../providers/fee_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/support_provider.dart';
 import '../providers/task_provider.dart';
@@ -30,6 +31,7 @@ class RealtimeService {
   TaskProvider? _tasks;
   TeachingProvider? _teaching;
   CourseProvider? _courses;
+  FeeProvider? _fees;
   RealtimeOpenHandler? _onOpen;
 
   void bind({
@@ -39,6 +41,7 @@ class RealtimeService {
     required TaskProvider tasks,
     required TeachingProvider teaching,
     required CourseProvider courses,
+    FeeProvider? fees,
     required RealtimeOpenHandler onOpen,
   }) {
     _ui = ui;
@@ -47,6 +50,7 @@ class RealtimeService {
     _tasks = tasks;
     _teaching = teaching;
     _courses = courses;
+    _fees = fees;
     _onOpen = onOpen;
   }
 
@@ -177,6 +181,11 @@ class RealtimeService {
       final teaching = _teaching;
       if (tasks != null) unawaited(tasks.load(silent: true));
       if (teaching != null) unawaited(teaching.load(silent: true));
+    }
+    if (type == 'FEE' || type == 'PAYMENT' || feeCaseId != null) {
+      final fees = _fees;
+      if (fees != null) unawaited(fees.load());
+      unawaited(_courses?.fetchReportStats() ?? Future.value());
     }
     final event = (dataMap['event'] ?? '').toString().toLowerCase();
     if (event == 'course_updated') {

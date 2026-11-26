@@ -20,6 +20,18 @@ class FeeChatMessage {
   });
 }
 
+class FeeReminderLog {
+  final String id;
+  final String kind;
+  final String sentAt;
+
+  const FeeReminderLog({
+    required this.id,
+    required this.kind,
+    required this.sentAt,
+  });
+}
+
 class FeePaymentCase {
   final String id;
   final String courseId;
@@ -27,10 +39,11 @@ class FeePaymentCase {
   final String month;
   final int amount;
   final int amountPaid;
-  final String status; // DUE | SENT | APPROVED | REJECTED | PAID
+  final String status; // DUE | SENT | PARTIAL | APPROVED | REJECTED | PAID | OVERDUE
   final String? dueDate;
   final List<FeeChatMessage> chat;
   final String? paymentScreenshotData;
+  final List<FeeReminderLog> reminders;
 
   const FeePaymentCase({
     required this.id,
@@ -43,6 +56,7 @@ class FeePaymentCase {
     this.dueDate,
     required this.chat,
     this.paymentScreenshotData,
+    this.reminders = const [],
   });
 
   FeePaymentCase copyWith({
@@ -51,6 +65,7 @@ class FeePaymentCase {
     String? paymentScreenshotData,
     int? amountPaid,
     String? dueDate,
+    List<FeeReminderLog>? reminders,
   }) {
     return FeePaymentCase(
       id: id,
@@ -64,6 +79,7 @@ class FeePaymentCase {
       chat: chat ?? this.chat,
       paymentScreenshotData:
           paymentScreenshotData ?? this.paymentScreenshotData,
+      reminders: reminders ?? this.reminders,
     );
   }
 }

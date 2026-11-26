@@ -24,6 +24,49 @@ class TaskProvider extends ChangeNotifier {
   int openCountFor(String userId) =>
       tasksForUser(userId).where((t) => t.status != 'DONE').length;
 
+  int completedCountFor(String userId) => tasksForUser(userId)
+      .where((t) => t.status == 'DONE' || t.status == 'REVIEWED')
+      .length;
+
+  int pendingCountFor(String userId) => tasksForUser(userId)
+      .where((t) => t.status == 'PENDING' || t.status == 'ASSIGNED')
+      .length;
+
+  int inProgressCountFor(String userId) => tasksForUser(userId)
+      .where((t) => t.status == 'IN_PROGRESS' || t.status == 'SUBMITTED')
+      .length;
+
+  int submittedCountFor(String userId) =>
+      tasksForUser(userId).where((t) => t.status == 'SUBMITTED').length;
+
+  int reviewedCountFor(String userId) =>
+      tasksForUser(userId).where((t) => t.status == 'REVIEWED').length;
+
+  int lateCountFor(String userId) {
+    final now = DateTime.now();
+    return tasksForUser(userId)
+        .where(
+          (t) =>
+              t.status != 'DONE' &&
+              t.status != 'REVIEWED' &&
+              t.dueAt.isBefore(now),
+        )
+        .length;
+  }
+
+  double progressPercentFor(String userId) {
+    final all = tasksForUser(userId);
+    if (all.isEmpty) return 0;
+    return (completedCountFor(userId) / all.length) * 100;
+  }
+
+  AssignedTask? latestActivityFor(String userId) {
+    final all = tasksForUser(userId);
+    if (all.isEmpty) return null;
+    all.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return all.first;
+  }
+
   Future<void> load({bool silent = false}) async {
     if (!silent) {
       _loading = true;
