@@ -44,6 +44,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
     if (allowed.isEmpty) return;
     if (!allowed.contains(duration)) duration = allowed.first;
 
+    String draftedReason = '';
     final ok = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -127,7 +128,9 @@ class _LeaveScreenState extends State<LeaveScreen> {
                     children: allowed.map((d) {
                       final selectedDur = (duration - d).abs() < 1e-9;
                       return ChoiceChip(
-                        label: Text(d == d.roundToDouble() ? '${d.toInt()}' : '$d'),
+                        label: Text(
+                          d == d.roundToDouble() ? '${d.toInt()}' : '$d',
+                        ),
                         selected: selectedDur,
                         onSelected: (_) => setModal(() => duration = d),
                       );
@@ -137,6 +140,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   TextField(
                     controller: reasonCtrl,
                     maxLines: 3,
+                    textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
                       labelText: 'Reason',
                       border: OutlineInputBorder(),
@@ -146,7 +150,12 @@ class _LeaveScreenState extends State<LeaveScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => Navigator.pop(ctx, true),
+                      onPressed: () {
+                        // Capture text before pop — sheet may still rebuild
+                        // during close animation after dispose.
+                        draftedReason = reasonCtrl.text.trim();
+                        Navigator.pop(ctx, true);
+                      },
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.blue,
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -160,17 +169,18 @@ class _LeaveScreenState extends State<LeaveScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // Dispose only after the route is fully gone.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        reasonCtrl.dispose();
+      });
+    });
 
-    if (ok != true || !mounted) {
-      reasonCtrl.dispose();
-      return;
-    }
-    final reason = reasonCtrl.text.trim();
-    reasonCtrl.dispose();
+    if (ok != true || !mounted) return;
+    final reason = draftedReason;
     if (reason.length < 3) {
       context.read<UiProvider>().showSnack(
-            'Please enter a longer reason',
+            'Please enter a longer reason (min 3 characters)',
             tone: AppSnackTone.error,
           );
       return;
