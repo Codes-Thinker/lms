@@ -307,9 +307,9 @@ function InboxPageInner() {
         style={{ height: "calc(100vh - 7.5rem)" }}
       >
         <div className="glass-card flex min-h-0 flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-black/10 px-4 py-3">
-            <h2 className="text-base font-semibold text-[#1a120e]">Chat inbox</h2>
-            <p className="text-xs font-medium text-[#1a120e]/60">
+          <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+            <h2 className="text-base font-semibold">Chat inbox</h2>
+            <p className="text-xs text-slate-500">
               Tap a chat. Photos open full size.
             </p>
             {error ? (
@@ -325,10 +325,10 @@ function InboxPageInner() {
                   type="button"
                   onClick={() => void openThread(t.id)}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition",
+                    "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition",
                     activeRow
-                      ? "bg-[#1a120e] text-white shadow-sm"
-                      : "text-[#1a120e] hover:bg-black/[0.04]"
+                      ? "bg-blue-600 text-white"
+                      : "hover:bg-slate-50"
                   )}
                 >
                   <div className="min-w-0">
@@ -336,8 +336,8 @@ function InboxPageInner() {
                       {t.userName}
                       <span
                         className={cn(
-                          "ml-1 font-medium",
-                          activeRow ? "text-white/75" : "text-[#1a120e]/50"
+                          "ml-1 font-normal",
+                          activeRow ? "text-blue-100" : "text-slate-400"
                         )}
                       >
                         , {t.userRole}
@@ -345,8 +345,8 @@ function InboxPageInner() {
                     </p>
                     <p
                       className={cn(
-                        "truncate text-xs font-medium",
-                        activeRow ? "text-white/70" : "text-[#1a120e]/55"
+                        "truncate text-xs",
+                        activeRow ? "text-blue-100" : "text-slate-500"
                       )}
                     >
                       {t.lastMessage || "No messages yet"}
@@ -357,8 +357,8 @@ function InboxPageInner() {
                       className={cn(
                         "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold",
                         activeRow
-                          ? "bg-white text-[#1a120e]"
-                          : "bg-rose-500 text-white"
+                          ? "bg-white text-blue-700"
+                          : "bg-blue-600 text-white"
                       )}
                     >
                       {t.unreadByAdmin}
@@ -368,7 +368,7 @@ function InboxPageInner() {
               );
             })}
             {threads.length === 0 && !error ? (
-              <p className="px-3 py-8 text-center text-sm font-medium text-[#1a120e]/55">
+              <p className="px-3 py-8 text-center text-sm text-slate-500">
                 No chats yet
               </p>
             ) : null}
@@ -377,7 +377,7 @@ function InboxPageInner() {
 
         <div className="glass-card flex min-h-0 flex-col overflow-hidden">
           {!active ? (
-            <div className="flex flex-1 items-center justify-center p-6 text-sm font-semibold text-[#1a120e]/55">
+            <div className="flex flex-1 items-center justify-center p-6 text-sm text-slate-500">
               Select a conversation
             </div>
           ) : (

@@ -17,16 +17,10 @@ import {
   Users,
   Star,
   UserPlus,
-  BookOpen,
-  ArrowUpRight,
-  Download,
-  Megaphone,
-  ShieldCheck,
-  Inbox,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { GlassSparkline } from "@/components/ui/glass-sparkline";
+import { StatRing } from "@/components/ui/stat-ring";
 import { api, getAdminUser } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
 import { cn } from "@/lib/utils";
@@ -171,89 +165,15 @@ export default function DashboardPage() {
   const rating = overview?.avgCourseRating ?? 0;
   const newStudents = overview?.newStudentsThisMonth ?? 0;
   const attendancePct = overview?.attendanceTodayPercent ?? 0;
-  const feesPending = overview?.feesPending ?? 0;
 
   const breakdown = useMemo(() => {
-    return [
-      { key: "students", label: "Students", count: students, color: "bg-amber-400", href: "/students" },
-      { key: "teachers", label: "Teachers", count: teachers, color: "bg-emerald-400", href: "/staff" },
-      { key: "interns", label: "Interns", count: interns, color: "bg-orange-300", href: "/interns" },
+    const parts = [
+      { key: "students", label: "Students", count: students, color: "bg-blue-500", href: "/students" },
+      { key: "teachers", label: "Teachers", count: teachers, color: "bg-emerald-500", href: "/staff" },
+      { key: "interns", label: "Interns", count: interns, color: "bg-sky-400", href: "/interns" },
     ];
+    return parts;
   }, [students, teachers, interns]);
-
-  const kpiCards = [
-    {
-      label: "Active people",
-      value: overview ? String(allUsers) : "—",
-      hint: "Students + teachers + interns",
-      tone: "default" as const,
-      spark: "emerald" as const,
-      href: "/users",
-      points: [10, 14, 12, 18, 16, 21, 19, 24],
-    },
-    {
-      label: "Open deals",
-      value: overview ? String(activity?.feesAwaitingReview ?? 0) : "—",
-      hint: "Fee screenshots awaiting review",
-      tone: "default" as const,
-      spark: "rose" as const,
-      href: "/fees",
-      points: [22, 18, 20, 14, 16, 12, 15, 11],
-    },
-    {
-      label: "Revenue pending",
-      value: overview ? `Rs ${feesPending.toLocaleString()}` : "—",
-      hint: "Student fees still due",
-      tone: "accent" as const,
-      spark: "white" as const,
-      href: "/fees",
-      points: [8, 12, 10, 16, 14, 20, 18, 23],
-    },
-    {
-      label: "System uptime",
-      value: overview ? `${attendancePct.toFixed(0)}%` : "—",
-      hint: "Attendance checked in today",
-      tone: "default" as const,
-      spark: "emerald" as const,
-      href: "/attendance",
-      points: [16, 17, 18, 19, 20, 21, 22, 24],
-    },
-  ];
-
-  const quickActions = [
-    {
-      label: "Review fee requests",
-      href: "/fees",
-      icon: Wallet,
-      count: activity?.feesAwaitingReview ?? 0,
-    },
-    {
-      label: "Answer support",
-      href: "/inbox",
-      icon: Inbox,
-      count: activity?.chatUnread ?? unreadMessages,
-    },
-    {
-      label: "New announcement",
-      href: "/courses",
-      icon: Megaphone,
-    },
-    {
-      label: "Check attendance",
-      href: "/attendance",
-      icon: CalendarCheck,
-    },
-    {
-      label: "Download reports",
-      href: "/feedback",
-      icon: Download,
-    },
-    {
-      label: "Verify certificates",
-      href: "/certificates",
-      icon: ShieldCheck,
-    },
-  ];
 
   const supportCards = [
     {
@@ -293,149 +213,57 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div className="page-enter space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-white/90 drop-shadow-sm">
-            Luxury glass console
-          </p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-white drop-shadow-sm sm:text-[32px]">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
             Welcome, {name}
           </h1>
-          <p className="mt-1 max-w-xl text-sm font-medium text-white/85 drop-shadow-sm">
-            Live LMS pulse — people, fees, attendance, and support at a glance.
+          <p className="mt-1.5 text-sm text-slate-500">
+            People, attendance, ratings, and live support at a glance.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="gap-1 border-black/5 bg-white text-[#1a120e] shadow-sm">
-            <Radio className="h-3 w-3 text-emerald-600" />
+          <Badge variant="success" className="gap-1">
+            <Radio className="h-3 w-3" />
             Live
           </Badge>
-          <Badge className="border-black/5 bg-white text-[#1a120e] shadow-sm">
-            {unread} alerts
-          </Badge>
+          <Badge variant="default">{unread} alerts</Badge>
           {unreadMessages > 0 ? (
-            <Badge className="border-rose-200 bg-rose-50 text-rose-800 shadow-sm">
-              {unreadMessages} chat
-            </Badge>
+            <Badge variant="warning">{unreadMessages} chat</Badge>
           ) : null}
         </div>
       </div>
-      {error ? (
-        <p className="glass-card px-4 py-3 text-sm text-rose-700">{error}</p>
-      ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      {/* KPI glass strip — image-style */}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpiCards.map((card, i) => (
-          <Link
-            key={card.label}
-            href={card.href}
-            className={cn(
-              "glass-card glass-card-interactive group block p-5 animate-fade-up",
-              card.tone === "accent" && "glass-card-accent",
-              `stagger-${i + 1}`
-            )}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p
-                  className={cn(
-                    "text-[28px] font-extrabold tracking-tight",
-                    card.tone === "accent" ? "text-white" : "text-[#1C1410]"
-                  )}
-                >
-                  {card.value}
-                </p>
-                <p
-                  className={cn(
-                    "mt-1 text-sm font-semibold",
-                    card.tone === "accent" ? "text-white/85" : "text-[#1C1410]/75"
-                  )}
-                >
-                  {card.label}
-                </p>
-                <p
-                  className={cn(
-                    "mt-1 text-xs",
-                    card.tone === "accent" ? "text-white/65" : "text-[#1C1410]/50"
-                  )}
-                >
-                  {card.hint}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <ArrowUpRight
-                  className={cn(
-                    "h-4 w-4 opacity-60 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:opacity-100",
-                    card.tone === "accent" ? "text-white" : "text-[#1C1410]"
-                  )}
-                />
-                <GlassSparkline points={card.points} tone={card.spark} />
-              </div>
-            </div>
-          </Link>
-        ))}
-      </section>
-
-      {/* Quick actions — 2-col glass chips */}
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {quickActions.map((action, i) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.label}
-              href={action.href}
-              className={cn(
-                "glass-action flex items-center gap-3 rounded-2xl px-4 py-3.5 animate-fade-up",
-                `stagger-${Math.min(i + 1, 6)}`
-              )}
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1C1410]/08 text-[#1C1410] ring-1 ring-white/35">
-                <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
-              </span>
-              <span className="flex-1 text-sm font-semibold text-[#1C1410]">
-                {action.label}
-              </span>
-              {typeof action.count === "number" && action.count > 0 ? (
-                <span className="rounded-full bg-[#1C1410] px-2 py-0.5 text-[10px] font-bold text-white">
-                  {action.count > 99 ? "99+" : action.count}
-                </span>
-              ) : (
-                <ArrowUpRight className="h-4 w-4 text-[#1C1410]/40" />
-              )}
-            </Link>
-          );
-        })}
-      </section>
-
-      {/* People + pulse */}
+      {/* All users + rings */}
       <section className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
-        <div className="glass-card glass-card-strong overflow-hidden p-5 sm:p-6">
+        <div className="glass-card overflow-hidden p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <span className="rounded-2xl bg-[#1C1410]/08 p-2.5 text-[#1C1410] ring-1 ring-white/40">
+              <span className="rounded-2xl bg-blue-50 p-2.5 text-blue-600">
                 <Users className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-sm font-medium text-[#1C1410]/55">All users</p>
-                <p className="mt-0.5 text-4xl font-semibold tracking-tight text-[#1C1410]">
+                <p className="text-sm font-medium text-slate-500">All users</p>
+                <p className="mt-0.5 text-4xl font-semibold tracking-tight text-slate-900">
                   {overview ? allUsers : "-"}
                 </p>
-                <p className="mt-1 text-xs text-[#1C1410]/45">
+                <p className="mt-1 text-xs text-slate-400">
                   Students + teachers + interns
                 </p>
               </div>
             </div>
             <Link
               href="/users"
-              className="text-sm font-semibold text-[#1C1410] underline-offset-4 hover:underline"
+              className="text-sm font-medium text-blue-600 hover:underline"
             >
               Manage users
             </Link>
           </div>
 
-          <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-white/35">
+          {/* Segmented proportion bar */}
+          <div className="mt-5 flex h-2.5 overflow-hidden rounded-full bg-slate-100">
             {breakdown.map((b) => {
               const pct = allUsers > 0 ? (b.count / allUsers) * 100 : 0;
               if (pct <= 0) return null;
@@ -462,15 +290,15 @@ export default function DashboardPage() {
                 <Link
                   key={b.key}
                   href={b.href}
-                  className="group rounded-2xl border border-white/35 bg-white/25 p-3.5 transition hover:bg-white/40"
+                  className="group rounded-2xl border border-slate-100 bg-slate-50/70 p-3.5 transition hover:border-blue-200 hover:bg-blue-50/40"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-medium text-[#1C1410]/55">
+                    <span className="text-xs font-medium text-slate-500">
                       {b.label}
                     </span>
-                    <Icon className="h-3.5 w-3.5 text-[#1C1410]/40 transition group-hover:text-[#1C1410]" />
+                    <Icon className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-blue-600" />
                   </div>
-                  <p className="mt-1.5 text-2xl font-semibold tracking-tight text-[#1C1410]">
+                  <p className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-900">
                     {overview ? b.count : "-"}
                   </p>
                 </Link>
@@ -479,58 +307,67 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="glass-card glass-card-strong flex flex-col justify-center p-5 sm:p-6">
+        <div className="glass-card flex flex-col justify-center p-5 sm:p-6">
           <div className="mb-4 flex items-center justify-between gap-2">
             <div>
-              <h3 className="font-semibold text-[#1C1410]">Pulse</h3>
-              <p className="text-sm text-[#1C1410]/55">
+              <h3 className="font-semibold text-slate-900">Pulse</h3>
+              <p className="text-sm text-slate-500">
                 Rings for today, {monthLabel()}
               </p>
             </div>
             <Link
               href="/attendance"
-              className="text-sm font-semibold text-[#1C1410] underline-offset-4 hover:underline"
+              className="text-sm font-medium text-blue-600 hover:underline"
             >
               Attendance
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-2xl border border-white/30 bg-white/25 p-3">
-              <p className="text-2xl font-extrabold text-[#1C1410]">
-                {overview ? `${Math.round(attendancePct)}%` : "—"}
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-[#1C1410]/55">
-                Attendance
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/30 bg-white/25 p-3">
-              <p className="text-2xl font-extrabold text-[#1C1410]">
-                {overview ? rating.toFixed(1) : "—"}
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-[#1C1410]/55">
-                Rating
-              </p>
-            </div>
-            <div className="rounded-2xl border border-white/30 bg-white/25 p-3">
-              <p className="text-2xl font-extrabold text-[#1C1410]">
-                {overview ? newStudents : "—"}
-              </p>
-              <p className="mt-1 text-[11px] font-semibold text-[#1C1410]/55">
-                New students
-              </p>
-            </div>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <StatRing
+              value={attendancePct}
+              label="Attendance"
+              sublabel="Today"
+              tone="amber"
+              size={100}
+            />
+            <StatRing
+              value={rating}
+              max={5}
+              display={overview ? rating.toFixed(1) : "-"}
+              label="Rating"
+              sublabel={
+                overview
+                  ? `${overview.coursesCount} courses`
+                  : "Courses"
+              }
+              tone="emerald"
+              size={100}
+            />
+            <StatRing
+              value={newStudents}
+              max={Math.max(10, newStudents)}
+              display={overview ? String(newStudents) : "-"}
+              label="New students"
+              sublabel="This month"
+              tone="sky"
+              size={100}
+            />
           </div>
-          <div className="mt-5 grid grid-cols-3 gap-2 border-t border-white/25 pt-4 text-center text-xs text-[#1C1410]/55">
+          <div className="mt-5 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 text-center text-xs text-slate-500">
             <div className="flex flex-col items-center gap-1">
-              <CalendarCheck className="h-3.5 w-3.5 text-amber-700" />
-              <span>{overview?.attendanceTodayCount ?? 0} marks</span>
+              <CalendarCheck className="h-3.5 w-3.5 text-amber-600" />
+              <span>
+                {overview?.attendanceTodayCount ?? 0} marks
+              </span>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <Star className="h-3.5 w-3.5 text-emerald-700" />
-              <span>{overview?.surveyResponses ?? 0} surveys</span>
+              <Star className="h-3.5 w-3.5 text-emerald-600" />
+              <span>
+                {overview?.surveyResponses ?? 0} surveys
+              </span>
             </div>
             <div className="flex flex-col items-center gap-1">
-              <UserPlus className="h-3.5 w-3.5 text-orange-700" />
+              <UserPlus className="h-3.5 w-3.5 text-sky-600" />
               <span>{monthLabel()}</span>
             </div>
           </div>
@@ -541,14 +378,14 @@ export default function DashboardPage() {
       <div className="glass-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-semibold text-[#1C1410]">Help &amp; support</h3>
-            <p className="text-sm text-[#1C1410]/55">
+            <h3 className="font-semibold">Help &amp; support</h3>
+            <p className="text-sm text-slate-500">
               Live queue from the app: fees, reports, chat, surveys
             </p>
           </div>
           <Link
             href="/feedback"
-            className="text-sm font-semibold text-[#1C1410] underline-offset-4 hover:underline"
+            className="text-sm font-medium text-blue-600 hover:underline"
           >
             Open feedback
           </Link>
@@ -560,77 +397,75 @@ export default function DashboardPage() {
               <Link
                 key={c.label}
                 href={c.href}
-                className="rounded-2xl border border-white/30 bg-white/25 p-3.5 transition hover:bg-white/40"
+                className="rounded-2xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/80 p-3.5 transition hover:border-blue-200 hover:to-blue-50/40"
               >
-                <div className="flex items-center gap-2 text-[#1C1410]/55">
-                  <Icon className="h-3.5 w-3.5 text-[#1C1410]" />
+                <div className="flex items-center gap-2 text-slate-500">
+                  <Icon className="h-3.5 w-3.5 text-blue-600" />
                   <span className="text-xs">{c.label}</span>
                 </div>
-                <p className="mt-2 text-xl font-semibold text-[#1C1410]">{c.value}</p>
+                <p className="mt-2 text-xl font-semibold">{c.value}</p>
               </Link>
             );
           })}
         </div>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#1C1410]/45">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Latest reports / complains
             </p>
             <ul className="space-y-2 text-sm">
               {(activity?.recentTickets ?? []).map((t) => (
                 <li
                   key={t.id}
-                  className="flex justify-between gap-2 border-t border-white/25 pt-2"
+                  className="flex justify-between gap-2 border-t border-slate-100 pt-2"
                 >
-                  <span className="min-w-0 truncate text-[#1C1410]/85">
-                    <span className="font-medium text-[#1C1410]">{t.kind}</span>
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium text-slate-800">{t.kind}</span>
                     {", "}
                     <Link
                       href={`/users/${t.userId}`}
-                      className="font-semibold text-[#1C1410] underline-offset-2 hover:underline"
+                      className="text-blue-700 hover:underline"
                     >
                       {t.userName}
                     </Link>
                     {": "}
                     {t.title}
                   </span>
-                  <Badge className="border-white/30 bg-white/30 text-[#1C1410]">
-                    {t.status}
-                  </Badge>
+                  <Badge variant="secondary">{t.status}</Badge>
                 </li>
               ))}
               {(activity?.recentTickets.length ?? 0) === 0 ? (
-                <li className="text-[#1C1410]/55">No open tickets</li>
+                <li className="text-slate-500">No open tickets</li>
               ) : null}
             </ul>
           </div>
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#1C1410]/45">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
               Latest surveys
             </p>
             <ul className="space-y-2 text-sm">
               {(activity?.recentSurveys ?? []).map((s) => (
                 <li
                   key={s.id}
-                  className="flex justify-between gap-2 border-t border-white/25 pt-2"
+                  className="flex justify-between gap-2 border-t border-slate-100 pt-2"
                 >
-                  <span className="min-w-0 truncate text-[#1C1410]/85">
+                  <span className="min-w-0 truncate">
                     <Link
                       href={`/users/${s.userId}`}
-                      className="font-medium text-[#1C1410] underline-offset-2 hover:underline"
+                      className="font-medium text-blue-700 hover:underline"
                     >
                       {s.userName}
                     </Link>
                     {", "}
                     {s.surveyTitle}
                   </span>
-                  <span className="shrink-0 text-xs text-[#1C1410]/45">
+                  <span className="shrink-0 text-xs text-slate-400">
                     {new Date(s.submittedAt).toLocaleString()}
                   </span>
                 </li>
               ))}
               {(activity?.recentSurveys.length ?? 0) === 0 ? (
-                <li className="text-[#1C1410]/55">No survey answers yet</li>
+                <li className="text-slate-500">No survey answers yet</li>
               ) : null}
             </ul>
           </div>
@@ -641,14 +476,14 @@ export default function DashboardPage() {
       <div className="glass-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="font-semibold text-[#1C1410]">People</h3>
-            <p className="text-sm text-[#1C1410]/55">
+            <h3 className="font-semibold">People</h3>
+            <p className="text-sm text-slate-500">
               Students, Interns, Teachers with profile
             </p>
           </div>
           <Link
             href="/users"
-            className="text-sm font-semibold text-[#1C1410] underline-offset-4 hover:underline"
+            className="text-sm font-medium text-blue-600 hover:underline"
           >
             Manage users
           </Link>
@@ -660,7 +495,7 @@ export default function DashboardPage() {
               <Link
                 key={p.id}
                 href={`/users/${p.id}`}
-                className="flex items-center gap-3 rounded-2xl border border-white/30 bg-white/25 p-3 transition hover:bg-white/40"
+                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
               >
                 <UserAvatar
                   name={display}
@@ -669,10 +504,10 @@ export default function DashboardPage() {
                   src={p.profileImage}
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-[#1C1410]">
+                  <p className="truncate font-semibold text-slate-900">
                     {display}
                   </p>
-                  <p className="truncate text-xs text-[#1C1410]/55">
+                  <p className="truncate text-xs text-slate-500">
                     {roleLabel(p.accountType)}
                     {p.track ? `, ${p.track}` : ""}
                   </p>
@@ -681,7 +516,7 @@ export default function DashboardPage() {
             );
           })}
           {people.length === 0 ? (
-            <p className="text-sm text-[#1C1410]/55">
+            <p className="text-sm text-slate-500">
               No users yet. Add from Users
             </p>
           ) : null}
@@ -692,52 +527,50 @@ export default function DashboardPage() {
         <div className="glass-card p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-[#1C1410]" />
-              <h3 className="font-semibold text-[#1C1410]">Student fees pending</h3>
+              <Wallet className="h-4 w-4 text-blue-600" />
+              <h3 className="font-semibold">Student fees pending</h3>
             </div>
-            <Link
-              href="/fees"
-              className="text-sm font-semibold text-[#1C1410] underline-offset-4 hover:underline"
-            >
+            <Link href="/fees" className="text-sm text-blue-600 hover:underline">
               Fees module
             </Link>
           </div>
-          <p className="mb-3 text-2xl font-semibold text-[#1C1410]">
+          <p className="mb-3 text-2xl font-semibold">
             Rs {(overview?.feesPending ?? 0).toLocaleString()}
           </p>
           <ul className="space-y-2 text-sm">
             {fees.map((f) => (
               <li
                 key={f.id}
-                className="flex justify-between border-t border-white/25 pt-2 text-[#1C1410]/85"
+                className="flex justify-between border-t border-slate-100 pt-2"
               >
                 {f.studentId ? (
                   <Link
                     href={`/users/${f.studentId}`}
-                    className="font-medium text-[#1C1410] underline-offset-2 hover:underline"
+                    className="font-medium text-blue-700 hover:underline"
                   >
                     {f.studentName}
                   </Link>
                 ) : (
                   <span>{f.studentName}</span>
                 )}
-                <span>
-                  {f.status}, {f.courseTitle}, Rs {f.amount.toLocaleString()}
+                <span className="text-slate-600">
+                  {f.status}, {f.courseTitle}, Rs{" "}
+                  {f.amount.toLocaleString()}
                 </span>
               </li>
             ))}
             {fees.length === 0 ? (
-              <li className="text-[#1C1410]/55">No pending student fees</li>
+              <li className="text-slate-500">No pending student fees</li>
             ) : null}
           </ul>
         </div>
 
         <div className="glass-card p-5">
           <div className="mb-3 flex items-center gap-2">
-            <ListTodo className="h-4 w-4 text-[#1C1410]" />
-            <h3 className="font-semibold text-[#1C1410]">Today attendance</h3>
+            <ListTodo className="h-4 w-4 text-blue-600" />
+            <h3 className="font-semibold">Today attendance</h3>
           </div>
-          <p className="mb-3 text-sm text-[#1C1410]/55">
+          <p className="mb-3 text-sm text-slate-500">
             Teacher tasks {overview?.openStaffTasks ?? 0}, Intern projects{" "}
             {overview?.openInternProjects ?? 0}
           </p>
@@ -745,22 +578,18 @@ export default function DashboardPage() {
             {attendance.map((a) => (
               <li
                 key={a.id}
-                className="flex justify-between border-t border-white/25 pt-2 text-[#1C1410]/85"
+                className="flex justify-between border-t border-slate-100 pt-2"
               >
                 <span>
                   {a.personName}, {a.role}
                 </span>
-                <span className="font-medium text-[#1C1410]">{a.status}</span>
+                <span className="font-medium">{a.status}</span>
               </li>
             ))}
             {attendance.length === 0 ? (
-              <li className="text-[#1C1410]/55">No marks yet</li>
+              <li className="text-slate-500">No marks yet</li>
             ) : null}
           </ul>
-          <div className="mt-4 flex items-center gap-2 text-xs text-[#1C1410]/50">
-            <BookOpen className="h-3.5 w-3.5" />
-            {overview?.coursesCount ?? 0} courses in catalog
-          </div>
         </div>
       </div>
     </div>

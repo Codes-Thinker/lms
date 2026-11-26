@@ -20,23 +20,23 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between",
+        "mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-end sm:justify-between",
         className
       )}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
           {Icon ? (
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#1C1410]/85 text-white shadow-lg shadow-black/20 ring-1 ring-white/25">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-600/30">
               <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
             </span>
           ) : null}
-          <h1 className="truncate text-2xl font-bold tracking-tight text-[#1C1410] sm:text-[28px]">
+          <h1 className="truncate text-2xl font-bold tracking-tight text-slate-900 sm:text-[28px]">
             {title}
           </h1>
         </div>
         {description ? (
-          <p className="mt-1.5 max-w-2xl text-sm text-[#1C1410]/55">{description}</p>
+          <p className="mt-1.5 max-w-2xl text-sm text-slate-500">{description}</p>
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -55,9 +55,9 @@ export function PageMetaPill({
   value: string | number;
 }) {
   return (
-    <div className="rounded-full border border-white/35 bg-white/35 px-3.5 py-1.5 text-sm text-[#1C1410]/70 backdrop-blur-md">
-      <span className="font-medium text-[#1C1410]/55">{label}:</span>{" "}
-      <span className="font-semibold text-[#1C1410]">{value}</span>
+    <div className="rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-sm text-slate-600">
+      <span className="font-medium text-slate-500">{label}:</span>{" "}
+      <span className="font-semibold text-slate-900">{value}</span>
     </div>
   );
 }

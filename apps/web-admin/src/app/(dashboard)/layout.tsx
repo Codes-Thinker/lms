@@ -82,6 +82,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: "/inbox", label: "Chat inbox", icon: MessageSquare },
       { href: "/feedback", label: "Feedback", icon: MessageCircleWarning },
+      { href: "/system", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -110,11 +111,11 @@ function NavLinks({
   };
 
   return (
-    <nav className="sidebar-scroll flex-1 space-y-3 pr-0.5">
+    <nav className="sidebar-scroll flex-1 space-y-4 pr-0.5">
       {navGroups.map((group, gi) => (
-        <div key={group.label ?? `g-${gi}`} className="space-y-0.5">
+        <div key={group.label ?? `g-${gi}`} className="space-y-1">
           {group.label && !collapsed ? (
-            <p className="px-3 pb-1 pt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <p className="px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400">
               {group.label}
             </p>
           ) : null}
@@ -130,30 +131,24 @@ function NavLinks({
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "nav-link relative flex items-center rounded-xl py-2 text-[13px] font-semibold",
-                  collapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
+                  "nav-link relative flex items-center rounded-lg py-2 text-[13px] font-semibold transition-colors",
+                  collapsed ? "justify-center px-2" : "gap-3 px-3",
                   active
-                    ? "bg-white text-[#1a120e] shadow-[0_8px_22px_-14px_rgba(0,0,0,0.65)]"
-                    : "bg-transparent text-white/88 hover:bg-white/12 hover:text-white"
+                    ? "bg-[#2563EB] text-white shadow-sm shadow-blue-600/25"
+                    : "bg-transparent text-slate-500 hover:bg-blue-50 hover:text-blue-700"
                 )}
               >
-                <Icon
-                  className={cn(
-                    "h-[17px] w-[17px] shrink-0",
-                    active ? "text-[#1a120e]" : "text-white/90"
-                  )}
-                  strokeWidth={2.1}
-                />
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
                 {!collapsed ? (
                   <>
                     <span className="flex-1 truncate">{item.label}</span>
                     {count > 0 ? (
                       <span
                         className={cn(
-                          "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none",
+                          "badge-pulse rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
                           active
-                            ? "bg-[#1a120e] text-white"
-                            : "bg-rose-500 text-white"
+                            ? "bg-white text-blue-700"
+                            : "bg-blue-600 text-white"
                         )}
                       >
                         {count > 99 ? "99+" : count}
@@ -161,7 +156,7 @@ function NavLinks({
                     ) : null}
                   </>
                 ) : count > 0 ? (
-                  <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-[#1c100c]" />
+                  <span className="badge-pulse absolute right-1 top-1 h-2 w-2 rounded-full bg-rose-500 ring-2 ring-white" />
                 ) : null}
               </Link>
             );
@@ -218,13 +213,11 @@ function SidebarBody({
       .slice(0, 2)
       .toUpperCase() || "AA";
 
-  const settingsActive = isNavItemActive(pathname, "/system");
-
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <>
       <div
         className={cn(
-          "mb-4 flex items-center px-2",
+          "mb-6 flex items-center px-2",
           collapsed ? "justify-center" : "gap-2.5"
         )}
       >
@@ -232,17 +225,17 @@ function SidebarBody({
         <img
           src="/brand/app_icon.png"
           alt="Code's Thinker LMS"
-          className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-white/25"
+          className="h-10 w-10 shrink-0 rounded-xl object-cover"
           onError={(e) => {
             (e.target as HTMLImageElement).src = "/brand/ct_mark.png";
           }}
         />
         {!collapsed ? (
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-bold tracking-tight text-white">
+            <p className="truncate text-[15px] font-bold tracking-tight text-slate-900">
               Code&apos;s Thinker
             </p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/60">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               LMS Admin
             </p>
           </div>
@@ -255,31 +248,13 @@ function SidebarBody({
         onNavigate={onNavigate}
       />
 
-      {/* Settings + profile + logout stay together — no huge empty gap */}
-      <div className="mt-3 space-y-1 border-t border-white/15 pt-3">
-        <Link
-          href="/system"
-          title={collapsed ? "Settings" : undefined}
-          onClick={onNavigate}
-          aria-current={settingsActive ? "page" : undefined}
-          className={cn(
-            "nav-link relative flex items-center rounded-xl py-2 text-[13px] font-semibold",
-            collapsed ? "justify-center px-2" : "gap-2.5 px-2.5",
-            settingsActive
-              ? "bg-white text-[#1a120e] shadow-[0_8px_22px_-14px_rgba(0,0,0,0.65)]"
-              : "bg-transparent text-white/88 hover:bg-white/12 hover:text-white"
-          )}
-        >
-          <Settings className="h-[17px] w-[17px] shrink-0" strokeWidth={2.1} />
-          {!collapsed ? <span className="flex-1 truncate">Settings</span> : null}
-        </Link>
-
+      <div className="mt-auto space-y-2 border-t border-slate-200 pt-3">
         {onToggleCollapse ? (
           <button
             type="button"
             className={cn(
-              "flex w-full items-center rounded-xl py-1.5 text-xs font-semibold text-white/65 hover:bg-white/10 hover:text-white",
-              collapsed ? "justify-center px-2" : "gap-2 px-2.5"
+              "flex w-full items-center rounded-lg py-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800",
+              collapsed ? "justify-center px-2" : "gap-2 px-3"
             )}
             onClick={onToggleCollapse}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -294,39 +269,39 @@ function SidebarBody({
             )}
           </button>
         ) : null}
-
         {!collapsed ? (
-          <div className="flex items-center gap-2.5 px-2 py-1.5">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/18 text-[11px] font-bold text-white ring-1 ring-white/30">
+          <div className="flex items-center gap-3 px-2 py-1">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
               {initials}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{name}</p>
-              <p className="truncate text-[11px] text-white/60">Super Admin</p>
+              <p className="truncate text-sm font-semibold text-slate-900">
+                {name}
+              </p>
+              <p className="truncate text-xs text-slate-500">Super Admin</p>
             </div>
           </div>
         ) : (
           <div className="flex justify-center py-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/18 text-[11px] font-bold text-white ring-1 ring-white/30">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
               {initials}
             </div>
           </div>
         )}
-
         <button
           type="button"
           className={cn(
-            "flex w-full items-center rounded-xl py-2 text-[13px] font-semibold text-rose-300 hover:bg-rose-500/20 hover:text-rose-100",
-            collapsed ? "justify-center px-2" : "gap-2.5 px-2.5"
+            "flex w-full items-center rounded-lg py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50",
+            collapsed ? "justify-center px-2" : "gap-3 px-3"
           )}
           title="Sign out"
           onClick={onLogout}
         >
-          <LogOut className="h-[17px] w-[17px] shrink-0" strokeWidth={2.1} />
+          <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
           {!collapsed ? <span>Logout</span> : null}
         </button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -404,7 +379,7 @@ export default function DashboardLayout({
 
   if (!ready) {
     return (
-      <div className="dashboard-shell flex min-h-screen items-center justify-center text-sm text-white/70">
+      <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
         Checking session…
       </div>
     );
@@ -421,12 +396,12 @@ export default function DashboardLayout({
         <AdminActivityProvider>
           <RealtimeBridge />
           <SectionReadOnVisit />
-          <div className="dashboard-shell flex min-h-screen">
+          <div className="dashboard-shell flex min-h-screen bg-[#F4F8FF]">
             {/* Desktop sidebar */}
             <aside
               className={cn(
-                "glass-sidebar fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden px-2.5 py-4 transition-[width] duration-300 ease-out lg:flex",
-                sidebarCollapsed ? "w-[72px]" : "w-[236px]"
+                "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-blue-100/80 bg-white px-3 py-4 transition-[width] duration-300 ease-out lg:flex",
+                sidebarCollapsed ? "w-[72px]" : "w-[250px]"
               )}
             >
               <SidebarBody
@@ -443,15 +418,15 @@ export default function DashboardLayout({
               <div className="fixed inset-0 z-40 lg:hidden">
                 <button
                   type="button"
-                  className="absolute inset-0 bg-[#1C1410]/50 backdrop-blur-sm"
+                  className="absolute inset-0 bg-slate-900/40"
                   aria-label="Close menu"
                   onClick={() => setMobileOpen(false)}
                 />
-                <aside className="glass-sidebar absolute inset-y-0 left-0 flex w-[min(270px,88vw)] flex-col px-2.5 py-4">
+                <aside className="absolute inset-y-0 left-0 flex w-[min(280px,86vw)] flex-col border-r border-blue-100/80 bg-white px-3 py-4">
                   <div className="mb-2 flex justify-end px-1">
                     <button
                       type="button"
-                      className="rounded-xl p-2 text-white/70 hover:bg-white/10 hover:text-white"
+                      className="rounded-lg p-2 text-slate-500 hover:bg-slate-50"
                       onClick={() => setMobileOpen(false)}
                     >
                       <X className="h-5 w-5" />
@@ -470,29 +445,29 @@ export default function DashboardLayout({
             <div
               className={cn(
                 "flex min-h-screen min-w-0 flex-1 flex-col transition-[margin] duration-200",
-                sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[236px]"
+                sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[250px]"
               )}
             >
-              <header className="glass-header sticky top-0 z-20 flex h-12 items-center gap-3 px-3 animate-fade-in sm:h-14 sm:gap-4 sm:px-5 md:px-6">
+              <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-3 animate-fade-in sm:h-16 sm:gap-4 sm:px-5 md:px-6">
                 <button
                   type="button"
-                  className="rounded-xl border border-black/10 bg-white p-2 text-[#1a120e] lg:hidden"
+                  className="rounded-lg border border-slate-200 p-2 text-slate-700 lg:hidden"
                   aria-label="Open menu"
                   onClick={() => setMobileOpen(true)}
                 >
                   <Menu className="h-5 w-5" strokeWidth={2} />
                 </button>
                 <div className="hidden min-w-0 lg:block">
-                  <p className="truncate text-sm font-bold text-[#1a120e]">
+                  <p className="truncate text-sm font-bold text-slate-900">
                     {pageTitleForPath(pathname).title}
                   </p>
-                  <p className="truncate text-[11px] font-medium text-[#1a120e]/60">
+                  <p className="truncate text-[11px] font-medium text-slate-400">
                     Admin Overview
                   </p>
                 </div>
                 <div className="relative min-w-0 flex-1 lg:max-w-md lg:flex-none lg:ml-auto">
                   <Search
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#1a120e]/50"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                     strokeWidth={2}
                   />
                   <Input
@@ -508,12 +483,12 @@ export default function DashboardLayout({
                       }
                     }}
                     placeholder="Search records..."
-                    className="h-9 w-full rounded-full border-black/10 bg-white pl-9 pr-9 text-[#1a120e] placeholder:text-[#1a120e]/45 shadow-sm"
+                    className="h-10 w-full rounded-lg border-slate-200 bg-slate-50 pl-9 pr-9"
                   />
                   {searchQ.trim() ? (
                     <button
                       type="button"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-[#1a120e]/45 hover:bg-black/5 hover:text-[#1a120e]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                       aria-label="Clear search"
                       onClick={() => setSearchQ("")}
                     >
@@ -523,24 +498,24 @@ export default function DashboardLayout({
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <NotificationsBell />
-                  <div className="hidden items-center gap-2 rounded-full border border-black/10 bg-white px-2.5 py-1 sm:flex">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#1a120e]/8 text-[10px] font-bold text-[#1a120e]">
+                  <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 sm:flex">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
                       {(name.split(" ").map((p) => p[0]).join("").slice(0, 2) ||
                         "AA"
                       ).toUpperCase()}
                     </div>
                     <div className="min-w-0 leading-tight">
-                      <p className="truncate text-xs font-semibold text-[#1a120e]">
+                      <p className="truncate text-xs font-semibold text-slate-900">
                         {name.split(" ")[0] || "Admin"}
                       </p>
-                      <p className="truncate text-[10px] font-medium text-[#1a120e]/55">
+                      <p className="truncate text-[10px] font-medium text-slate-400">
                         Super Admin
                       </p>
                     </div>
                   </div>
                 </div>
               </header>
-              <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4 md:p-5">
+              <main className="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4 md:p-6">
                 <PageEnter key={pathname}>{children}</PageEnter>
               </main>
             </div>
