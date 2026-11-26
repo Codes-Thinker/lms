@@ -61,3 +61,7 @@ apps/api/secrets/
 **/*firebase-adminsdk*.json
 **/firebase-service-account.json
 config.bat
+
+.env
+.env.*
+!.env.example
