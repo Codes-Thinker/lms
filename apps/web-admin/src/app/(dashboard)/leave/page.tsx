@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useSnackbar } from "@/components/ui/snackbar";
+import { useAdminActivity } from "@/components/ui/admin-activity-provider";
+import { SearchParamsBoundary } from "@/components/ui/search-params-boundary";
 import { cn } from "@/lib/utils";
 
 type LeaveRow = {
@@ -31,8 +34,11 @@ type LeaveStats = {
   rejected: number;
 };
 
-export default function LeavePage() {
+function LeavePageInner() {
   const { show } = useSnackbar();
+  const searchParams = useSearchParams();
+  const focusLeaveId = searchParams.get("leaveId");
+  const { refresh: refreshActivity } = useAdminActivity();
   const [rows, setRows] = useState<LeaveRow[]>([]);
   const [stats, setStats] = useState<LeaveStats | null>(null);
   const [status, setStatus] = useState("ALL");
@@ -44,9 +50,10 @@ export default function LeavePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [highlightId, setHighlightId] = useState<string | null>(focusLeaveId);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const q = new URLSearchParams();
@@ -60,16 +67,35 @@ export default function LeavePage() {
       ]);
       setRows(list);
       setStats(st);
+      void refreshActivity();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load leave requests");
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
-  }, [status, batch, from, to]);
+  }, [status, batch, from, to, refreshActivity]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (focusLeaveId) setHighlightId(focusLeaveId);
+  }, [focusLeaveId]);
+
+  useEffect(() => {
+    function onLeaveUpdated() {
+      void load({ silent: true });
+    }
+    window.addEventListener("lms:leave-updated", onLeaveUpdated);
+    return () => window.removeEventListener("lms:leave-updated", onLeaveUpdated);
+  }, [load]);
+
+  useEffect(() => {
+    if (!highlightId || !rows.length) return;
+    const el = document.getElementById(`leave-row-${highlightId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId, rows]);
 
   const batches = useMemo(() => {
     const set = new Set<string>();
@@ -238,15 +264,19 @@ export default function LeavePage() {
                 </tr>
               ) : (
                 rows.map((r) => (
-                  <tr key={r.id} className="border-t border-slate-100">
+                  <tr
+                    key={r.id}
+                    id={`leave-row-${r.id}`}
+                    className={cn(
+                      "border-t border-slate-100",
+                      highlightId === r.id && "bg-amber-50 ring-2 ring-inset ring-amber-300"
+                    )}
+                  >
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-900">
                         {r.studentName ?? "—"}
                       </div>
-                      <div className="text-xs text-slate-400">{r.studentId}</div>
-                      {r.studentEmail && (
-                        <div className="text-xs text-slate-400">{r.studentEmail}</div>
-                      )}
+                      <div className="text-xs text-slate-400">{r.studentEmail ?? r.studentId}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div>{r.batch ?? "—"}</div>
@@ -348,5 +378,13 @@ export default function LeavePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LeavePage() {
+  return (
+    <SearchParamsBoundary>
+      <LeavePageInner />
+    </SearchParamsBoundary>
   );
 }

@@ -173,6 +173,8 @@ class RealtimeService {
     final taskId = dataMap['taskId']?.toString();
     final feeCaseId =
         dataMap['feeCaseId']?.toString() ?? dataMap['caseId']?.toString();
+    final leaveId = dataMap['leaveId']?.toString();
+    final notificationId = map['id']?.toString();
 
     final notes = _notes;
     if (notes != null) unawaited(notes.load());
@@ -206,6 +208,9 @@ class RealtimeService {
         : (title.trim().isEmpty
             ? NotificationRouter.labelForType(type)
             : title);
+    final tipKey =
+        notificationId ?? '$type:${leaveId ?? event}:${text.hashCode}';
+    if (!NotificationRouter.shouldShowTip(tipKey)) return;
     unawaited(NotifyTone.instance.play());
     _ui?.showTip(
       text,
@@ -217,8 +222,9 @@ class RealtimeService {
           taskId: taskId,
           feeCaseId: feeCaseId,
           courseId: dataMap['courseId']?.toString(),
+          leaveId: leaveId,
           event: dataMap['event']?.toString(),
-          notificationId: map['id']?.toString(),
+          notificationId: notificationId,
         );
         _onOpen?.call(type, taskId: taskId);
       },

@@ -18,6 +18,7 @@ type ActivitySummary = {
   complains: number;
   surveys: number;
   feesAwaitingReview: number;
+  leavePending: number;
   chatUnread: number;
   chatUnreadThreads: number;
 };
@@ -25,6 +26,7 @@ type ActivitySummary = {
 type AdminActivityContextValue = {
   openTickets: number;
   feesAwaitingReview: number;
+  leavePending: number;
   chatUnread: number;
   chatUnreadThreads: number;
   reports: number;
@@ -38,6 +40,7 @@ const empty: ActivitySummary = {
   complains: 0,
   surveys: 0,
   feesAwaitingReview: 0,
+  leavePending: 0,
   chatUnread: 0,
   chatUnreadThreads: 0,
 };
@@ -45,6 +48,7 @@ const empty: ActivitySummary = {
 const AdminActivityContext = createContext<AdminActivityContextValue>({
   openTickets: 0,
   feesAwaitingReview: 0,
+  leavePending: 0,
   chatUnread: 0,
   chatUnreadThreads: 0,
   reports: 0,
@@ -71,6 +75,7 @@ export function AdminActivityProvider({
         complains: data.complains ?? 0,
         surveys: data.surveys ?? 0,
         feesAwaitingReview: data.feesAwaitingReview ?? 0,
+        leavePending: data.leavePending ?? 0,
         chatUnread: data.chatUnread ?? 0,
         chatUnreadThreads: data.chatUnreadThreads ?? 0,
       });
@@ -95,6 +100,7 @@ export function AdminActivityProvider({
     () => ({
       openTickets: summary.openTickets,
       feesAwaitingReview: summary.feesAwaitingReview,
+      leavePending: summary.leavePending,
       chatUnread: summary.chatUnread,
       chatUnreadThreads: summary.chatUnreadThreads,
       reports: summary.reports,

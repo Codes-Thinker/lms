@@ -86,18 +86,38 @@ export class NotificationsService {
     type?: NotificationType;
     data?: Record<string, string>;
   }) {
-    const admins = await this.prisma.user.findMany({
-      where: {
-        OR: [
-          { accountType: "SUPER_ADMIN" },
-          { roles: { some: { role: { code: "SUPER_ADMIN" } } } },
-        ],
-        status: "ACTIVE",
-      },
+    return this.notifyStaffAndAdmins(input, { includeStaff: false });
+  }
+
+  /** SUPER_ADMIN + optional STAFF (HR), deduped by user id. */
+  async notifyStaffAndAdmins(
+    input: {
+      title: string;
+      body: string;
+      type?: NotificationType;
+      data?: Record<string, string>;
+    },
+    opts: { includeStaff?: boolean } = { includeStaff: true }
+  ) {
+    const or: Record<string, unknown>[] = [
+      { accountType: "SUPER_ADMIN" },
+      { roles: { some: { role: { code: "SUPER_ADMIN" } } } },
+    ];
+    if (opts.includeStaff !== false) {
+      or.push(
+        { accountType: "STAFF" },
+        { roles: { some: { role: { code: "STAFF" } } } }
+      );
+    }
+    const recipients = await this.prisma.user.findMany({
+      where: { OR: or, status: "ACTIVE" },
       select: { id: true },
     });
+    const seen = new Set<string>();
     const results = [];
-    for (const a of admins) {
+    for (const a of recipients) {
+      if (seen.has(a.id)) continue;
+      seen.add(a.id);
       results.push(
         await this.notifyUser({
           userId: a.id,
@@ -109,5 +129,10 @@ export class NotificationsService {
       );
     }
     return results;
+  }
+
+  /** Broadcast a leave list refresh to connected admin/staff dashboards. */
+  emitLeaveUpdated(payload: Record<string, string>) {
+    this.realtime.emitToAdmins("leave:updated", payload);
   }
 }

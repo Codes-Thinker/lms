@@ -61,7 +61,7 @@ export class RealtimeGateway
       client.data.user = payload;
       // Auto-join personal room so clients need not pass userId.
       void client.join(`user:${payload.sub}`);
-      if (this.isSuperAdmin(payload)) {
+      if (this.isAdminOrStaff(payload)) {
         void client.join("admins");
       }
       this.logger.debug(`Socket ${client.id} authenticated as ${payload.sub}`);
@@ -92,7 +92,7 @@ export class RealtimeGateway
   @SubscribeMessage("joinAdmins")
   onJoinAdmins(@ConnectedSocket() client: Socket) {
     const user = client.data.user as SocketUser | undefined;
-    if (!this.isSuperAdmin(user)) {
+    if (!this.isAdminOrStaff(user)) {
       return { ok: false, error: "forbidden" };
     }
     void client.join("admins");
@@ -166,6 +166,15 @@ export class RealtimeGateway
     return (
       user.accountType === "SUPER_ADMIN" ||
       (user.roles ?? []).includes("SUPER_ADMIN")
+    );
+  }
+
+  /** SUPER_ADMIN + STAFF can receive admin broadcast rooms (leave, fees, …). */
+  private isAdminOrStaff(user?: SocketUser | null) {
+    if (!user) return false;
+    if (this.isSuperAdmin(user)) return true;
+    return (
+      user.accountType === "STAFF" || (user.roles ?? []).includes("STAFF")
     );
   }
 

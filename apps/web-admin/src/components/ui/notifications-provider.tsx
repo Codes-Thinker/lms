@@ -27,6 +27,7 @@ type NotifyInput = {
   title: string;
   body?: string;
   type?: AppNotification["type"];
+  data?: Record<string, string>;
 };
 
 type NotificationsContextValue = {
@@ -106,8 +107,11 @@ export function hrefForNotification(n: AppNotification): string {
       return "/attendance";
     case "fee":
       return "/fees";
-    case "leave":
+    case "leave": {
+      const leaveId = d.leaveId || "";
+      if (leaveId) return `/leave?leaveId=${encodeURIComponent(leaveId)}`;
       return "/leave";
+    }
     case "chat":
       return "/inbox";
     case "report":
@@ -172,6 +176,7 @@ export function NotificationsProvider({
       type: input.type ?? "system",
       createdAt: new Date().toISOString(),
       read: false,
+      data: input.data ?? null,
     };
     setNotes((prev) => [note, ...prev]);
   }, []);

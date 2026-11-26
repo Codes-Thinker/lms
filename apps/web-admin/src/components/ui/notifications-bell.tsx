@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
   report: "Report",
   complain: "Complain",
   survey: "Survey",
+  leave: "Leave",
   general: "Support",
 };
 

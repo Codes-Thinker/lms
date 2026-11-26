@@ -23,6 +23,7 @@ export function getAdminSocket(): Socket | null {
 export function connectAdminRealtime(opts: {
   onNotification?: (payload: Record<string, unknown>) => void;
   onChatMessage?: (payload: Record<string, unknown>) => void;
+  onLeaveUpdated?: (payload: Record<string, unknown>) => void;
 }): () => void {
   const origin = apiOrigin();
   if (!origin) return () => {};
@@ -54,6 +55,15 @@ export function connectAdminRealtime(opts: {
 
   socket.on("chat:message", (payload: Record<string, unknown>) => {
     opts.onChatMessage?.(payload);
+  });
+
+  socket.on("leave:updated", (payload: Record<string, unknown>) => {
+    opts.onLeaveUpdated?.(payload);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("lms:leave-updated", { detail: payload })
+      );
+    }
   });
 
   return () => {

@@ -59,8 +59,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final feeCaseId =
         data['feeCaseId']?.toString() ?? data['caseId']?.toString();
     final courseId = data['courseId']?.toString();
+    final leaveId = data['leaveId']?.toString();
     final event = data['event']?.toString();
     final isStaff = context.read<AuthProvider>().isStaff;
+    final isStudent = context.read<AuthProvider>().isStudent;
 
     NotificationRouter.setPending(
       type: type,
@@ -68,6 +70,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       taskId: taskId,
       feeCaseId: feeCaseId,
       courseId: courseId,
+      leaveId: leaveId,
       event: event,
     );
 
@@ -77,8 +80,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       taskId: taskId,
       feeCaseId: feeCaseId,
       courseId: courseId,
+      leaveId: leaveId,
       event: event,
       isStaff: isStaff,
+      isStudent: isStudent,
       goToTab: (tab) => context.read<UiProvider>().setNavIndex(tab),
     );
     NotificationRouter.clear();

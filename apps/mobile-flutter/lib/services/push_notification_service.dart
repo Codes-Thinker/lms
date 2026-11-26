@@ -221,6 +221,7 @@ class PushNotificationService {
       'taskId': pick('taskId'),
       'feeCaseId': pick('feeCaseId') ?? pick('caseId') ?? pick('feeId'),
       'courseId': pick('courseId'),
+      'leaveId': pick('leaveId'),
       'event': pick('event'),
       'notificationId': pick('notificationId'),
     };
@@ -244,6 +245,9 @@ class PushNotificationService {
         : (rawTitle.trim().isNotEmpty ? rawTitle.trim() : 'New update');
 
     _onForegroundRefresh?.call();
+    final tipKey = meta['notificationId'] ??
+        '$type:${meta['leaveId'] ?? meta['event'] ?? text}';
+    if (!NotificationRouter.shouldShowTip(tipKey)) return;
     await NotifyTone.instance.play();
 
     final ui = _ui;
@@ -262,6 +266,7 @@ class PushNotificationService {
           taskId: meta['taskId'],
           feeCaseId: meta['feeCaseId'],
           courseId: meta['courseId'],
+          leaveId: meta['leaveId'],
           event: meta['event'],
           notificationId: meta['notificationId'],
         );
@@ -279,6 +284,7 @@ class PushNotificationService {
       taskId: meta['taskId'],
       feeCaseId: meta['feeCaseId'],
       courseId: meta['courseId'],
+      leaveId: meta['leaveId'],
       event: meta['event'],
       fromLaunch: fromLaunch,
     );
@@ -299,6 +305,7 @@ class PushNotificationService {
         taskId: meta['taskId'],
         feeCaseId: meta['feeCaseId'],
         courseId: meta['courseId'],
+        leaveId: meta['leaveId'],
         event: meta['event'],
         fromLaunch: false,
       );

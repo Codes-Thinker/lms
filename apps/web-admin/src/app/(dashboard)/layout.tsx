@@ -107,6 +107,8 @@ function NavLinks({
     if (href === "/inbox") return Math.max(activity.chatUnread, noteCount);
     if (href === "/fees")
       return Math.max(activity.feesAwaitingReview, noteCount);
+    if (href === "/leave")
+      return Math.max(activity.leavePending, noteCount);
     if (href === "/feedback") return noteCount;
     return noteCount;
   };

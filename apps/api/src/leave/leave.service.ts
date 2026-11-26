@@ -292,40 +292,50 @@ export class LeaveService {
       });
     });
 
-    await this.notifications.notifyUser({
-      userId: studentId,
-      title: "Leave request submitted",
-      body: `Your leave for ${created.leaveDate.toISOString().slice(0, 10)} (${durationDays} day(s)) is pending review.`,
-      type: NotificationType.LEAVE,
-      data: { leaveId: created.id, event: "leave_submitted" },
-    });
-
-    await this.notifications.notifyAdmins({
-      title: "New leave request",
-      body: `${student.fullName} requested ${durationDays} day(s) leave on ${created.leaveDate.toISOString().slice(0, 10)}.`,
-      type: NotificationType.LEAVE,
-      data: { leaveId: created.id, studentId, event: "leave_submitted" },
-    });
-
-    // Also notify active STAFF (HR / teachers), without duplicating SUPER_ADMIN.
-    const staff = await this.prisma.user.findMany({
-      where: {
-        accountType: "STAFF",
-        status: "ACTIVE",
-      },
-      select: { id: true },
-    });
-    for (const s of staff) {
+    const serialized = this.serialize(created);
+    const leaveDateStr = serialized.leaveDate;
+    // Persist succeeded — never fail the HTTP response if notify/FCM fails.
+    try {
       await this.notifications.notifyUser({
-        userId: s.id,
-        title: "New leave request",
-        body: `${student.fullName} requested ${durationDays} day(s) leave on ${created.leaveDate.toISOString().slice(0, 10)}.`,
+        userId: studentId,
+        title: "Leave request submitted",
+        body: `Your leave for ${leaveDateStr} (${durationDays} day(s)) is pending review.`,
         type: NotificationType.LEAVE,
-        data: { leaveId: created.id, studentId, event: "leave_submitted" },
+        data: {
+          leaveId: created.id,
+          event: "leave_submitted",
+          leaveDate: leaveDateStr,
+          durationDays: String(durationDays),
+        },
       });
+    } catch {
+      // student ack optional
+    }
+    try {
+      await this.notifications.notifyStaffAndAdmins({
+        title: "New leave request",
+        body: `${student.fullName} requested ${durationDays} day(s) leave on ${leaveDateStr}.`,
+        type: NotificationType.LEAVE,
+        data: {
+          leaveId: created.id,
+          studentId,
+          event: "leave_submitted",
+          leaveDate: leaveDateStr,
+          durationDays: String(durationDays),
+          studentName: student.fullName,
+        },
+      });
+      this.notifications.emitLeaveUpdated({
+        leaveId: created.id,
+        studentId,
+        event: "leave_submitted",
+        status: "PENDING",
+      });
+    } catch {
+      // admin notify optional after persist
     }
 
-    return this.serialize(created);
+    return serialized;
   }
 
   async listAdmin(filters: {
@@ -451,15 +461,30 @@ export class LeaveService {
       return next;
     });
 
-    await this.notifications.notifyUser({
-      userId: updated.studentId,
-      title: "Leave approved",
-      body: `Your leave on ${updated.leaveDate.toISOString().slice(0, 10)} was approved.`,
-      type: NotificationType.LEAVE,
-      data: { leaveId: updated.id, event: "leave_approved" },
-    });
+    const serialized = this.serialize(updated);
+    try {
+      await this.notifications.notifyUser({
+        userId: updated.studentId,
+        title: "Leave approved",
+        body: "Your leave request has been approved.",
+        type: NotificationType.LEAVE,
+        data: {
+          leaveId: updated.id,
+          event: "leave_approved",
+          leaveDate: serialized.leaveDate,
+        },
+      });
+      this.notifications.emitLeaveUpdated({
+        leaveId: updated.id,
+        studentId: updated.studentId,
+        event: "leave_approved",
+        status: "APPROVED",
+      });
+    } catch {
+      // notify optional after persist
+    }
 
-    return this.serialize(updated);
+    return serialized;
   }
 
   async reject(id: string, actor: AuthActor, rejectionReason?: string) {
@@ -489,18 +514,30 @@ export class LeaveService {
       });
     });
 
-    await this.notifications.notifyUser({
-      userId: updated.studentId,
-      title: "Leave rejected",
-      body: `Your leave on ${updated.leaveDate.toISOString().slice(0, 10)} was rejected: ${reason}`,
-      type: NotificationType.LEAVE,
-      data: {
+    const serialized = this.serialize(updated);
+    try {
+      await this.notifications.notifyUser({
+        userId: updated.studentId,
+        title: "Leave rejected",
+        body: "Your leave request has been rejected. Please check the reason.",
+        type: NotificationType.LEAVE,
+        data: {
+          leaveId: updated.id,
+          event: "leave_rejected",
+          leaveDate: serialized.leaveDate,
+          rejectionReason: reason,
+        },
+      });
+      this.notifications.emitLeaveUpdated({
         leaveId: updated.id,
+        studentId: updated.studentId,
         event: "leave_rejected",
-        rejectionReason: reason,
-      },
-    });
+        status: "REJECTED",
+      });
+    } catch {
+      // notify optional after persist
+    }
 
-    return this.serialize(updated);
+    return serialized;
   }
 }

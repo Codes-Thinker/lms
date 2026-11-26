@@ -9,19 +9,140 @@ import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 
 class LeaveScreen extends StatefulWidget {
-  const LeaveScreen({super.key});
+  const LeaveScreen({super.key, this.focusLeaveId});
+
+  /// When opened from a notification, scroll/open this request.
+  final String? focusLeaveId;
 
   @override
   State<LeaveScreen> createState() => _LeaveScreenState();
 }
 
 class _LeaveScreenState extends State<LeaveScreen> {
+  String? _openedFocusId;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LeaveProvider>().load();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<LeaveProvider>().load();
+      if (!mounted) return;
+      _maybeOpenFocused();
     });
+  }
+
+  void _maybeOpenFocused() {
+    final id = widget.focusLeaveId;
+    if (id == null || id.isEmpty || _openedFocusId == id) return;
+    final leave = context.read<LeaveProvider>();
+    LeaveRequest? match;
+    for (final r in leave.requests) {
+      if (r.id == id) {
+        match = r;
+        break;
+      }
+    }
+    if (match == null) return;
+    _openedFocusId = id;
+    _showRequestDetail(match);
+  }
+
+  void _showRequestDetail(LeaveRequest r) {
+    final color = _statusColor(r.status);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.line,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      r.leaveDate,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      r.status,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_fmtDays(r.durationDays)} day(s)',
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Reason',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.muted,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(r.reason),
+              if (r.status == 'REJECTED' &&
+                  (r.rejectionReason ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Rejection reason',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  r.rejectionReason!,
+                  style: const TextStyle(color: Color(0xFFDC2626)),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openRequestSheet() async {
@@ -364,69 +485,79 @@ class _LeaveScreenState extends State<LeaveScreen> {
 
   Widget _historyCard(LeaveRequest r) {
     final color = _statusColor(r.status);
+    final focused = widget.focusLeaveId == r.id;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      child: Material(
+        color: focused ? const Color(0xFFFFFBEB) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          onTap: () => _showRequestDetail(r),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: focused ? const Color(0xFFF59E0B) : AppColors.line,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    r.leaveDate,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        r.leaveDate,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Text(
+                        r.status,
+                        style: TextStyle(
+                          color: color,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${r.durationDays} day(s) · ${r.reason}',
+                  style: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                if (r.status == 'REJECTED' &&
+                    (r.rejectionReason?.isNotEmpty ?? false)) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Reason: ${r.rejectionReason}',
                     style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                      color: Color(0xFFDC2626),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    r.status,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
+                ],
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              '${r.durationDays} day(s) · ${r.reason}',
-              style: const TextStyle(
-                color: AppColors.muted,
-                fontSize: 13,
-                height: 1.35,
-              ),
-            ),
-            if (r.status == 'REJECTED' &&
-                (r.rejectionReason?.isNotEmpty ?? false)) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Reason: ${r.rejectionReason}',
-                style: const TextStyle(
-                  color: Color(0xFFDC2626),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

@@ -95,6 +95,7 @@ class _AppShellState extends State<AppShell> {
       taskId: NotificationRouter.pendingTaskId,
       feeCaseId: NotificationRouter.pendingFeeCaseId,
       courseId: NotificationRouter.pendingCourseId,
+      leaveId: NotificationRouter.pendingLeaveId,
       event: NotificationRouter.pendingEvent,
       isStaff: auth.isStaff,
       isStudent: auth.isStudent,

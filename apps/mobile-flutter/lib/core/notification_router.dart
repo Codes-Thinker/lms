@@ -21,12 +21,29 @@ class NotificationRouter {
   static String? pendingTaskId;
   static String? pendingFeeCaseId;
   static String? pendingCourseId;
+  static String? pendingLeaveId;
   static String? pendingEvent;
   static bool launchedFromNotification = false;
   static bool openAdminChat = false;
 
+  static String? _lastTipKey;
+  static DateTime? _lastTipAt;
+
   /// Registered by [AppShell] so opens never wipe the navigation stack.
   static void Function(String type)? shellHandler;
+
+  /// Prevent FCM + Socket double tip/sound for the same notification.
+  static bool shouldShowTip(String key) {
+    final now = DateTime.now();
+    if (_lastTipKey == key &&
+        _lastTipAt != null &&
+        now.difference(_lastTipAt!) < const Duration(seconds: 3)) {
+      return false;
+    }
+    _lastTipKey = key;
+    _lastTipAt = now;
+    return true;
+  }
 
   static void setPending({
     required String? type,
@@ -34,6 +51,7 @@ class NotificationRouter {
     String? taskId,
     String? feeCaseId,
     String? courseId,
+    String? leaveId,
     String? event,
     bool fromLaunch = false,
   }) {
@@ -47,6 +65,9 @@ class NotificationRouter {
     }
     if (courseId != null && courseId.isNotEmpty) {
       pendingCourseId = courseId;
+    }
+    if (leaveId != null && leaveId.isNotEmpty) {
+      pendingLeaveId = leaveId;
     }
     if (event != null && event.isNotEmpty) {
       pendingEvent = event;
@@ -63,6 +84,7 @@ class NotificationRouter {
     pendingTaskId = null;
     pendingFeeCaseId = null;
     pendingCourseId = null;
+    pendingLeaveId = null;
     pendingEvent = null;
     launchedFromNotification = false;
     // openAdminChat cleared via takeOpenAdminChat after consume
@@ -92,11 +114,18 @@ class NotificationRouter {
     return id;
   }
 
+  static String? takePendingLeaveId() {
+    final id = pendingLeaveId;
+    pendingLeaveId = null;
+    return id;
+  }
+
   static bool get hasPendingDeepLink =>
       openAdminChat ||
       (pendingTaskId != null && pendingTaskId!.isNotEmpty) ||
       (pendingFeeCaseId != null && pendingFeeCaseId!.isNotEmpty) ||
       (pendingCourseId != null && pendingCourseId!.isNotEmpty) ||
+      (pendingLeaveId != null && pendingLeaveId!.isNotEmpty) ||
       (pendingType != null && pendingType!.isNotEmpty);
 
   /// Shell tab for notification type.
@@ -162,6 +191,7 @@ class NotificationRouter {
     String? taskId,
     String? feeCaseId,
     String? courseId,
+    String? leaveId,
     String? event,
     required bool isStaff,
     bool isStudent = false,
@@ -174,6 +204,7 @@ class NotificationRouter {
     final resolvedTask = taskId ?? takePendingTaskId();
     final resolvedFee = feeCaseId ?? takePendingFeeCaseId();
     final resolvedCourse = courseId ?? takePendingCourseId();
+    final resolvedLeave = leaveId ?? takePendingLeaveId();
     final tab = tabForType(upper, event: ev, isStudent: isStudent && !isStaff);
 
     void setTabUnderCover() {
@@ -224,7 +255,9 @@ class NotificationRouter {
     }
 
     if (upper == 'LEAVE') {
-      nav.push(AppMotion.cover(const LeaveScreen()));
+      nav.push(
+        AppMotion.cover(LeaveScreen(focusLeaveId: resolvedLeave)),
+      );
       setTabUnderCover();
       return;
     }

@@ -3,7 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { ChatKind, NotificationType, TicketKind, TicketStatus } from "@prisma/client";
+import {
+  ChatKind,
+  LeaveStatus,
+  NotificationType,
+  TicketKind,
+  TicketStatus,
+} from "@prisma/client";
 import { assertImageDataUrl } from "../common/media-validation";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -143,7 +149,7 @@ export class SupportService {
   }
 
   async activitySummary() {
-    const [openTickets, reports, complains, surveys, feesSent, chat] =
+    const [openTickets, reports, complains, surveys, feesSent, chat, leavePending] =
       await Promise.all([
         this.prisma.supportTicket.count({
           where: { status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] } },
@@ -163,6 +169,9 @@ export class SupportService {
         this.prisma.surveyResponse.count(),
         this.prisma.feeCase.count({ where: { status: "SENT" } }),
         this.unreadSummary(),
+        this.prisma.leaveRequest.count({
+          where: { status: LeaveStatus.PENDING },
+        }),
       ]);
     const recentTickets = await this.prisma.supportTicket.findMany({
       where: { status: { in: [TicketStatus.OPEN, TicketStatus.IN_PROGRESS] } },
@@ -181,6 +190,7 @@ export class SupportService {
       complains,
       surveys,
       feesAwaitingReview: feesSent,
+      leavePending,
       chatUnread: chat.unreadMessages,
       chatUnreadThreads: chat.unreadThreads,
       recentTickets: recentTickets.map((t) => ({
