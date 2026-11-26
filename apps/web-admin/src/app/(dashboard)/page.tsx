@@ -293,7 +293,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="page-enter space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1C1410]/50">

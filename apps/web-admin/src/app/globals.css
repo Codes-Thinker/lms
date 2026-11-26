@@ -299,17 +299,82 @@
 }
 
 .page-enter {
-  animation: page-hero 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-pop 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) both;
+  transform-origin: 50% 12%;
 }
 
-@keyframes page-hero {
-  from {
+@keyframes page-pop {
+  0% {
     opacity: 0;
-    transform: translateY(16px) scale(0.985);
+    transform: translateY(28px) scale(0.9);
+    filter: blur(6px);
   }
-  to {
+  65% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.02);
+    filter: blur(0);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* Nested glass panels pop in after the page shell */
+.page-enter .glass-card,
+.page-enter .glass-action {
+  animation: panel-pop 0.5s cubic-bezier(0.22, 1.35, 0.36, 1) both;
+}
+
+.page-enter .glass-card:nth-child(1),
+.page-enter .glass-action:nth-child(1) {
+  animation-delay: 70ms;
+}
+.page-enter .glass-card:nth-child(2),
+.page-enter .glass-action:nth-child(2) {
+  animation-delay: 120ms;
+}
+.page-enter .glass-card:nth-child(3),
+.page-enter .glass-action:nth-child(3) {
+  animation-delay: 170ms;
+}
+.page-enter .glass-card:nth-child(4),
+.page-enter .glass-action:nth-child(4) {
+  animation-delay: 220ms;
+}
+.page-enter .glass-card:nth-child(5),
+.page-enter .glass-action:nth-child(5) {
+  animation-delay: 270ms;
+}
+.page-enter .glass-card:nth-child(n + 6),
+.page-enter .glass-action:nth-child(n + 6) {
+  animation-delay: 320ms;
+}
+
+@keyframes panel-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.015);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .page-enter .glass-card,
+  .page-enter .glass-action {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
   }
 }
 
