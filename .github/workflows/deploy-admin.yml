@@ -1,0 +1,69 @@
+# Optional: deploy Next.js admin when apps/web-admin changes.
+# Only runs if EC2_ADMIN_DIR secret is set (path on EC2 with the admin checkout).
+#
+# Secrets (same EC2 as API, plus):
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY
+#   EC2_ADMIN_DIR  — e.g. /home/ubuntu/lms-admin  (git repo of web-admin or monorepo)
+# Optional:
+#   ADMIN_GIT_REF  — branch to pull (default main)
+
+name: Deploy Admin (optional)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web-admin/**"
+      - ".github/workflows/deploy-admin.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-admin-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy-admin:
+    name: Build admin on EC2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip if EC2_ADMIN_DIR not configured
+        id: check
+        env:
+          ADMIN_DIR: ${{ secrets.EC2_ADMIN_DIR }}
+        run: |
+          if [ -z "${ADMIN_DIR:-}" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "EC2_ADMIN_DIR secret empty — admin auto-deploy disabled."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy admin over SSH
+        if: steps.check.outputs.skip != 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          ADMIN_DIR: ${{ secrets.EC2_ADMIN_DIR }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: ADMIN_DIR
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd "$ADMIN_DIR"
+            if [ -d apps/web-admin ]; then
+              git pull --ff-only origin main
+              cd apps/web-admin
+            else
+              git pull --ff-only origin main
+            fi
+            npm install
+            npm run build
+            if pm2 describe lms-admin >/dev/null 2>&1; then
+              pm2 restart lms-admin --update-env
+            else
+              pm2 start npm --name lms-admin -- start
+            fi
+            pm2 save
