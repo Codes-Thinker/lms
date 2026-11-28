@@ -27,9 +27,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   IconData _iconFor(AppNotificationItem n) {
     final type = n.type.toUpperCase();
-    final event = n.data?['event']?.toString();
+    final event = n.data?['event']?.toString().toLowerCase();
     if (type == 'CHAT' || event == 'chat') {
       return Icons.chat_bubble_outline_rounded;
+    }
+    if (event == 'course_updated' || type == 'COURSE') {
+      return Icons.menu_book_outlined;
     }
     switch (type) {
       case 'FEE':
@@ -38,6 +41,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return Icons.fingerprint_rounded;
       case 'TASK':
         return Icons.assignment_outlined;
+      case 'LEAVE':
+        return Icons.event_busy_outlined;
+      case 'QUIZ':
+        return Icons.quiz_outlined;
+      case 'CERTIFICATE':
+        return Icons.workspace_premium_outlined;
+      case 'SYSTEM':
+        return Icons.settings_outlined;
       default:
         return Icons.notifications_none_rounded;
     }
@@ -47,7 +58,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (n.type.toUpperCase() == 'CHAT') return AppBrand.shortName;
     final t = n.title.trim();
     if (t.toLowerCase().contains('admin')) return AppBrand.shortName;
-    return t.isEmpty ? 'Notification' : t;
+    return t.isEmpty ? NotificationRouter.labelForType(n.type) : t;
   }
 
   Future<void> _open(AppNotificationItem n) async {
@@ -61,8 +72,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final courseId = data['courseId']?.toString();
     final leaveId = data['leaveId']?.toString();
     final event = data['event']?.toString();
-    final isStaff = context.read<AuthProvider>().isStaff;
-    final isStudent = context.read<AuthProvider>().isStudent;
 
     NotificationRouter.setPending(
       type: type,
@@ -74,6 +83,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       event: event,
     );
 
+    // Close inbox first so deep-link sits on AppShell — back stays in app.
+    final handler = NotificationRouter.shellHandler;
+    if (handler != null) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      handler(type);
+      return;
+    }
+
+    final isStaff = context.read<AuthProvider>().isStaff;
+    final isStudent = context.read<AuthProvider>().isStudent;
     await NotificationRouter.openDeepLink(
       context,
       type: type,

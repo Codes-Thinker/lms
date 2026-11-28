@@ -19,6 +19,7 @@ import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
+import '../../widgets/recent_notifications_panel.dart';
 import '../course/all_courses_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -643,6 +644,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       );
                     },
                   ),
+                ),
+              ),
+
+              // Live inbox on dashboard
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(pad, 16, pad, 0),
+                sliver: const SliverToBoxAdapter(
+                  child: RecentNotificationsPanel(),
                 ),
               ),
 

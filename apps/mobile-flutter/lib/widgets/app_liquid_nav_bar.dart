@@ -9,11 +9,13 @@ class AppLiquidNavItem {
   final IconData? icon;
   final String label;
   final bool useBrandMark;
+  final int badgeCount;
 
   const AppLiquidNavItem({
     this.icon,
     required this.label,
     this.useBrandMark = false,
+    this.badgeCount = 0,
   });
 }
 
@@ -202,15 +204,58 @@ class _AppLiquidNavBarState extends State<AppLiquidNavBar> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    item.useBrandMark
-                                        ? BrandMark(size: selected ? 24 : 22)
-                                        : Icon(
-                                            item.icon,
-                                            size: 21,
-                                            color: selected || near
-                                                ? AppColors.blue
-                                                : AppColors.muted,
+                                    Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        item.useBrandMark
+                                            ? BrandMark(
+                                                size: selected ? 24 : 22,
+                                              )
+                                            : Icon(
+                                                item.icon,
+                                                size: 21,
+                                                color: selected || near
+                                                    ? AppColors.blue
+                                                    : AppColors.muted,
+                                              ),
+                                        if (item.badgeCount > 0)
+                                          Positioned(
+                                            right: -10,
+                                            top: -6,
+                                            child: Container(
+                                              constraints: const BoxConstraints(
+                                                minWidth: 16,
+                                                minHeight: 16,
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.danger,
+                                                borderRadius:
+                                                    BorderRadius.circular(100),
+                                                border: Border.all(
+                                                  color: Colors.white,
+                                                  width: 1.5,
+                                                ),
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Text(
+                                                item.badgeCount > 9
+                                                    ? '9+'
+                                                    : '${item.badgeCount}',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w800,
+                                                  height: 1.1,
+                                                ),
+                                              ),
+                                            ),
                                           ),
+                                      ],
+                                    ),
                                     const SizedBox(height: 2),
                                     AnimatedDefaultTextStyle(
                                       duration: AppMotion.fast,

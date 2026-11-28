@@ -114,6 +114,12 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onBack() {
+    // Nested / overlay routes (task, leave, chat) — pop those first.
+    final root = Navigator.of(context, rootNavigator: true);
+    if (root.canPop()) {
+      root.pop();
+      return;
+    }
     if (_index.value > 0) {
       _lastBackAt = null;
       _goTo(0);
@@ -158,10 +164,15 @@ class _AppShellState extends State<AppShell> {
       const ProfileScreen(),
     ];
 
+    final notes = context.watch<NotificationProvider>();
+    final isStudent = auth.isStudent;
+    int tabBadge(int tab) => notes.unreadForTab(tab, isStudent: isStudent);
+
     final items = <AppLiquidNavItem>[
       AppLiquidNavItem(
         label: auth.isStudent ? 'Dashboard' : 'Home',
         useBrandMark: true,
+        badgeCount: tabBadge(0),
       ),
       AppLiquidNavItem(
         icon: CupertinoIcons.checkmark_seal_fill,
@@ -170,25 +181,37 @@ class _AppShellState extends State<AppShell> {
             : auth.isStaff
                 ? 'Staff'
                 : 'Assignments',
+        badgeCount: tabBadge(1),
       ),
       if (auth.isStudent)
-        const AppLiquidNavItem(
+        AppLiquidNavItem(
           icon: CupertinoIcons.creditcard_fill,
           label: 'Fees',
+          badgeCount: tabBadge(2),
         )
       else
-        const AppLiquidNavItem(icon: Icons.fingerprint, label: 'Attend'),
+        AppLiquidNavItem(
+          icon: Icons.fingerprint,
+          label: 'Attend',
+          badgeCount: tabBadge(2),
+        ),
       if (auth.isStudent)
-        const AppLiquidNavItem(
+        AppLiquidNavItem(
           icon: CupertinoIcons.book_fill,
           label: 'Courses',
+          badgeCount: tabBadge(3),
         )
       else
-        const AppLiquidNavItem(
+        AppLiquidNavItem(
           icon: CupertinoIcons.chat_bubble_2_fill,
           label: 'Help',
+          badgeCount: tabBadge(3),
         ),
-      const AppLiquidNavItem(icon: CupertinoIcons.person_fill, label: 'Profile'),
+      AppLiquidNavItem(
+        icon: CupertinoIcons.person_fill,
+        label: 'Profile',
+        badgeCount: tabBadge(4),
+      ),
     ];
 
     return PopScope(

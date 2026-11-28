@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import '../core/notification_router.dart';
 import '../services/api_client.dart';
 import '../services/local_cache.dart';
 
@@ -23,6 +26,8 @@ class AppNotificationItem {
     this.data,
   });
 
+  String? get event => data?['event']?.toString();
+
   factory AppNotificationItem.fromJson(Map<String, dynamic> json) {
     return AppNotificationItem(
       id: json['id'] as String,
@@ -41,6 +46,28 @@ class AppNotificationItem {
           : null,
     );
   }
+
+  Map<String, dynamic> toCacheJson() => {
+        'id': id,
+        'title': title,
+        'body': body,
+        'type': type,
+        'read': read,
+        'createdAt': createdAt.toIso8601String(),
+        'userId': targetUserId,
+        'data': data,
+      };
+
+  AppNotificationItem copyWith({bool? read}) => AppNotificationItem(
+        id: id,
+        title: title,
+        body: body,
+        type: type,
+        read: read ?? this.read,
+        createdAt: createdAt,
+        targetUserId: targetUserId,
+        data: data,
+      );
 }
 
 class NotificationProvider extends ChangeNotifier {
@@ -50,6 +77,44 @@ class NotificationProvider extends ChangeNotifier {
   List<AppNotificationItem> get items => List.unmodifiable(_items);
   bool get loading => _loading;
   int get unreadCount => _items.where((n) => !n.read).length;
+
+  List<AppNotificationItem> get recent =>
+      List<AppNotificationItem>.unmodifiable(_items.take(8));
+
+  /// Unread count for a bottom-nav tab (student vs staff layouts).
+  int unreadForTab(int tab, {required bool isStudent}) {
+    return _items.where((n) {
+      if (n.read) return false;
+      final mapped = NotificationRouter.tabForType(
+        n.type,
+        event: n.event,
+        isStudent: isStudent,
+      );
+      return mapped == tab;
+    }).length;
+  }
+
+  /// Instant inbox update from Socket.IO (before full reload).
+  void upsertLive(Map<String, dynamic> raw) {
+    final id = raw['id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final item = AppNotificationItem.fromJson({
+      ...raw,
+      'read': raw['read'] ?? false,
+      'createdAt':
+          raw['createdAt'] ?? DateTime.now().toUtc().toIso8601String(),
+    });
+    _items = [item, ..._items.where((n) => n.id != id)];
+    notifyListeners();
+    unawaited(_persist());
+  }
+
+  Future<void> _persist() async {
+    await LocalCache.setJson(
+      LocalCache.notifications,
+      _items.map((n) => n.toCacheJson()).toList(),
+    );
+  }
 
   Future<void> load() async {
     _loading = true;
@@ -86,78 +151,18 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> markRead(String id) async {
     try {
       await ApiClient.instance.post('/notifications/$id/read');
-      _items = _items
-          .map(
-            (n) => n.id == id
-                ? AppNotificationItem(
-                    id: n.id,
-                    title: n.title,
-                    body: n.body,
-                    type: n.type,
-                    read: true,
-                    createdAt: n.createdAt,
-                    targetUserId: n.targetUserId,
-                    data: n.data,
-                  )
-                : n,
-          )
-          .toList();
+      _items = _items.map((n) => n.id == id ? n.copyWith(read: true) : n).toList();
       notifyListeners();
-      await LocalCache.setJson(
-        LocalCache.notifications,
-        _items
-            .map(
-              (n) => {
-                'id': n.id,
-                'title': n.title,
-                'body': n.body,
-                'type': n.type,
-                'read': n.read,
-                'createdAt': n.createdAt.toIso8601String(),
-                'userId': n.targetUserId,
-                'data': n.data,
-              },
-            )
-            .toList(),
-      );
+      await _persist();
     } catch (_) {}
   }
 
   Future<void> markAllRead() async {
     try {
       await ApiClient.instance.post('/notifications/read-all');
-      _items = _items
-          .map(
-            (n) => AppNotificationItem(
-              id: n.id,
-              title: n.title,
-              body: n.body,
-              type: n.type,
-              read: true,
-              createdAt: n.createdAt,
-              targetUserId: n.targetUserId,
-              data: n.data,
-            ),
-          )
-          .toList();
+      _items = _items.map((n) => n.copyWith(read: true)).toList();
       notifyListeners();
-      await LocalCache.setJson(
-        LocalCache.notifications,
-        _items
-            .map(
-              (n) => {
-                'id': n.id,
-                'title': n.title,
-                'body': n.body,
-                'type': n.type,
-                'read': n.read,
-                'createdAt': n.createdAt.toIso8601String(),
-                'userId': n.targetUserId,
-                'data': n.data,
-              },
-            )
-            .toList(),
-      );
+      await _persist();
     } catch (_) {}
   }
 }

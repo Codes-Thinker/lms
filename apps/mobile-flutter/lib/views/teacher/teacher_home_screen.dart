@@ -16,6 +16,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/recent_notifications_panel.dart';
 import '../attendance/attendance_screen.dart';
 import '../course/all_courses_screen.dart';
 import '../help/help_hub_screen.dart';
@@ -354,6 +355,13 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                     ),
                   ],
                 ),
+              ),
+            ),
+
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
+              sliver: const SliverToBoxAdapter(
+                child: RecentNotificationsPanel(),
               ),
             ),
 

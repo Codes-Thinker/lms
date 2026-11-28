@@ -237,6 +237,9 @@ class NotificationRouter {
       if (resolvedFee != null && resolvedFee.isNotEmpty) {
         nav.push(AppMotion.cover(FeeChatScreen(caseId: resolvedFee)));
         setTabUnderCover();
+      } else if (isStudent && !isStaff) {
+        // Fees is already a shell tab — don't push a duplicate screen.
+        goToTab(tab);
       } else {
         nav.push(AppMotion.cover(const FeesScreen()));
         setTabUnderCover();

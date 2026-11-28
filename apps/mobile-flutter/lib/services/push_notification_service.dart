@@ -223,7 +223,7 @@ class PushNotificationService {
       'courseId': pick('courseId'),
       'leaveId': pick('leaveId'),
       'event': pick('event'),
-      'notificationId': pick('notificationId'),
+      'notificationId': pick('notificationId') ?? pick('id'),
     };
   }
 

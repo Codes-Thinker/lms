@@ -177,7 +177,19 @@ class RealtimeService {
     final notificationId = map['id']?.toString();
 
     final notes = _notes;
-    if (notes != null) unawaited(notes.load());
+    if (notes != null) {
+      notes.upsertLive({
+        'id': notificationId ?? 'live-${DateTime.now().millisecondsSinceEpoch}',
+        'title': title,
+        'body': body,
+        'type': type,
+        'read': false,
+        'createdAt':
+            map['createdAt']?.toString() ?? DateTime.now().toUtc().toIso8601String(),
+        'data': dataMap,
+      });
+      unawaited(notes.load());
+    }
     if (type == 'CHAT') {
       final support = _support;
       if (support != null) unawaited(support.loadAdminChat(silent: true));
