@@ -9,6 +9,7 @@ class TeachingStudent {
   final String? batch;
   final String accountType;
   final String status;
+  final String? profileImage;
 
   const TeachingStudent({
     required this.id,
@@ -18,6 +19,7 @@ class TeachingStudent {
     this.batch,
     required this.accountType,
     required this.status,
+    this.profileImage,
   });
 
   factory TeachingStudent.fromJson(Map<String, dynamic> j) => TeachingStudent(
@@ -28,6 +30,7 @@ class TeachingStudent {
         batch: j['batch']?.toString(),
         accountType: j['accountType']?.toString() ?? 'STUDENT',
         status: j['status']?.toString() ?? 'ACTIVE',
+        profileImage: j['profileImage']?.toString(),
       );
 }
 

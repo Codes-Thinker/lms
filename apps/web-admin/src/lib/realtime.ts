@@ -24,6 +24,7 @@ export function connectAdminRealtime(opts: {
   onNotification?: (payload: Record<string, unknown>) => void;
   onChatMessage?: (payload: Record<string, unknown>) => void;
   onLeaveUpdated?: (payload: Record<string, unknown>) => void;
+  onProfileUpdated?: (payload: Record<string, unknown>) => void;
 }): () => void {
   const origin = apiOrigin();
   if (!origin) return () => {};
@@ -62,6 +63,15 @@ export function connectAdminRealtime(opts: {
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("lms:leave-updated", { detail: payload })
+      );
+    }
+  });
+
+  socket.on("profile:updated", (payload: Record<string, unknown>) => {
+    opts.onProfileUpdated?.(payload);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("lms:profile-updated", { detail: payload })
       );
     }
   });

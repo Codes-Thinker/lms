@@ -88,6 +88,7 @@ function mapStudent(u: Record<string, unknown>): StudentRow {
     batchName: (u.batchName as string) || null,
     status: String(u.status || "-"),
     progressPercent: Number(u.progressPercent ?? 0),
+    profileImage: (u.profileImage as string) || null,
     courses,
   };
 }
@@ -206,6 +207,28 @@ function StudentsPageInner() {
     }
     void refresh();
   }, [courseParam, page, qFromUrl, refresh]);
+
+  useEffect(() => {
+    const onProfile = (ev: Event) => {
+      const detail = (ev as CustomEvent<Record<string, unknown>>).detail;
+      const userId = String(detail?.userId || "");
+      const nextImage =
+        detail?.profileImage === undefined
+          ? undefined
+          : ((detail.profileImage as string | null) ?? null);
+      if (!userId || nextImage === undefined) {
+        void refresh();
+        return;
+      }
+      setList((prev) =>
+        prev.map((s) =>
+          s.id === userId ? { ...s, profileImage: nextImage } : s
+        )
+      );
+    };
+    window.addEventListener("lms:profile-updated", onProfile);
+    return () => window.removeEventListener("lms:profile-updated", onProfile);
+  }, [refresh]);
 
   const tabs = useMemo(
     () => [{ id: "all", title: "All Students", category: "" }, ...courses],

@@ -786,20 +786,20 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
           child: Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F1FF),
-                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFEEF4FF),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  CupertinoIcons.time,
-                  size: 18,
+                  Icons.school_rounded,
+                  size: 20,
                   color: _royal,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,9 +812,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         fontWeight: FontWeight.w700,
                         fontSize: 14.5,
                         color: _navy,
+                        height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
                       maxLines: 1,
@@ -823,6 +824,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         color: _slate,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
+                        height: 1.2,
                       ),
                     ),
                   ],
@@ -831,10 +833,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
               const SizedBox(width: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: _royal,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(9),
                 ),
                 child: const Text(
                   'Open',
@@ -842,6 +844,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
+                    height: 1,
                   ),
                 ),
               ),

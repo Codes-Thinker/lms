@@ -201,6 +201,28 @@ function UsersPageInner() {
   }, [qFromUrl]);
 
   useEffect(() => {
+    const onProfile = (ev: Event) => {
+      const detail = (ev as CustomEvent<Record<string, unknown>>).detail;
+      const userId = String(detail?.userId || "");
+      const nextImage =
+        detail?.profileImage === undefined
+          ? undefined
+          : ((detail.profileImage as string | null) ?? null);
+      if (!userId || nextImage === undefined) {
+        void load();
+        return;
+      }
+      setItems((prev) =>
+        prev.map((u) =>
+          u.id === userId ? { ...u, profileImage: nextImage } : u
+        )
+      );
+    };
+    window.addEventListener("lms:profile-updated", onProfile);
+    return () => window.removeEventListener("lms:profile-updated", onProfile);
+  }, [load]);
+
+  useEffect(() => {
     if (form.accountType !== "STUDENT") return;
     const monthly = Number(studentFee.monthlyFee);
     const months = Number(studentFee.courseDurationMonths);

@@ -18,6 +18,7 @@ import { canChangeAccountType } from "../common/production-guards";
 import { MailService } from "../mail/mail.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { CreateUserDto, ListUsersQueryDto, UpdateUserDto } from "./users.dto";
 
 @Injectable()
@@ -26,7 +27,8 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
-    private readonly notifications: NotificationsService
+    private readonly notifications: NotificationsService,
+    private readonly realtime: RealtimeGateway
   ) {}
 
   async listBatches() {
@@ -850,7 +852,15 @@ export class UsersService {
           : {}),
       },
     });
-    return this.getById(userId);
+    const updated = await this.getById(userId);
+    if (profileImage !== undefined) {
+      this.realtime.emitToAdmins("profile:updated", {
+        userId,
+        profileImage: updated.profileImage ?? null,
+        name: updated.name,
+      });
+    }
+    return updated;
   }
 
   async update(

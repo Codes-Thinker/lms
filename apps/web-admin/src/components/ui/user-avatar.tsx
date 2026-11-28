@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { initials, roleTone } from "@/lib/roles";
 
@@ -25,17 +28,24 @@ export function UserAvatar({
   size = "md",
   className,
 }: Props) {
-  if (src) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+  const showPhoto = Boolean(src) && !broken;
+
+  if (showPhoto) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={src}
+        src={src!}
         alt={name || email || "User"}
         className={cn(
           "shrink-0 rounded-full object-cover",
           sizes[size],
           className
         )}
+        onError={() => setBroken(true)}
       />
     );
   }

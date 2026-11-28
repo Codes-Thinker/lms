@@ -440,6 +440,7 @@ function StaffPageInner() {
                           name={s.name}
                           email={s.email}
                           accountType="STAFF"
+                          src={s.profileImage}
                           size="sm"
                         />
                         {s.name}

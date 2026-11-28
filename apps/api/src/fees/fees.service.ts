@@ -87,6 +87,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
       id: f.id,
       studentId: f.studentId,
       studentName: f.student.fullName,
+      profileImage: f.student.profileImage ?? null,
       courseId: f.courseId,
       courseTitle: f.courseTitle,
       batch: f.student.batch?.code ?? f.course?.batchLabel ?? null,
@@ -133,6 +134,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
         student: {
           select: {
             fullName: true,
+            profileImage: true,
             monthlyFee: true,
             totalCourseFee: true,
             courseDurationMonths: true,

@@ -276,30 +276,24 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> setAvatarPath(String path) async {
     if (_user == null) return;
+
+    // Upload first so admin / other devices get the same photo; then keep local cache.
+    final raw = await File(path).readAsBytes();
+    final dataUrl = await ImageCompressService.toDataUrl(raw, maxSide: 512);
+    final data = await ApiClient.instance.patch(
+      '/users/me',
+      body: {'profileImage': dataUrl},
+    ) as Map<String, dynamic>;
+    final updated = AppUser.fromApi(data);
+    _user = updated;
     await AvatarService.savePath(_user!.id, path);
     _avatarPath = path;
-    notifyListeners();
-
-    // Upload compressed photo so admin dashboard shows the same image.
-    try {
-      final raw = await File(path).readAsBytes();
-      final dataUrl = await ImageCompressService.toDataUrl(raw, maxSide: 800);
-      final data = await ApiClient.instance.patch(
-        '/users/me',
-        body: {'profileImage': dataUrl},
-      ) as Map<String, dynamic>;
-      final updated = AppUser.fromApi(data);
-      _user = updated;
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(_kToken);
-      if (token != null) {
-        await _persist(token, updated.toJson());
-      }
-      notifyListeners();
-    } catch (e) {
-      debugPrint('Avatar upload failed: $e');
-      rethrow;
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_kToken);
+    if (token != null) {
+      await _persist(token, updated.toJson());
     }
+    notifyListeners();
   }
 
   /// Hard-delete on server, then wipe local session — email/password stop working.

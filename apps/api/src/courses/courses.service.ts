@@ -1000,6 +1000,7 @@ export class CoursesService {
                 phone: true,
                 accountType: true,
                 status: true,
+                profileImage: true,
                 batch: { select: { code: true, name: true } },
               },
             },
@@ -1025,6 +1026,7 @@ export class CoursesService {
         phone: e.user.phone,
         accountType: e.user.accountType,
         status: e.user.status,
+        profileImage: e.user.profileImage ?? null,
         batch: e.user.batch?.code ?? c.batchLabel,
       })),
     }));

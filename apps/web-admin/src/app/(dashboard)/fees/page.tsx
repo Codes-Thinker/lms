@@ -31,6 +31,7 @@ type FeeRow = {
   id: string;
   studentId: string;
   studentName: string;
+  profileImage?: string | null;
   courseId?: string;
   courseTitle: string;
   batch?: string | null;
@@ -150,9 +151,14 @@ function FeesPageInner() {
     const id = window.setInterval(() => {
       load().catch(() => {});
     }, 15000);
+    const onProfile = () => {
+      load().catch(() => {});
+    };
+    window.addEventListener("lms:profile-updated", onProfile);
     return () => {
       cancelled = true;
       window.clearInterval(id);
+      window.removeEventListener("lms:profile-updated", onProfile);
     };
   }, [load, show]);
 
@@ -348,6 +354,7 @@ function FeesPageInner() {
                       <UserAvatar
                         name={r.studentName}
                         accountType="STUDENT"
+                        src={r.profileImage}
                         size="sm"
                       />
                       <span className="truncate">{r.studentName}</span>
@@ -450,6 +457,7 @@ function FeesPageInner() {
                   <UserAvatar
                     name={r.studentName}
                     accountType="STUDENT"
+                    src={r.profileImage}
                     size="sm"
                   />
                   <span className="truncate">{r.studentName}</span>

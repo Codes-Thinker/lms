@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/app_loader.dart';
+import '../../widgets/profile_avatar.dart';
 import 'assignment_chat_screen.dart';
 
 /// Teacher: course filter tabs + Students / Assignments + assign sheet.
@@ -637,15 +638,10 @@ class _StudentsTab extends StatelessWidget {
             ),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.softBlue,
-                  child: Text(
-                    s.name.isNotEmpty ? s.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: AppColors.blue,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                ProfileAvatar(
+                  name: s.name,
+                  profileImage: s.profileImage,
+                  radius: 20,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

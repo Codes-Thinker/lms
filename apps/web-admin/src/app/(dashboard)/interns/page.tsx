@@ -44,6 +44,7 @@ type InternRow = {
   status: string;
   internshipStart?: string | null;
   internshipEnd?: string | null;
+  profileImage?: string | null;
   projects: InternProject[];
 };
 
@@ -109,6 +110,7 @@ function mapIntern(u: Record<string, unknown>): InternRow {
     status: String(u.status || "-"),
     internshipStart: (u.internshipStart as string) || null,
     internshipEnd: (u.internshipEnd as string) || null,
+    profileImage: (u.profileImage as string) || null,
     projects,
   };
 }
@@ -178,6 +180,28 @@ export default function InternsPage() {
     }
     refresh().catch((e) => show(e instanceof Error ? e.message : "Load failed"));
   }, [refresh, show]);
+
+  useEffect(() => {
+    const onProfile = (ev: Event) => {
+      const detail = (ev as CustomEvent<Record<string, unknown>>).detail;
+      const userId = String(detail?.userId || "");
+      const nextImage =
+        detail?.profileImage === undefined
+          ? undefined
+          : ((detail.profileImage as string | null) ?? null);
+      if (!userId || nextImage === undefined) {
+        void refresh().catch(() => {});
+        return;
+      }
+      setInterns((prev) =>
+        prev.map((i) =>
+          i.id === userId ? { ...i, profileImage: nextImage } : i
+        )
+      );
+    };
+    window.addEventListener("lms:profile-updated", onProfile);
+    return () => window.removeEventListener("lms:profile-updated", onProfile);
+  }, [refresh]);
 
   function projectSummaryFor(internId: string) {
     const fromUser = interns.find((i) => i.id === internId)?.projects ?? [];
@@ -302,6 +326,7 @@ export default function InternsPage() {
                           name={i.name}
                           email={i.email}
                           accountType="INTERN"
+                          src={i.profileImage}
                           size="sm"
                         />
                         {i.name}

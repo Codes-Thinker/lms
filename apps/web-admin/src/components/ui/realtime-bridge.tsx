@@ -73,6 +73,13 @@ export function RealtimeBridge() {
           window.dispatchEvent(new CustomEvent("lms:leave-updated"));
         }
       },
+      onProfileUpdated: (payload) => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("lms:profile-updated", { detail: payload })
+          );
+        }
+      },
     });
   }, [push, refresh, refreshChat, refreshActivity, show]);
 
