@@ -69,6 +69,16 @@ export class AttendanceService implements OnModuleInit {
     return new Date(Date.UTC(y, m - 1, d));
   }
 
+  /** Parse YYYY-MM-DD as UTC calendar date (matches Prisma @db.Date storage). */
+  private parseDateKey(dateStr?: string | null): Date {
+    if (!dateStr?.trim()) return this.todayDate();
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+    if (!m) return this.todayDate();
+    return new Date(
+      Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])),
+    );
+  }
+
   private isLate(now: Date, shiftStart: string | null): boolean {
     const [h, m] = (shiftStart ?? "10:00").split(":").map(Number);
     // 5-minute grace after shift start
@@ -97,24 +107,17 @@ export class AttendanceService implements OnModuleInit {
   }) {
     const where: Record<string, unknown> = {};
     if (filters?.date) {
-      const d = new Date(filters.date);
-      d.setHours(0, 0, 0, 0);
-      where.date = d;
+      where.date = this.parseDateKey(filters.date);
     }
     if (filters?.startDate && filters?.endDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      where.date = { gte: start, lte: end };
+      where.date = {
+        gte: this.parseDateKey(filters.startDate),
+        lte: this.parseDateKey(filters.endDate),
+      };
     } else if (filters?.startDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      where.date = { gte: start };
+      where.date = { gte: this.parseDateKey(filters.startDate) };
     } else if (filters?.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      where.date = { lte: end };
+      where.date = { lte: this.parseDateKey(filters.endDate) };
     }
     if (filters?.accountType) {
       where.user = { accountType: filters.accountType };
@@ -134,6 +137,7 @@ export class AttendanceService implements OnModuleInit {
         course: true,
         user: {
           include: {
+            batch: true,
             enrollments: {
               include: { course: { select: { id: true, title: true, category: true } } },
             },
@@ -151,13 +155,7 @@ export class AttendanceService implements OnModuleInit {
    * student for the selected course (or all marked attendance when All).
    */
   async board(filters?: { date?: string; courseId?: string }) {
-    const day = filters?.date
-      ? (() => {
-          const d = new Date(filters.date!);
-          d.setHours(0, 0, 0, 0);
-          return d;
-        })()
-      : this.todayDate();
+    const day = this.parseDateKey(filters?.date);
     const dateStr = day.toISOString().slice(0, 10);
 
     // Every course added in admin becomes a tab (even with 0 enrollments).
