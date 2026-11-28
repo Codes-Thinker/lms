@@ -55,6 +55,7 @@ export class FeesService implements OnModuleInit, OnModuleDestroy {
     paymentScreenshotData?: string | null;
     student: {
       fullName: string;
+      profileImage?: string | null;
       batch?: { code: string; name: string } | null;
       courseDurationMonths?: number | null;
       totalCourseFee?: number | null;
