@@ -20,6 +20,7 @@ import '../../widgets/app_loader.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/course_cover.dart';
 import '../../widgets/recent_notifications_panel.dart';
+import '../../widgets/unread_count_badge.dart';
 import '../course/all_courses_screen.dart';
 import '../course/course_detail_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -171,6 +172,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return auth.user?.roleLabel ?? '';
     }();
     final unread = notes.unreadCount;
+    final taskUnread = notes.unreadForTypes(const ['TASK']);
+    final feeUnread = notes.unreadForTypes(const ['FEE']);
     final totalAssigned = myTasks.length;
     final completed = tasks.completedCountFor(userId);
     final pending = tasks.pendingCountFor(userId);
@@ -548,6 +551,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           icon: CupertinoIcons.doc_on_clipboard_fill,
                           label: 'Assignments',
                           value: '$totalAssigned',
+                          badge: taskUnread,
                           onTap: () =>
                               context.read<UiProvider>().setNavIndex(1),
                         ),
@@ -564,6 +568,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           value: pending > 0
                               ? '$pending'
                               : '$inProgress',
+                          badge: pending > 0 ? taskUnread : 0,
                           onTap: () =>
                               context.read<UiProvider>().setNavIndex(1),
                         ),
@@ -573,6 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           value: feeDue <= 0
                               ? 'Clear'
                               : 'Rs ${_fmtMoney(feeDue)}',
+                          badge: feeUnread,
                           onTap: () =>
                               context.read<UiProvider>().setNavIndex(2),
                         ),
@@ -913,6 +919,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     required String label,
     required String value,
     VoidCallback? onTap,
+    int badge = 0,
   }) {
     return Material(
       color: Colors.transparent,
@@ -938,7 +945,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: 15, color: _statAccent),
+                Row(
+                  children: [
+                    Icon(icon, size: 15, color: _statAccent),
+                    const Spacer(),
+                    UnreadCountBadge(count: badge, compact: true),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 Text(
                   value,

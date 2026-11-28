@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -16,6 +18,7 @@ import '../../providers/ui_provider.dart';
 import '../../services/avatar_service.dart';
 import '../../services/office_location_service.dart';
 import '../../services/push_notification_service.dart';
+import '../../widgets/unread_count_badge.dart';
 import '../ai/ai_coach_screen.dart';
 import '../auth/login_screen.dart';
 import '../certificates/certificates_screen.dart';
@@ -249,6 +252,10 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final courses = context.watch<CourseProvider>();
+    final notes = context.watch<NotificationProvider>();
+    final leaveUnread = notes.unreadForTypes(const ['LEAVE']);
+    final attendanceUnread = notes.unreadForTypes(const ['ATTENDANCE']);
+    final chatUnread = notes.unreadForTypes(const ['CHAT']);
     final avatarImage = auth.avatarImage;
     final pad = AppResponsive.pagePad(context);
     final bottom = AppResponsive.shellBottom(context);
@@ -503,6 +510,11 @@ class ProfileScreen extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
+                  unawaited(
+                    context.read<NotificationProvider>().markTypesRead(
+                      const ['LEAVE'],
+                    ),
+                  );
                   Navigator.of(context).push(
                     AppMotion.fadeSlide(const LeaveScreen()),
                   );
@@ -514,12 +526,12 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppColors.line),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(CupertinoIcons.calendar_badge_minus,
+                      const Icon(CupertinoIcons.calendar_badge_minus,
                           color: AppColors.blue),
-                      SizedBox(width: 12),
-                      Expanded(
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -541,7 +553,10 @@ class ProfileScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                      UnreadCountBadge(count: leaveUnread),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.muted),
                     ],
                   ),
                 ),
@@ -554,6 +569,11 @@ class ProfileScreen extends StatelessWidget {
               child: InkWell(
                 borderRadius: BorderRadius.circular(18),
                 onTap: () {
+                  unawaited(
+                    context.read<NotificationProvider>().markTypesRead(
+                      const ['ATTENDANCE'],
+                    ),
+                  );
                   Navigator.of(context).push(
                     AppMotion.fadeSlide(const AttendanceScreen()),
                   );
@@ -565,11 +585,11 @@ class ProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppColors.line),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.fingerprint, color: AppColors.blue),
-                      SizedBox(width: 12),
-                      Expanded(
+                      const Icon(Icons.fingerprint, color: AppColors.blue),
+                      const SizedBox(width: 12),
+                      const Expanded(
                         child: Text(
                           'Attendance',
                           style: TextStyle(
@@ -578,7 +598,105 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+                      UnreadCountBadge(count: attendanceUnread),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // Staff / intern: leave + attendance tiles with unread counts
+          if (!auth.isStudent) ...[
+            const SizedBox(height: 24),
+            const _SectionLabel('LEAVE & ATTENDANCE'),
+            const SizedBox(height: 10),
+            Material(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  unawaited(
+                    context.read<NotificationProvider>().markTypesRead(
+                      const ['LEAVE'],
+                    ),
+                  );
+                  Navigator.of(context).push(
+                    AppMotion.fadeSlide(const LeaveScreen()),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(CupertinoIcons.calendar_badge_minus,
+                          color: AppColors.blue),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Leave requests',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      UnreadCountBadge(count: leaveUnread),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.muted),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Material(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  unawaited(
+                    context.read<NotificationProvider>().markTypesRead(
+                      const ['ATTENDANCE'],
+                    ),
+                  );
+                  context.read<UiProvider>().setNavIndex(2);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.fingerprint, color: AppColors.blue),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Attendance',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      UnreadCountBadge(count: attendanceUnread),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.muted),
                     ],
                   ),
                 ),
@@ -663,10 +781,20 @@ class ProfileScreen extends StatelessWidget {
             return links.asMap().entries.map((entry) {
             final item = entry.value;
             final isLast = entry.key == links.length - 1;
+            final isChat = item.$1.toLowerCase().contains('chat');
             return Column(
               children: [
                 InkWell(
-                  onTap: item.$4,
+                  onTap: () {
+                    if (isChat) {
+                      unawaited(
+                        context
+                            .read<NotificationProvider>()
+                            .markTypesRead(const ['CHAT']),
+                      );
+                    }
+                    item.$4();
+                  },
                   borderRadius: BorderRadius.circular(12),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -714,6 +842,7 @@ class ProfileScreen extends StatelessWidget {
                             ],
                           ),
                         ),
+                        if (isChat) UnreadCountBadge(count: chatUnread),
                         const SizedBox(width: 8),
                         const Icon(
                           CupertinoIcons.chevron_forward,

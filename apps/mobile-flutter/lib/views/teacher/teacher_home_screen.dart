@@ -15,8 +15,10 @@ import '../../providers/course_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
+import '../../providers/ui_provider.dart';
 import '../../widgets/brand_logo.dart';
 import '../../widgets/recent_notifications_panel.dart';
+import '../../widgets/unread_count_badge.dart';
 import '../attendance/attendance_screen.dart';
 import '../course/all_courses_screen.dart';
 import '../help/help_hub_screen.dart';
@@ -90,6 +92,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         ? track
         : role;
     final unread = notes.unreadCount;
+    final taskUnread = notes.unreadForTypes(const ['TASK']);
+    final attendanceUnread = notes.unreadForTypes(const ['ATTENDANCE']);
+    final chatUnread = notes.unreadForTypes(const ['CHAT']);
     final gap = AppResponsive.isCompact(context) ? 6.0 : 8.0;
     final titleSize = AppResponsive.isCompact(context) ? 11.0 : 12.0;
     final countSize = AppResponsive.isCompact(context) ? 15.0 : 17.0;
@@ -256,6 +261,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                             accent: const Color(0xFF7C3AED),
                             titleSize: titleSize,
                             countSize: countSize,
+                            badge: taskUnread,
+                            onTap: () =>
+                                context.read<UiProvider>().setNavIndex(1),
                           ),
                         ),
                       ],
@@ -282,6 +290,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                             accent: const Color(0xFF0D9488),
                             titleSize: titleSize,
                             countSize: countSize,
+                            badge: taskUnread,
+                            onTap: () =>
+                                context.read<UiProvider>().setNavIndex(1),
                           ),
                         ),
                         SizedBox(width: gap),
@@ -293,6 +304,9 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                             accent: const Color(0xFFDC2626),
                             titleSize: titleSize,
                             countSize: countSize,
+                            badge: attendanceUnread,
+                            onTap: () =>
+                                context.read<UiProvider>().setNavIndex(2),
                           ),
                         ),
                       ],
@@ -333,13 +347,28 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         _actionChip(
                           'Attendance',
                           icon: Icons.fingerprint_rounded,
-                          onTap: () =>
-                              _push(context, const AttendanceScreen()),
+                          badge: attendanceUnread,
+                          onTap: () {
+                            unawaited(
+                              context
+                                  .read<NotificationProvider>()
+                                  .markTypesRead(const ['ATTENDANCE']),
+                            );
+                            _push(context, const AttendanceScreen());
+                          },
                         ),
                         _actionChip(
                           'My tasks',
                           icon: Icons.task_alt_rounded,
-                          onTap: () => _push(context, const TasksScreen()),
+                          badge: taskUnread,
+                          onTap: () {
+                            unawaited(
+                              context
+                                  .read<NotificationProvider>()
+                                  .markTypesRead(const ['TASK']),
+                            );
+                            _push(context, const TasksScreen());
+                          },
                         ),
                         _actionChip(
                           'Batch report',
@@ -349,7 +378,15 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                         _actionChip(
                           'Help',
                           icon: Icons.help_outline_rounded,
-                          onTap: () => _push(context, const HelpHubScreen()),
+                          badge: chatUnread,
+                          onTap: () {
+                            unawaited(
+                              context
+                                  .read<NotificationProvider>()
+                                  .markTypesRead(const ['CHAT']),
+                            );
+                            _push(context, const HelpHubScreen());
+                          },
                         ),
                       ],
                     ),
@@ -635,8 +672,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     required Color accent,
     required double titleSize,
     required double countSize,
+    int badge = 0,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
       decoration: BoxDecoration(
@@ -646,16 +685,23 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: accent.withValues(alpha: 0.88),
-              fontSize: titleSize,
-              fontWeight: FontWeight.w600,
-              height: 1.2,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: accent.withValues(alpha: 0.88),
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              UnreadCountBadge(count: badge, compact: true),
+            ],
           ),
           const SizedBox(height: 6),
           FittedBox(
@@ -676,6 +722,16 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
         ],
       ),
     );
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: card,
+      ),
+    );
   }
 
   Widget _actionChip(
@@ -683,6 +739,7 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
     required IconData icon,
     required VoidCallback onTap,
     bool filled = false,
+    int badge = 0,
   }) {
     return Material(
       color: filled ? AppColors.blueDark : Colors.white,
@@ -717,6 +774,10 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                   color: filled ? Colors.white : AppColors.blueDark,
                 ),
               ),
+              if (badge > 0) ...[
+                const SizedBox(width: 6),
+                UnreadCountBadge(count: badge, compact: true),
+              ],
             ],
           ),
         ),

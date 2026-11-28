@@ -94,13 +94,24 @@ class NotificationProvider extends ChangeNotifier {
     }).length;
   }
 
+  /// Unread count for one or more notification types (tiles / icons).
+  int unreadForTypes(Iterable<String> types) {
+    final set = types.map((t) => t.toUpperCase()).toSet();
+    if (set.isEmpty) return 0;
+    return _items
+        .where((n) => !n.read && set.contains(n.type.toUpperCase()))
+        .length;
+  }
+
   /// Instant inbox update from Socket.IO (before full reload).
   void upsertLive(Map<String, dynamic> raw) {
     final id = raw['id']?.toString();
     if (id == null || id.isEmpty) return;
+    final existing = _items.where((n) => n.id == id).firstOrNull;
     final item = AppNotificationItem.fromJson({
       ...raw,
-      'read': raw['read'] ?? false,
+      // Keep optimistic local read so badges don't jump back up.
+      'read': existing?.read == true ? true : (raw['read'] ?? false),
       'createdAt':
           raw['createdAt'] ?? DateTime.now().toUtc().toIso8601String(),
     });
@@ -117,11 +128,12 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    final locallyRead = _items.where((n) => n.read).map((n) => n.id).toSet();
     _loading = true;
     notifyListeners();
 
     final cached = await LocalCache.getList(LocalCache.notifications);
-    if (cached.isNotEmpty) {
+    if (cached.isNotEmpty && _items.isEmpty) {
       _items = cached
           .whereType<Map>()
           .map((e) => AppNotificationItem.fromJson(Map<String, dynamic>.from(e)))
@@ -133,10 +145,16 @@ class NotificationProvider extends ChangeNotifier {
     try {
       final data = await ApiClient.instance.get('/notifications/me');
       if (data is List) {
-        _items = data
-            .map((e) => AppNotificationItem.fromJson(e as Map<String, dynamic>))
-            .toList();
-        await LocalCache.setJson(LocalCache.notifications, data);
+        _items = data.map((e) {
+          final item =
+              AppNotificationItem.fromJson(e as Map<String, dynamic>);
+          // Preserve optimistic mark-as-read until server catches up.
+          if (locallyRead.contains(item.id)) {
+            return item.copyWith(read: true);
+          }
+          return item;
+        }).toList();
+        await _persist();
       }
     } catch (_) {}
     _loading = false;
@@ -148,21 +166,46 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Optimistic — badges / blue dots drop immediately.
   Future<void> markRead(String id) async {
+    final had = _items.any((n) => n.id == id && !n.read);
+    if (!had) return;
+    _items = _items.map((n) => n.id == id ? n.copyWith(read: true) : n).toList();
+    notifyListeners();
+    unawaited(_persist());
     try {
       await ApiClient.instance.post('/notifications/$id/read');
-      _items = _items.map((n) => n.id == id ? n.copyWith(read: true) : n).toList();
-      notifyListeners();
-      await _persist();
     } catch (_) {}
   }
 
   Future<void> markAllRead() async {
+    if (unreadCount == 0) return;
+    _items = _items.map((n) => n.copyWith(read: true)).toList();
+    notifyListeners();
+    unawaited(_persist());
     try {
       await ApiClient.instance.post('/notifications/read-all');
-      _items = _items.map((n) => n.copyWith(read: true)).toList();
-      notifyListeners();
-      await _persist();
     } catch (_) {}
+  }
+
+  Future<void> markTypesRead(Iterable<String> types) async {
+    final set = types.map((t) => t.toUpperCase()).toSet();
+    final ids = _items
+        .where((n) => !n.read && set.contains(n.type.toUpperCase()))
+        .map((n) => n.id)
+        .toList();
+    if (ids.isEmpty) return;
+    _items = _items
+        .map((n) => ids.contains(n.id) ? n.copyWith(read: true) : n)
+        .toList();
+    notifyListeners();
+    unawaited(_persist());
+    for (final id in ids) {
+      unawaited(() async {
+        try {
+          await ApiClient.instance.post('/notifications/$id/read');
+        } catch (_) {}
+      }());
+    }
   }
 }
