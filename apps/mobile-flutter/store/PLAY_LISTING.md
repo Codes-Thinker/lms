@@ -1,11 +1,15 @@
 # Play listing — Code's Thinker LMS
 
-**App name:** Code's Thinker LMS  
-**Package:** com.codesthinker.lms.mobile_flutter  
-**AAB:** ~/Desktop/CodesThinker-LMS-1.2.0.aab (also build/app/outputs/bundle/release/app-release.aab)  
+**Play Console app ID:** `4972643227704410547`  
+**Package:** `com.codesthinker.lms.mobile_flutter`  
+**Version live (Internal testing):** `1.2.0 (2)` — Available to internal testers (28 Nov 2026)  
 **Privacy:** https://www.codesthinkerlms.site/privacy  
-**Icon 512:** apps/mobile-flutter/assets/brand/store/play_store_512.png  
+**AAB:** `~/Desktop/CodesThinker-LMS-1.2.0.aab`  
+**Upload pack:** `~/Desktop/CodesThinker-LMS-PlayUpload/`  
 **Contact:** ayaz@codesthinker.com  
+
+## Console
+https://play.google.com/console/u/0/developers/8232273867127029569/app/4972643227704410547/app-dashboard
 
 ## Short description (≤80 chars)
 Learn, attend, pay fees, and track tasks with Code's Thinker LMS.
@@ -22,13 +26,24 @@ Code's Thinker LMS is the official mobile app for Codes Thinker students, intern
 
 Requires an active Codes Thinker LMS account. Not for public self-signup.
 
-## Data safety (summary)
-- Collected: name, email, phone (optional), profile photo, approximate/precise location for staff office attendance, device IDs for push notifications, app activity (courses, tasks, fees)
-- Shared: with service providers that host API/database/push only
-- Security: data encrypted in transit (HTTPS)
-- Users can request deletion via app or email
+## Status
+- [x] App created under HEPTA FILOS
+- [x] Signed release AAB uploaded
+- [x] Internal testing release published (1.2.0 / versionCode 2)
+- [x] Store listing assets (icon, feature graphic, 4 phone screenshots) + descriptions
+- [x] Privacy policy URL live
+- [ ] Select/create email tester list + share join link (Copy link on Testers tab)
+- [ ] Remaining App content declarations (Ads, Data safety, Target audience, Content ratings, Background location, etc.)
+- [ ] Promote release to Production after declarations
+
+## Data safety (summary for form)
+- Collected: name, email, phone (optional), profile photo, precise location for staff office attendance (incl. background when allowed), device IDs for push, app activity
+- Shared: with hosting/API/push providers only
+- Security: encrypted in transit (HTTPS)
+- Deletion: via app / email
 - Ads: No
 
-## Sensitive permissions
-- Location (including background when allowed): staff office geofence attendance
-- Camera / photos: profile photo and fee screenshots only when user chooses
+## Signing
+Upload keystore is local only (gitignored):
+`apps/mobile-flutter/android/keystore/codesthinker-lms-upload.jks`
+Backup also in personal agent store. Keep passwords from `android/key.properties`.
