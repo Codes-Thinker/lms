@@ -1,0 +1,5 @@
+
+# Never ship credentials
+secrets/
+*.pem
+tsconfig.tsbuildinfo
