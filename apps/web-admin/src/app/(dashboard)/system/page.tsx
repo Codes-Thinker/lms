@@ -28,7 +28,22 @@ type OfficeConfig = {
   staffEndTime: string;
   internStartTime: string;
   internEndTime: string;
+  staffWorkingDays: string;
+  staffOffDays: string;
+  exitGraceMinutes: number;
 };
+
+type HolidayRow = { id: string; date: string; label: string };
+
+const WEEK_DAYS = [
+  { v: 0, label: "Sun" },
+  { v: 1, label: "Mon" },
+  { v: 2, label: "Tue" },
+  { v: 3, label: "Wed" },
+  { v: 4, label: "Thu" },
+  { v: 5, label: "Fri" },
+  { v: 6, label: "Sat" },
+] as const;
 
 const defaultOffice: OfficeConfig = {
   latitude: 29.3931779,
@@ -37,10 +52,13 @@ const defaultOffice: OfficeConfig = {
   timezone: "Asia/Karachi",
   studentStartTime: "09:00",
   studentEndTime: "14:00",
-  staffStartTime: "08:00",
-  staffEndTime: "17:00",
+  staffStartTime: "10:00",
+  staffEndTime: "18:00",
   internStartTime: "10:00",
   internEndTime: "18:00",
+  staffWorkingDays: "0,1,2,3,4,5",
+  staffOffDays: "6",
+  exitGraceMinutes: 2,
 };
 
 type CategoryRow = {
@@ -59,10 +77,35 @@ export default function SystemPage() {
     message: "",
   });
   const [office, setOffice] = useState<OfficeConfig>(defaultOffice);
+  const [holidays, setHolidays] = useState<HolidayRow[]>([]);
+  const [holidayDate, setHolidayDate] = useState("");
+  const [holidayLabel, setHolidayLabel] = useState("");
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [catBusy, setCatBusy] = useState(false);
   const { show } = useSnackbar();
+
+  function workingSet(): Set<number> {
+    return new Set(
+      office.staffWorkingDays
+        .split(",")
+        .map((s) => Number(s.trim()))
+        .filter((n) => Number.isFinite(n))
+    );
+  }
+
+  function toggleWorkingDay(day: number) {
+    const set = workingSet();
+    if (set.has(day)) set.delete(day);
+    else set.add(day);
+    const sorted = Array.from(set).sort((a, b) => a - b);
+    const off = WEEK_DAYS.map((d) => d.v).filter((v) => !set.has(v));
+    setOffice({
+      ...office,
+      staffWorkingDays: sorted.join(","),
+      staffOffDays: off.join(","),
+    });
+  }
 
   async function loadCategories() {
     const rows = await api<CategoryRow[]>("/system/categories/all");
@@ -87,8 +130,14 @@ export default function SystemPage() {
           ...defaultOffice,
           ...o,
           radiusMeters: o.radiusMeters || 50,
+          staffWorkingDays: o.staffWorkingDays || defaultOffice.staffWorkingDays,
+          staffOffDays: o.staffOffDays || defaultOffice.staffOffDays,
+          exitGraceMinutes: o.exitGraceMinutes ?? 2,
         })
       )
+      .catch(() => {});
+    api<HolidayRow[]>("/system/holidays")
+      .then(setHolidays)
       .catch(() => {});
     loadCategories().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -294,6 +343,50 @@ export default function SystemPage() {
             </div>
           ))}
         </div>
+        <div className="space-y-2 rounded-xl border border-slate-100 p-3">
+          <p className="text-sm font-semibold">Staff working days</p>
+          <p className="text-xs text-slate-500">
+            Default Sun–Fri (48h/week at 8h/day). Unchecked days are weekly off.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {WEEK_DAYS.map((d) => {
+              const on = workingSet().has(d.v);
+              return (
+                <button
+                  key={d.v}
+                  type="button"
+                  onClick={() => toggleWorkingDay(d.v)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                    on
+                      ? "bg-blue-600 text-white"
+                      : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="space-y-1.5 pt-2">
+            <Label>Exit grace (minutes)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={30}
+              value={office.exitGraceMinutes}
+              onChange={(e) =>
+                setOffice({
+                  ...office,
+                  exitGraceMinutes: Number(e.target.value) || 0,
+                })
+              }
+            />
+            <p className="text-xs text-slate-500">
+              After leaving the geofence this long, checkout is recorded
+              automatically.
+            </p>
+          </div>
+        </div>
         <Button
           onClick={() =>
             api("/system/office-config", {
@@ -306,6 +399,81 @@ export default function SystemPage() {
         >
           Save attendance settings
         </Button>
+        <div className="space-y-2 border-t border-slate-100 pt-4">
+          <p className="text-sm font-semibold">Public holidays</p>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              type="date"
+              value={holidayDate}
+              onChange={(e) => setHolidayDate(e.target.value)}
+              className="w-auto"
+            />
+            <Input
+              value={holidayLabel}
+              onChange={(e) => setHolidayLabel(e.target.value)}
+              placeholder="Label"
+              className="min-w-[140px] flex-1"
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!holidayDate}
+              onClick={() => {
+                api<HolidayRow>("/system/holidays", {
+                  method: "POST",
+                  body: JSON.stringify({
+                    date: holidayDate,
+                    label: holidayLabel.trim() || "Holiday",
+                  }),
+                })
+                  .then((row) => {
+                    setHolidays((prev) =>
+                      [...prev.filter((h) => h.id !== row.id), row].sort((a, b) =>
+                        a.date.localeCompare(b.date)
+                      )
+                    );
+                    setHolidayDate("");
+                    setHolidayLabel("");
+                    show("Holiday saved");
+                  })
+                  .catch((e) => show(String(e), "error"));
+              }}
+            >
+              Add
+            </Button>
+          </div>
+          <ul className="space-y-1 text-sm">
+            {holidays.map((h) => (
+              <li
+                key={h.id}
+                className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
+              >
+                <span>
+                  {h.date} — {h.label}
+                </span>
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-rose-600"
+                  onClick={() => {
+                    api(`/system/holidays/${h.id}`, { method: "DELETE" })
+                      .then(() => {
+                        setHolidays((prev) =>
+                          prev.filter((x) => x.id !== h.id)
+                        );
+                        show("Holiday removed");
+                      })
+                      .catch((e) => show(String(e), "error"));
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+            {holidays.length === 0 ? (
+              <li className="text-xs text-slate-400">No holidays configured</li>
+            ) : null}
+          </ul>
+        </div>
       </div>
 
       <div className="glass-card max-w-2xl space-y-3 p-5">

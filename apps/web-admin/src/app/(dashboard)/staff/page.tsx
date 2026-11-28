@@ -41,6 +41,17 @@ type TeachingStats = {
   remainingFees: number;
 };
 
+type TodayAttn = {
+  status: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  workedHours: number;
+  missingHours: number;
+  expectedHours: number;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+};
+
 type StaffRow = {
   id: string;
   name: string;
@@ -49,8 +60,10 @@ type StaffRow = {
   track?: string | null;
   designation?: string | null;
   status: string;
+  profileImage?: string | null;
   taughtCourses: TaughtCourse[];
   teachingStats: TeachingStats;
+  today?: TodayAttn | null;
 };
 
 type TaskChat = {
@@ -138,9 +151,23 @@ function mapStaff(u: Record<string, unknown>): StaffRow {
     track: (u.track as string) || null,
     designation: (u.designation as string) || null,
     status: String(u.status || "ACTIVE"),
+    profileImage: (u.profileImage as string) || null,
     taughtCourses: taught,
     teachingStats,
+    today: null,
   };
+}
+
+function fmtTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
 }
 
 function StaffPageInner() {
@@ -184,13 +211,29 @@ function StaffPageInner() {
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const [userRes, taskList] = await Promise.all([
+      const [userRes, taskList, board] = await Promise.all([
         api<{ items: Array<Record<string, unknown>> }>(
           "/users?accountType=STAFF&pageSize=100"
         ),
         api<TaskRow[]>("/tasks"),
+        api<{
+          rows: Array<{
+            userId: string;
+            today: TodayAttn;
+            profileImage?: string | null;
+          }>;
+        }>("/attendance/staff/board").catch(() => ({ rows: [] })),
       ]);
-      const rows = userRes.items.map(mapStaff);
+      const byId = new Map(board.rows.map((r) => [r.userId, r]));
+      const rows = userRes.items.map((u) => {
+        const base = mapStaff(u);
+        const hit = byId.get(base.id);
+        return {
+          ...base,
+          profileImage: hit?.profileImage ?? base.profileImage,
+          today: hit?.today ?? null,
+        };
+      });
       setStaff(rows);
       setTasks(taskList);
       writeListCache<StaffCache>(CACHE_KEY, { staff: rows, tasks: taskList });
@@ -324,9 +367,9 @@ function StaffPageInner() {
     <div className="space-y-6">
       <div className="glass-card flex flex-wrap items-start justify-between gap-3 p-5">
         <div>
-          <h2 className="text-lg font-semibold">Teachers</h2>
+          <h2 className="text-lg font-semibold">Staff / Teachers</h2>
           <p className="text-sm text-slate-500">
-            Teaching staff and live student assignments
+            Attendance hours, teaching load, and assignments
           </p>
           <p className="mt-1 text-xs text-slate-500">
             Set course instructor in{" "}
@@ -357,13 +400,14 @@ function StaffPageInner() {
           <thead className="bg-slate-50/80 text-slate-500">
             <tr>
               <th className="px-5 py-3 font-medium">Name</th>
-              <th className="px-5 py-3 font-medium">Email / Phone</th>
+              <th className="px-5 py-3 font-medium">Email / Role</th>
+              <th className="px-5 py-3 font-medium">Today</th>
+              <th className="px-5 py-3 font-medium">In / Out</th>
+              <th className="px-5 py-3 font-medium">Worked</th>
+              <th className="px-5 py-3 font-medium">Missing</th>
               <th className="px-5 py-3 font-medium">Courses</th>
-              <th className="px-5 py-3 font-medium">Students</th>
-              <th className="px-5 py-3 font-medium">Topics taught</th>
-              <th className="px-5 py-3 font-medium">Student fees</th>
-              <th className="px-5 py-3 font-medium">Status</th>
-              <th className="px-5 py-3 font-medium">Chat</th>
+              <th className="px-5 py-3 font-medium">Account</th>
+              <th className="px-5 py-3 font-medium">Details</th>
             </tr>
           </thead>
           <tbody>
@@ -402,22 +446,43 @@ function StaffPageInner() {
                       </Link>
                       <p className="mt-1 text-[11px] text-slate-500">
                         {[s.track, s.designation].filter(Boolean).join(" · ") ||
-                          "No track"}
+                          "Staff"}
                       </p>
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs">{s.email}</p>
                       <p className="text-xs text-slate-500">
-                        {s.phone?.trim() || "No phone"}
+                        {s.designation || s.phone?.trim() || "—"}
                       </p>
                     </td>
+                    <td className="px-5 py-3.5">
+                      <Badge
+                        variant={
+                          s.today?.status === "COMPLETE" ||
+                          s.today?.status === "AUTO_CHECKOUT"
+                            ? "success"
+                            : s.today?.status === "ABSENT" ||
+                                s.today?.status === "OFF"
+                              ? "outline"
+                              : "warning"
+                        }
+                      >
+                        {s.today?.status ?? "—"}
+                      </Badge>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs text-slate-600">
+                      {fmtTime(s.today?.checkInAt)} / {fmtTime(s.today?.checkOutAt)}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs font-semibold">
+                      {s.today ? `${s.today.workedHours}h` : "—"}
+                    </td>
+                    <td className="px-5 py-3.5 text-xs font-semibold text-rose-600">
+                      {s.today ? `${s.today.missingHours}h` : "—"}
+                    </td>
                     <td
-                      className="max-w-[180px] px-5 py-3.5 text-xs text-slate-600"
+                      className="max-w-[160px] px-5 py-3.5 text-xs text-slate-600"
                       title={courseLine}
                     >
-                      {courseLine}
-                    </td>
-                    <td className="px-5 py-3.5">
                       <button
                         type="button"
                         className="text-left"
@@ -425,48 +490,19 @@ function StaffPageInner() {
                           setExpandedTeacherId(expanded ? null : s.id)
                         }
                       >
-                        <p className="font-semibold text-slate-900">
-                          {stats.studentCount}
-                        </p>
-                        <p className="line-clamp-2 max-w-[160px] text-[11px] text-slate-500">
-                          {studentNames}
-                        </p>
+                        {courseLine}
                       </button>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-slate-900">
-                        {stats.topicsTaught}/{stats.topicsTotal}
-                      </p>
-                      <p
-                        className="line-clamp-2 max-w-[180px] text-[11px] text-slate-500"
-                        title={taughtLine}
-                      >
-                        {taughtLine}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3.5 text-xs">
-                      <p className="font-semibold text-slate-900">
-                        Paid {money(stats.totalPaid)}
-                      </p>
-                      <p className="text-slate-500">
-                        Total {money(stats.totalFees)}
-                      </p>
-                      <p className="text-slate-500">
-                        Left {money(stats.remainingFees)}
-                      </p>
                     </td>
                     <td className="px-5 py-3.5">{accountStatusBadge(s.status)}</td>
                     <td className="px-5 py-3.5">
                       <Button size="sm" variant="secondary" asChild>
-                        <Link href={`/inbox?userId=${encodeURIComponent(s.id)}`}>
-                          Chat
-                        </Link>
+                        <Link href={`/users/${s.id}`}>View details</Link>
                       </Button>
                     </td>
                   </tr>
                   {expanded ? (
                     <tr className="bg-slate-50/70">
-                      <td colSpan={8} className="px-5 py-4">
+                      <td colSpan={9} className="px-5 py-4">
                         <div className="grid gap-4 md:grid-cols-3">
                           <div>
                             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">

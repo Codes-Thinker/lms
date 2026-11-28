@@ -86,6 +86,42 @@ export class MailService {
     });
   }
 
+  async sendTemporaryPassword(input: {
+    to: string;
+    fullName: string;
+    temporaryPassword: string;
+  }): Promise<void> {
+    const fromName =
+      this.config.get<string>("MAIL_FROM_NAME") ?? "Codes Thinker";
+    const fromEmail =
+      this.config.get<string>("MAIL_FROM_EMAIL") ?? "noreply@codesthinker.com";
+    const subject = "Your temporary Codes Thinker LMS password";
+    const text = [
+      `Hello ${input.fullName},`,
+      "",
+      "An administrator generated a temporary password for your LMS account.",
+      "",
+      `Temporary password: ${input.temporaryPassword}`,
+      "",
+      "Sign in with this password, then change it from your profile if possible.",
+      "If you did not expect this email, contact your administrator.",
+      "",
+      "Codes Thinker Software House",
+    ].join("\n");
+
+    if (!this.transporter) {
+      this.log.log(`[dev mail] To: ${input.to}\nSubject: ${subject}\n${text}`);
+      return;
+    }
+
+    await this.transporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: input.to,
+      subject,
+      text,
+    });
+  }
+
   async sendPasswordReset(input: {
     fullName: string;
     email: string;

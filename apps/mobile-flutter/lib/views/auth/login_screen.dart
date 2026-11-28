@@ -30,12 +30,16 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _obscure = ValueNotifier<bool>(true);
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  late final AnimationController _enter;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
 
   @override
   void initState() {
@@ -43,13 +47,24 @@ class _LoginScreenState extends State<LoginScreen> {
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
+        statusBarIconBrightness: Brightness.light,
       ),
     );
+    _enter = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+    );
+    _fade = CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.04),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _enter, curve: Curves.easeOutCubic));
+    _enter.forward();
   }
 
   @override
   void dispose() {
+    _enter.dispose();
     _email.dispose();
     _password.dispose();
     _obscure.dispose();
@@ -90,7 +105,6 @@ class _LoginScreenState extends State<LoginScreen> {
         if (auth.isStaff) teaching.load(),
       ]);
       await PushNotificationService.instance.registerWithBackend();
-      // Start office geofence immediately — do not wait for Attend tab.
       final userId = auth.user?.id;
       OfficeLocationService.instance.bind(attendance, userId: userId);
       unawaited(OfficeLocationService.instance.start(userId: userId));
@@ -137,210 +151,318 @@ class _LoginScreenState extends State<LoginScreen> {
     final auth = context.watch<AuthProvider>();
     final busy = context.watch<UiProvider>().globalLoading;
     final pad = AppResponsive.pagePad(context);
-    final bottom = MediaQuery.paddingOf(context).bottom;
+    final size = MediaQuery.sizeOf(context);
 
     return PopScope(
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppColors.bg,
-        body: Column(
+        body: Stack(
+          fit: StackFit.expand,
           children: [
-            Expanded(
-              child: SafeArea(
-                bottom: false,
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(pad, 12, pad, 24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Brand — left aligned, product header
-                        Row(
-                          children: [
-                            const CtMark(size: 40),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Text(
-                                AppBrand.shortName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.ink,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 36),
-                        const Text(
-                          'Sign in',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
-                            letterSpacing: -0.8,
-                            height: 1.1,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Use your Code\'s Thinker account to continue.',
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
-                        ),
-
-                        const SizedBox(height: 28),
-                        const Text(
-                          'CONTINUE AS',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.7,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _RoleSegment(
-                          role: auth.loginRole,
-                          onChanged: auth.selectLoginRole,
-                        ),
-
-                        const SizedBox(height: 24),
-                        _LabeledField(
-                          label: 'Email',
-                          child: TextField(
-                            controller: _email,
-                            focusNode: _emailFocus,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            onSubmitted: (_) => _passwordFocus.requestFocus(),
-                            cursorColor: AppColors.blue,
-                            style: const TextStyle(
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.ink,
-                            ),
-                            decoration: _inputDecoration(
-                              hint: 'you@gmail.com',
-                              prefix: CupertinoIcons.mail,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ValueListenableBuilder<bool>(
-                          valueListenable: _obscure,
-                          builder: (_, obscure, __) {
-                            return _LabeledField(
-                              label: 'Password',
-                              child: TextField(
-                                controller: _password,
-                                focusNode: _passwordFocus,
-                                obscureText: obscure,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _submit(context),
-                                cursorColor: AppColors.blue,
-                                style: const TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.ink,
-                                ),
-                                decoration: _inputDecoration(
-                                  hint: 'Your password',
-                                  prefix: CupertinoIcons.lock,
-                                  suffix: IconButton(
-                                    onPressed: () =>
-                                        _obscure.value = !obscure,
-                                    splashRadius: 20,
-                                    icon: Icon(
-                                      obscure
-                                          ? CupertinoIcons.eye
-                                          : CupertinoIcons.eye_slash,
-                                      color: AppColors.muted,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed: busy ? null : () => _forgot(context),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 8,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            child: const Text(
-                              'Forgot password?',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.blueDark,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: FilledButton(
-                            onPressed: busy ? null : () => _submit(context),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.blue,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor:
-                                  AppColors.blue.withValues(alpha: 0.55),
-                              disabledForegroundColor: Colors.white,
-                              elevation: 0,
-                              shadowColor: Colors.transparent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: const Text(
-                              'Sign in',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+            // Splash-like backdrop (static).
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1A1C2E),
+                    Color(0xFF1E3A5F),
+                    Color(0xFF2563EB),
+                  ],
+                  stops: [0.0, 0.55, 1.0],
+                ),
+              ),
+            ),
+            // Static soft orbs (same feel as splash, no motion).
+            Positioned(
+              left: -80,
+              top: size.height * 0.12,
+              child: IgnorePointer(
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.22),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -60,
+              bottom: size.height * 0.18,
+              child: IgnorePointer(
+                child: Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: size.width * 0.2,
+              top: size.height * 0.42,
+              child: IgnorePointer(
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF60A5FA).withValues(alpha: 0.16),
                   ),
                 ),
               ),
             ),
             SafeArea(
-              top: false,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(pad, 8, pad, bottom > 0 ? 8 : 16),
-                child: Text(
-                  AppBrand.tagline,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.muted.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12.5,
+              child: FadeTransition(
+                opacity: _fade,
+                child: SlideTransition(
+                  position: _slide,
+                  child: Column(
+                    children: [
+                      // Logo at top — splash style.
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(pad, 18, pad, 8),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.18),
+                                    blurRadius: 22,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              alignment: Alignment.center,
+                              child: const CtMark(size: 44),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              AppBrand.shortName,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              AppBrand.tagline,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Form centered on screen.
+                      Expanded(
+                        child: Center(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.fromLTRB(pad, 8, pad, 20),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.fromLTRB(
+                                  18,
+                                  22,
+                                  18,
+                                  20,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.18),
+                                      blurRadius: 32,
+                                      offset: const Offset(0, 14),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text(
+                                      'Sign in',
+                                      style: TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.ink,
+                                        letterSpacing: -0.7,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    const Text(
+                                      'Use your Code\'s Thinker account to continue.',
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        height: 1.4,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    const Text(
+                                      'CONTINUE AS',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.8,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _RoleCards(
+                                      role: auth.loginRole,
+                                      onChanged: auth.selectLoginRole,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    _LabeledField(
+                                      label: 'Email',
+                                      child: TextField(
+                                        controller: _email,
+                                        focusNode: _emailFocus,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        onSubmitted: (_) =>
+                                            _passwordFocus.requestFocus(),
+                                        cursorColor: AppColors.blue,
+                                        style: const TextStyle(
+                                          fontSize: 15.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.ink,
+                                        ),
+                                        decoration: _inputDecoration(
+                                          hint: 'you@gmail.com',
+                                          prefix: CupertinoIcons.mail,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 14),
+                                    ValueListenableBuilder<bool>(
+                                      valueListenable: _obscure,
+                                      builder: (_, obscure, __) {
+                                        return _LabeledField(
+                                          label: 'Password',
+                                          child: TextField(
+                                            controller: _password,
+                                            focusNode: _passwordFocus,
+                                            obscureText: obscure,
+                                            textInputAction:
+                                                TextInputAction.done,
+                                            onSubmitted: (_) =>
+                                                _submit(context),
+                                            cursorColor: AppColors.blue,
+                                            style: const TextStyle(
+                                              fontSize: 15.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: AppColors.ink,
+                                            ),
+                                            decoration: _inputDecoration(
+                                              hint: 'Your password',
+                                              prefix: CupertinoIcons.lock,
+                                              suffix: IconButton(
+                                                onPressed: () =>
+                                                    _obscure.value = !obscure,
+                                                splashRadius: 20,
+                                                icon: Icon(
+                                                  obscure
+                                                      ? CupertinoIcons.eye
+                                                      : CupertinoIcons
+                                                          .eye_slash,
+                                                  color: AppColors.muted,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: busy
+                                            ? null
+                                            : () => _forgot(context),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 8,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        child: const Text(
+                                          'Forgot password?',
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.blue,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 52,
+                                      child: FilledButton(
+                                        onPressed: busy
+                                            ? null
+                                            : () => _submit(context),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: AppColors.blue,
+                                          foregroundColor: Colors.white,
+                                          disabledBackgroundColor: AppColors
+                                              .blue
+                                              .withValues(alpha: 0.55),
+                                          disabledForegroundColor: Colors.white,
+                                          elevation: 0,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(28),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Sign in',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -356,7 +478,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required IconData prefix,
     Widget? suffix,
   }) {
-    const radius = 12.0;
+    const radius = 28.0;
     OutlineInputBorder border(Color color, [double width = 1]) {
       return OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
@@ -374,9 +496,9 @@ class _LoginScreenState extends State<LoginScreen> {
       prefixIcon: Icon(prefix, color: AppColors.muted, size: 18),
       suffixIcon: suffix,
       filled: true,
-      fillColor: AppColors.card,
+      fillColor: const Color(0xFFF8FAFC),
       isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: border(AppColors.line),
       enabledBorder: border(AppColors.line),
       focusedBorder: border(AppColors.blue, 1.5),
@@ -401,7 +523,7 @@ class _LabeledField extends StatelessWidget {
           label,
           style: const TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: 13,
+            fontSize: 13.5,
             color: AppColors.ink,
           ),
         ),
@@ -412,54 +534,119 @@ class _LabeledField extends StatelessWidget {
   }
 }
 
-/// Compact segmented role control — not three tall vibe cards.
-class _RoleSegment extends StatelessWidget {
+class _RoleCards extends StatelessWidget {
   final LoginRole role;
   final ValueChanged<LoginRole> onChanged;
 
-  const _RoleSegment({required this.role, required this.onChanged});
+  static const _roles = [
+    (LoginRole.student, 'Student', CupertinoIcons.person_fill),
+    (LoginRole.intern, 'Intern', CupertinoIcons.briefcase_fill),
+    (LoginRole.staff, 'Staff', CupertinoIcons.person_3_fill),
+  ];
+
+  const _RoleCards({required this.role, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        children: [
-          _seg('Student', LoginRole.student),
-          _seg('Intern', LoginRole.intern),
-          _seg('Staff', LoginRole.staff),
+    return Row(
+      children: [
+        for (var i = 0; i < _roles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(
+            child: _RoleCard(
+              label: _roles[i].$2,
+              icon: _roles[i].$3,
+              selected: role == _roles[i].$1,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                onChanged(_roles[i].$1);
+              },
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
+}
 
-  Widget _seg(String label, LoginRole value) {
-    final selected = role == value;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onChanged(value),
-        behavior: HitTestBehavior.opaque,
+class _RoleCard extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RoleCard({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: selected ? 1.02 : 1.0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutBack,
         child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.curve,
-          padding: const EdgeInsets.symmetric(vertical: 11),
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
           decoration: BoxDecoration(
-            color: selected ? AppColors.blue : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : AppColors.muted,
+            color: selected ? AppColors.softBlue : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? AppColors.blue : Colors.transparent,
+              width: 2,
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: AppColors.blue.withValues(alpha: 0.14),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : const [],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: selected ? AppColors.blue : const Color(0xFFE8EEF6),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: selected ? Colors.white : AppColors.muted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? AppColors.blue : AppColors.muted,
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ),
         ),
       ),

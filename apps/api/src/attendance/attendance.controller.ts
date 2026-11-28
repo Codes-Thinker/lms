@@ -1,14 +1,26 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
 import { AuthUser, CurrentUser } from "../common/decorators/current-user.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { AttendanceService } from "./attendance.service";
+import { StaffHoursService } from "./staff-hours.service";
 
 @Controller("attendance")
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AttendanceController {
-  constructor(private readonly attendance: AttendanceService) {}
+  constructor(
+    private readonly attendance: AttendanceService,
+    private readonly staffHours: StaffHoursService
+  ) {}
 
   @Get("me")
   my(@CurrentUser() user: AuthUser) {
@@ -48,6 +60,35 @@ export class AttendanceController {
     @Query("courseId") courseId?: string,
   ) {
     return this.attendance.board({ date, courseId });
+  }
+
+  /** Staff/Intern today board with missing hours. */
+  @Get("staff/board")
+  @Roles("SUPER_ADMIN", "STAFF")
+  staffBoard(@Query("date") date?: string) {
+    return this.staffHours.board(date);
+  }
+
+  @Get("staff/:userId/summary")
+  @Roles("SUPER_ADMIN", "STAFF")
+  staffSummary(
+    @Param("userId") userId: string,
+    @Query("period") period?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string
+  ) {
+    return this.staffHours.summary(userId, { period, from, to });
+  }
+
+  @Get("staff/:userId/history")
+  @Roles("SUPER_ADMIN", "STAFF")
+  staffHistory(
+    @Param("userId") userId: string,
+    @Query("period") period?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string
+  ) {
+    return this.staffHours.history(userId, { period, from, to });
   }
 
   @Post("check-in")

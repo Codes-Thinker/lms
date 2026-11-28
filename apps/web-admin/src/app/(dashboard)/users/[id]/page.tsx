@@ -173,12 +173,39 @@ export default function UserProfilePage() {
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [shiftStart, setShiftStart] = useState("09:00");
-  const [shiftEnd, setShiftEnd] = useState("17:00");
+  const [shiftStart, setShiftStart] = useState("10:00");
+  const [shiftEnd, setShiftEnd] = useState("18:00");
   const [shiftSaving, setShiftSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [tempBusy, setTempBusy] = useState(false);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [hoursPeriod, setHoursPeriod] = useState<"today" | "week" | "month">(
+    "today"
+  );
+  const [hoursSummary, setHoursSummary] = useState<{
+    expectedHours: number;
+    workedHours: number;
+    missingHours: number;
+    overtimeHours: number;
+    presentDays: number;
+    absentDays: number;
+    leaveDays: number;
+    lateArrivals: number;
+    earlyDepartures: number;
+    days: Array<{
+      date: string;
+      status: string;
+      checkInAt: string | null;
+      checkOutAt: string | null;
+      workedHours: number;
+      missingHours: number;
+      expectedHours: number;
+      note: string | null;
+    }>;
+  } | null>(null);
   const [catalog, setCatalog] = useState<Array<{ id: string; title: string }>>(
     []
   );
@@ -304,6 +331,32 @@ export default function UserProfilePage() {
         }
       } catch {
         /* role defaults apply */
+      }
+      try {
+        const hours = await api<{
+          expectedHours: number;
+          workedHours: number;
+          missingHours: number;
+          overtimeHours: number;
+          presentDays: number;
+          absentDays: number;
+          leaveDays: number;
+          lateArrivals: number;
+          earlyDepartures: number;
+          days: Array<{
+            date: string;
+            status: string;
+            checkInAt: string | null;
+            checkOutAt: string | null;
+            workedHours: number;
+            missingHours: number;
+            expectedHours: number;
+            note: string | null;
+          }>;
+        }>(`/attendance/staff/${params.id}/summary?period=today`);
+        if (!cancelled) setHoursSummary(hours);
+      } catch {
+        if (!cancelled) setHoursSummary(null);
       }
       try {
         const courses = await api<Array<{ id: string; title: string }>>(
@@ -751,6 +804,84 @@ export default function UserProfilePage() {
                   {showPassword ? "Hide" : "Show"}
                 </Button>
               </div>
+              <div className="flex flex-wrap gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={tempBusy || !params?.id}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        "Generate a temporary password? The user will be activated and any open invitations revoked. The password is shown once."
+                      )
+                    ) {
+                      return;
+                    }
+                    setTempBusy(true);
+                    api<{ temporaryPassword: string }>(
+                      `/users/${params.id}/temporary-password`,
+                      { method: "POST" }
+                    )
+                      .then((res) => {
+                        setTempPassword(res.temporaryPassword);
+                        show("Temporary password generated");
+                      })
+                      .catch((e) => show(String(e), "error"))
+                      .finally(() => setTempBusy(false));
+                  }}
+                >
+                  {tempBusy ? "Generating…" : "Generate temporary password"}
+                </Button>
+                {form.status === "INVITED" ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={inviteBusy || !params?.id}
+                    onClick={() => {
+                      setInviteBusy(true);
+                      api(`/users/${params.id}/resend-invitation`, {
+                        method: "POST",
+                      })
+                        .then(() => show("Invitation resent"))
+                        .catch((e) => show(String(e), "error"))
+                        .finally(() => setInviteBusy(false));
+                    }}
+                  >
+                    {inviteBusy ? "Sending…" : "Resend invitation"}
+                  </Button>
+                ) : null}
+              </div>
+              {tempPassword ? (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-amber-900">
+                    Temporary password (copy now — not shown again)
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <code className="rounded bg-white px-2 py-1 font-mono text-slate-900">
+                      {tempPassword}
+                    </code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(tempPassword);
+                        show("Copied");
+                      }}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setTempPassword(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -830,17 +961,131 @@ export default function UserProfilePage() {
         )}
       </div>
 
+      {!isStudent && params?.id ? (
+        <div className="glass-card space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="font-semibold">Working hours</h3>
+            <div className="flex flex-wrap gap-1">
+              {(["today", "week", "month"] as const).map((p) => (
+                <Button
+                  key={p}
+                  type="button"
+                  size="sm"
+                  variant={hoursPeriod === p ? "default" : "secondary"}
+                  onClick={() => {
+                    setHoursPeriod(p);
+                    api<NonNullable<typeof hoursSummary>>(
+                      `/attendance/staff/${params.id}/summary?period=${p}`
+                    )
+                      .then(setHoursSummary)
+                      .catch((e) => show(String(e), "error"));
+                  }}
+                >
+                  {p === "today" ? "Today" : p === "week" ? "Week" : "Month"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          {hoursSummary ? (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Stat
+                  label="Expected"
+                  value={`${hoursSummary.expectedHours}h`}
+                />
+                <Stat label="Worked" value={`${hoursSummary.workedHours}h`} />
+                <Stat
+                  label="Missing"
+                  value={`${hoursSummary.missingHours}h`}
+                />
+                <Stat
+                  label="Overtime"
+                  value={`${hoursSummary.overtimeHours}h`}
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm text-slate-600">
+                <p>Present: {hoursSummary.presentDays}</p>
+                <p>Absent: {hoursSummary.absentDays}</p>
+                <p>Leave days: {hoursSummary.leaveDays}</p>
+                <p>
+                  Late / early: {hoursSummary.lateArrivals} /{" "}
+                  {hoursSummary.earlyDepartures}
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs text-slate-500">
+                    <tr>
+                      <th className="py-2 pr-3">Date</th>
+                      <th className="py-2 pr-3">Status</th>
+                      <th className="py-2 pr-3">In</th>
+                      <th className="py-2 pr-3">Out</th>
+                      <th className="py-2 pr-3">Worked</th>
+                      <th className="py-2 pr-3">Missing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hoursSummary.days
+                      .filter((d) => d.status !== "OFF")
+                      .map((d) => (
+                        <tr key={d.date} className="border-t border-slate-100">
+                          <td className="py-2 pr-3">{d.date}</td>
+                          <td className="py-2 pr-3">{d.status}</td>
+                          <td className="py-2 pr-3">
+                            {d.checkInAt
+                              ? new Date(d.checkInAt).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "—"}
+                          </td>
+                          <td className="py-2 pr-3">
+                            {d.checkOutAt
+                              ? new Date(d.checkOutAt).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })
+                              : "—"}
+                          </td>
+                          <td className="py-2 pr-3">{d.workedHours}h</td>
+                          <td className="py-2 pr-3 text-rose-600">
+                            {d.missingHours}h
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">
+              No working-hours summary yet.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="glass-card p-5">
           <h3 className="mb-3 font-semibold">Details</h3>
           <dl className="space-y-2 text-sm">
+            <Row label="User ID" value={u.id} />
             <Row label="Role" value={roleLabel(u.accountType)} />
+            <Row label="Status" value={u.status || "-"} />
             <Row label="Email" value={u.email} />
             <Row label="Phone" value={u.phone || "-"} />
             <Row label="Track" value={u.track || "-"} />
             <Row label="Designation" value={u.designation || "-"} />
             <Row label="Department" value={u.department || "-"} />
             <Row label="Batch" value={u.batch || "-"} />
+            <Row
+              label="Created"
+              value={
+                u.createdAt
+                  ? new Date(u.createdAt).toLocaleString()
+                  : "-"
+              }
+            />
             {isIntern ? (
               <Row
                 label="Internship"

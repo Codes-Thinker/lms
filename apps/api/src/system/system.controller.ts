@@ -49,6 +49,30 @@ export class SystemController {
     return this.system.updateOfficeConfig(body as never);
   }
 
+  @Get("holidays")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "STAFF")
+  listHolidays() {
+    return this.system.listHolidays();
+  }
+
+  @Post("holidays")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "STAFF")
+  addHoliday(@Body() body: { date?: string; label?: string }) {
+    return this.system.addHoliday({
+      date: body.date ?? "",
+      label: body.label ?? "Holiday",
+    });
+  }
+
+  @Delete("holidays/:id")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles("SUPER_ADMIN", "STAFF")
+  deleteHoliday(@Param("id") id: string) {
+    return this.system.deleteHoliday(id);
+  }
+
   // ── Course categories (dynamic) ──
   @Get("categories")
   @UseGuards(JwtAuthGuard, RolesGuard)

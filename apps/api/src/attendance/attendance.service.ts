@@ -423,17 +423,73 @@ export class AttendanceService implements OnModuleInit {
     return row ? this.map(row) : null;
   }
 
-  /** Verify geofence distance (for the Flutter app to check before showing check-in button). */
+  /**
+   * Verify geofence + apply exit grace checkout for open sessions.
+   * GPS loss / stop updates: do nothing (shift-end auto-checkout remains authority).
+   */
   async verifyLocation(userId: string, lat: number, lng: number) {
     const config = await this.system.getOfficeConfig();
     const distance = haversine(lat, lng, config.latitude, config.longitude);
     const inside = distance <= config.radiusMeters;
+    const now = new Date();
+    const grace = Math.max(0, config.exitGraceMinutes ?? 2);
+
+    let geofenceCheckout = false;
+    const today = this.todayDate();
+    const open = await this.prisma.attendanceRecord.findFirst({
+      where: {
+        userId,
+        date: today,
+        checkInAt: { not: null },
+        checkOutAt: null,
+      },
+    });
+
+    if (open) {
+      if (inside) {
+        await this.prisma.attendanceRecord.update({
+          where: { id: open.id },
+          data: { lastInsideAt: now, outsideSince: null },
+        });
+      } else {
+        const outsideSince = open.outsideSince ?? now;
+        if (!open.outsideSince) {
+          await this.prisma.attendanceRecord.update({
+            where: { id: open.id },
+            data: { outsideSince },
+          });
+        }
+        const outsideMs = now.getTime() - outsideSince.getTime();
+        if (outsideMs >= grace * 60_000) {
+          await this.prisma.attendanceRecord.update({
+            where: { id: open.id },
+            data: {
+              checkOutAt: outsideSince,
+              status: AttendanceStatus.CHECKED_OUT,
+              autoCheckout: false,
+              source: "GEOFENCE_EXIT",
+            },
+          });
+          geofenceCheckout = true;
+          await this.notifications.notifyUser({
+            userId,
+            title: "Checked out",
+            body: "You left the office area. Attendance was checked out automatically.",
+            type: "ATTENDANCE",
+            data: { event: "geofence_exit", attendanceId: open.id },
+          });
+        }
+      }
+    }
+
     return {
       inside,
       distance: Math.round(distance),
       radius: config.radiusMeters,
       officeLat: config.latitude,
       officeLng: config.longitude,
+      geofenceCheckout,
+      exitGraceMinutes: grace,
     };
   }
 

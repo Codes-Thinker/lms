@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
@@ -79,10 +79,13 @@ export class SystemService {
           timezone: "Asia/Karachi",
           studentStartTime: "09:00",
           studentEndTime: "14:00",
-          staffStartTime: "08:00",
-          staffEndTime: "17:00",
+          staffStartTime: "10:00",
+          staffEndTime: "18:00",
           internStartTime: "10:00",
           internEndTime: "18:00",
+          staffWorkingDays: "0,1,2,3,4,5",
+          staffOffDays: "6",
+          exitGraceMinutes: 2,
         },
       });
     }
@@ -100,12 +103,14 @@ export class SystemService {
     staffEndTime?: string;
     internStartTime?: string;
     internEndTime?: string;
+    staffWorkingDays?: string;
+    staffOffDays?: string;
+    exitGraceMinutes?: number;
   }) {
     return this.prisma.officeConfig.upsert({
       where: { id: 1 },
       update: {
         ...data,
-        // Keep pin static unless explicitly overridden; always clamp radius to 50 default intent
         radiusMeters: data.radiusMeters ?? 50,
       },
       create: {
@@ -116,12 +121,51 @@ export class SystemService {
         timezone: data.timezone ?? "Asia/Karachi",
         studentStartTime: data.studentStartTime ?? "09:00",
         studentEndTime: data.studentEndTime ?? "14:00",
-        staffStartTime: data.staffStartTime ?? "08:00",
-        staffEndTime: data.staffEndTime ?? "17:00",
+        staffStartTime: data.staffStartTime ?? "10:00",
+        staffEndTime: data.staffEndTime ?? "18:00",
         internStartTime: data.internStartTime ?? "10:00",
         internEndTime: data.internEndTime ?? "18:00",
+        staffWorkingDays: data.staffWorkingDays ?? "0,1,2,3,4,5",
+        staffOffDays: data.staffOffDays ?? "6",
+        exitGraceMinutes: data.exitGraceMinutes ?? 2,
       },
     });
+  }
+
+  async listHolidays() {
+    const rows = await this.prisma.officeHoliday.findMany({
+      orderBy: { date: "asc" },
+    });
+    return rows.map((h) => ({
+      id: h.id,
+      date: h.date.toISOString().slice(0, 10),
+      label: h.label,
+      createdAt: h.createdAt.toISOString(),
+    }));
+  }
+
+  async addHoliday(input: { date: string; label: string }) {
+    const date = new Date(`${input.date.trim()}T00:00:00.000Z`);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException("Invalid holiday date");
+    }
+    const label = (input.label ?? "").trim() || "Holiday";
+    const row = await this.prisma.officeHoliday.upsert({
+      where: { date },
+      update: { label },
+      create: { date, label },
+    });
+    return {
+      id: row.id,
+      date: row.date.toISOString().slice(0, 10),
+      label: row.label,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  async deleteHoliday(id: string) {
+    await this.prisma.officeHoliday.delete({ where: { id } });
+    return { ok: true };
   }
 
   /** Per-user schedule override, else role defaults from office config. */

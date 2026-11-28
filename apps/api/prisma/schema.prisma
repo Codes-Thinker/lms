@@ -398,6 +398,10 @@ model AttendanceRecord {
   autoCheckout    Boolean          @default(false)
   shiftStart      String?
   shiftEnd        String?
+  /// Last time verify-location confirmed inside geofence.
+  lastInsideAt    DateTime?
+  /// First time verify-location confirmed outside while session open.
+  outsideSince    DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -627,19 +631,31 @@ model OfficeConfig {
   timezone          String   @default("Asia/Karachi")
   studentStartTime  String   @default("09:00")
   studentEndTime    String   @default("14:00")
-  staffStartTime    String   @default("08:00")
-  staffEndTime      String   @default("17:00")
+  /// Default staff shift: 10:00–18:00 (8h), Sun–Fri.
+  staffStartTime    String   @default("10:00")
+  staffEndTime      String   @default("18:00")
   internStartTime   String   @default("10:00")
   internEndTime     String   @default("18:00")
+  /// JS getDay() list: 0=Sun … 6=Sat. Default Sun–Fri.
+  staffWorkingDays  String   @default("0,1,2,3,4,5")
+  staffOffDays      String   @default("6")
+  exitGraceMinutes  Int      @default(2)
   updatedAt         DateTime @updatedAt
+}
+
+model OfficeHoliday {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  label     String
+  createdAt DateTime @default(now())
 }
 
 model StaffSchedule {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startTime String   @default("08:00")
-  endTime   String   @default("17:00")
+  startTime String   @default("10:00")
+  endTime   String   @default("18:00")
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

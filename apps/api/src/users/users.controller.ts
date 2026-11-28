@@ -89,6 +89,16 @@ export class UsersController {
     return this.users.resendInvitation(id, actor.sub);
   }
 
+  /** Admin: generate a one-time temporary password (returned once, never stored). */
+  @Post(":id/temporary-password")
+  @Roles("SUPER_ADMIN", "STAFF")
+  temporaryPassword(
+    @Param("id") id: string,
+    @CurrentUser() actor: AuthUser
+  ) {
+    return this.users.generateTemporaryPassword(id, actor.sub);
+  }
+
   /** Admin hard-delete — wipes all of that user's data. */
   @Delete(":id")
   @Roles("SUPER_ADMIN")

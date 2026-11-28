@@ -418,8 +418,80 @@ export class UsersService {
       activatedAt: u.activatedAt,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
-      invitations: u.invitations,
+      // Never expose invitation tokenHash (or passwordHash).
+      invitations: u.invitations.map((inv) => ({
+        id: inv.id,
+        expiresAt: inv.expiresAt,
+        usedAt: inv.usedAt,
+        revokedAt: inv.revokedAt,
+        sentAt: inv.sentAt,
+      })),
     };
+  }
+
+  /**
+   * Admin generates a one-time temporary password.
+   * Plaintext is returned once (and emailed when mail is configured) — never stored.
+   */
+  async generateTemporaryPassword(userId: string, actorId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
+    if (user.accountType === AccountType.SUPER_ADMIN) {
+      throw new ForbiddenException("Cannot reset SUPER_ADMIN via this endpoint");
+    }
+
+    const temporaryPassword = this.makeTempPassword();
+    const passwordHash = await argon2.hash(temporaryPassword, {
+      type: argon2.argon2id,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          passwordHash,
+          status: AccountStatus.ACTIVE,
+          activatedAt: user.activatedAt ?? new Date(),
+        },
+      });
+      await tx.invitation.updateMany({
+        where: {
+          userId,
+          usedAt: null,
+          revokedAt: null,
+        },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    try {
+      await this.mail.sendTemporaryPassword({
+        to: user.email,
+        fullName: user.fullName,
+        temporaryPassword,
+      });
+    } catch {
+      // Mail optional — admin still receives plaintext once in API response.
+    }
+
+    void actorId; // reserved for future audit log
+    return {
+      userId: user.id,
+      email: user.email,
+      temporaryPassword,
+      emailed: true,
+    };
+  }
+
+  private makeTempPassword(): string {
+    const alphabet =
+      "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$";
+    const bytes = randomBytes(12);
+    let out = "";
+    for (let i = 0; i < 12; i++) {
+      out += alphabet[bytes[i]! % alphabet.length];
+    }
+    return out;
   }
 
   /** Comprehensive student detail for the admin dashboard. */

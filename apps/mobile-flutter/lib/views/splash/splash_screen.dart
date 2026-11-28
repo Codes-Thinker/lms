@@ -113,16 +113,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _boot() async {
     final fromNotif = NotificationRouter.launchedFromNotification;
-    if (!fromNotif) {
-      // Short brand beat — do not block on full data load.
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-    }
+    final startedAt = DateTime.now();
+    // Brand splash should stay visible at least ~3s (skip for push cold-start).
+    const minSplash = Duration(seconds: 3);
 
     if (!mounted) return;
     final auth = context.read<AuthProvider>();
 
-    for (var i = 0; i < 20 && !auth.hydrated; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+    for (var i = 0; i < 40 && !auth.hydrated; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
 
     if (!mounted) return;
@@ -130,6 +129,16 @@ class _SplashScreenState extends State<SplashScreen>
     // First install only — skip when opened from a push (deep-link).
     final showOnboarding =
         !fromNotif && !(await OnboardingPrefs.isCompleted());
+    if (!mounted) return;
+
+    if (!fromNotif) {
+      final elapsed = DateTime.now().difference(startedAt);
+      final remaining = minSplash - elapsed;
+      if (remaining > Duration.zero) {
+        await Future<void>.delayed(remaining);
+      }
+    }
+
     if (!mounted) return;
 
     if (auth.isAuthenticated) {
@@ -146,7 +155,7 @@ class _SplashScreenState extends State<SplashScreen>
       final notes = context.read<NotificationProvider>();
       final teaching = context.read<TeachingProvider>();
       final projects = context.read<ProjectProvider>();
-      // Prefetch in background so splash exits immediately.
+      // Prefetch in background after minimum splash time.
       unawaited(Future.wait([
         courses.fetchAll(),
         tasks.load(),
