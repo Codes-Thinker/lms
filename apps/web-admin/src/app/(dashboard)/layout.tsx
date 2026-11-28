@@ -196,27 +196,15 @@ function SectionReadOnVisit() {
 
 function SidebarBody({
   pathname,
-  name,
   collapsed,
   onNavigate,
-  onLogout,
   onToggleCollapse,
 }: {
   pathname: string;
-  name: string;
   collapsed?: boolean;
   onNavigate?: () => void;
-  onLogout: () => void;
   onToggleCollapse?: () => void;
 }) {
-  const initials =
-    name
-      .split(" ")
-      .map((p) => p[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "AA";
-
   return (
     <>
       <div
@@ -252,7 +240,7 @@ function SidebarBody({
         onNavigate={onNavigate}
       />
 
-      <div className="mt-auto space-y-2 border-t border-slate-200 pt-3">
+      <div className="mt-auto border-t border-slate-200 pt-3">
         {onToggleCollapse ? (
           <button
             type="button"
@@ -273,37 +261,6 @@ function SidebarBody({
             )}
           </button>
         ) : null}
-        {!collapsed ? (
-          <div className="flex items-center gap-3 px-2 py-1">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
-              {initials}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-900">
-                {name}
-              </p>
-              <p className="truncate text-xs text-slate-500">Super Admin</p>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center py-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 ring-1 ring-blue-100">
-              {initials}
-            </div>
-          </div>
-        )}
-        <button
-          type="button"
-          className={cn(
-            "flex w-full items-center rounded-lg py-2.5 text-[13px] font-semibold text-rose-600 hover:bg-rose-50",
-            collapsed ? "justify-center px-2" : "gap-3 px-3"
-          )}
-          title="Sign out"
-          onClick={onLogout}
-        >
-          <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
-          {!collapsed ? <span>Logout</span> : null}
-        </button>
       </div>
     </>
   );
@@ -410,9 +367,7 @@ export default function DashboardLayout({
             >
               <SidebarBody
                 pathname={pathname}
-                name={name}
                 collapsed={sidebarCollapsed}
-                onLogout={logout}
                 onToggleCollapse={toggleSidebar}
               />
             </aside>
@@ -438,9 +393,7 @@ export default function DashboardLayout({
                   </div>
                   <SidebarBody
                     pathname={pathname}
-                    name={name}
                     onNavigate={() => setMobileOpen(false)}
-                    onLogout={logout}
                   />
                 </aside>
               </div>
@@ -502,8 +455,8 @@ export default function DashboardLayout({
                 </div>
                 <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                   <NotificationsBell />
-                  <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 sm:flex">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
                       {(name.split(" ").map((p) => p[0]).join("").slice(0, 2) ||
                         "AA"
                       ).toUpperCase()}
@@ -515,6 +468,14 @@ export default function DashboardLayout({
                       <p className="truncate text-[10px] font-medium text-slate-400">
                         Super Admin
                       </p>
+                      <button
+                        type="button"
+                        onClick={logout}
+                        className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 hover:text-rose-700"
+                      >
+                        <LogOut className="h-3 w-3" strokeWidth={2.5} />
+                        Logout
+                      </button>
                     </div>
                   </div>
                 </div>

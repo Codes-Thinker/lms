@@ -106,7 +106,11 @@ class _LoginScreenState extends State<LoginScreen>
       ]);
       await PushNotificationService.instance.registerWithBackend();
       final userId = auth.user?.id;
-      OfficeLocationService.instance.bind(attendance, userId: userId);
+      OfficeLocationService.instance.bind(
+        attendance,
+        userId: userId,
+        ui: ui,
+      );
       unawaited(OfficeLocationService.instance.start(userId: userId));
       if (!context.mounted) return;
       final pendingType = NotificationRouter.pendingType;

@@ -17,10 +17,8 @@ import '../../providers/task_provider.dart';
 import '../../providers/teaching_provider.dart';
 import '../../providers/ui_provider.dart';
 import '../../widgets/brand_logo.dart';
-import '../../widgets/recent_notifications_panel.dart';
 import '../../widgets/unread_count_badge.dart';
 import '../attendance/attendance_screen.dart';
-import '../course/all_courses_screen.dart';
 import '../help/help_hub_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../report/report_screen.dart';
@@ -136,16 +134,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                           color: _navy,
                           letterSpacing: -0.2,
                         ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Search courses',
-                      onPressed: () =>
-                          _push(context, const AllCoursesScreen()),
-                      icon: const Icon(
-                        CupertinoIcons.search,
-                        color: _navy,
-                        size: 22,
                       ),
                     ),
                     IconButton(
@@ -392,13 +380,6 @@ class _TeacherHomeScreenState extends State<TeacherHomeScreen> {
                     ),
                   ],
                 ),
-              ),
-            ),
-
-            SliverPadding(
-              padding: EdgeInsets.fromLTRB(pad, 18, pad, 0),
-              sliver: const SliverToBoxAdapter(
-                child: RecentNotificationsPanel(),
               ),
             ),
 

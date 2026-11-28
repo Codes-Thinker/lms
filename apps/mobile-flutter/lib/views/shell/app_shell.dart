@@ -55,7 +55,11 @@ class _AppShellState extends State<AppShell> {
     if (!auth.isAuthenticated) return;
     final attendance = context.read<AttendanceProvider>();
     final userId = auth.user?.id;
-    OfficeLocationService.instance.bind(attendance, userId: userId);
+    OfficeLocationService.instance.bind(
+      attendance,
+      userId: userId,
+      ui: context.read<UiProvider>(),
+    );
     unawaited(OfficeLocationService.instance.start(userId: userId));
   }
 

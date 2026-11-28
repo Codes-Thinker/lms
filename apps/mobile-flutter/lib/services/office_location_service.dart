@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/attendance_provider.dart';
+import '../providers/ui_provider.dart';
 import 'push_notification_service.dart';
 
 /// Tracks proximity to the admin-configured office pin.
@@ -18,15 +20,27 @@ class OfficeLocationService {
 
   StreamSubscription<Position>? _sub;
   AttendanceProvider? _attendance;
+  UiProvider? _ui;
   Timer? _poll;
   bool _wasInside = false;
   bool _starting = false;
   bool _started = false;
   String? _boundUserId;
+  DateTime? _lastApiSyncAt;
 
-  void bind(AttendanceProvider attendance, {String? userId}) {
+  void bind(AttendanceProvider attendance, {String? userId, UiProvider? ui}) {
     _attendance = attendance;
     if (userId != null) _boundUserId = userId;
+    if (ui != null) _ui = ui;
+  }
+
+  void bindUi(UiProvider ui) => _ui = ui;
+
+  bool get _isAppForeground {
+    final state = WidgetsBinding.instance.lifecycleState;
+    return state == null ||
+        state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive;
   }
 
   Future<bool> ensurePermission({bool requestAlways = true}) async {
@@ -58,8 +72,9 @@ class OfficeLocationService {
     if (!kIsWeb && Platform.isAndroid) {
       return AndroidSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 8,
-        intervalDuration: const Duration(seconds: 15),
+        // Higher filter = less GPS jitter / UI blink at the fence edge.
+        distanceFilter: 15,
+        intervalDuration: const Duration(seconds: 20),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: "Code's Thinker · Office tracking",
           notificationText:
@@ -72,7 +87,7 @@ class OfficeLocationService {
     if (!kIsWeb && Platform.isIOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 8,
+        distanceFilter: 15,
         activityType: ActivityType.other,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
@@ -80,7 +95,7 @@ class OfficeLocationService {
     }
     return const LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 8,
+      distanceFilter: 15,
     );
   }
 
@@ -111,7 +126,8 @@ class OfficeLocationService {
   Future<bool> _claimLocalArrivalAlert() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final key = 'lms_office_arrival_local_${_boundUserId ?? 'anon'}_${_dayKey()}';
+      final key =
+          'lms_office_arrival_local_${_boundUserId ?? 'anon'}_${_dayKey()}';
       if (prefs.getBool(key) == true) return false;
       await prefs.setBool(key, true);
       return true;
@@ -120,17 +136,53 @@ class OfficeLocationService {
     }
   }
 
-  Future<void> _handlePosition(Position pos, {bool silent = true}) async {
+  /// In-app → top tip. Background / killed session → system tray.
+  Future<void> _notifyUser({
+    required String title,
+    required String body,
+    required int id,
+    String type = 'ATTENDANCE',
+  }) async {
+    if (_isAppForeground && _ui != null) {
+      _ui!.showTip(
+        body,
+        title: title,
+        duration: const Duration(seconds: 6),
+      );
+      return;
+    }
+    await PushNotificationService.instance.showLocalAlert(
+      title: title,
+      body: body,
+      type: type,
+      id: id,
+    );
+  }
+
+  Future<void> _handlePosition(
+    Position pos, {
+    bool silent = true,
+    bool forceApiSync = false,
+  }) async {
     final att = _attendance;
     if (att == null) return;
 
     final wasInside = _wasInside;
+
+    // Stream samples stay local — API sync only on edges / manual / rare poll.
+    final now = DateTime.now();
+    final dueApi = forceApiSync ||
+        _lastApiSyncAt == null ||
+        now.difference(_lastApiSyncAt!) > const Duration(minutes: 3);
     await att.applyGpsSample(
       pos.latitude,
       pos.longitude,
       accuracyMeters: pos.accuracy,
       silent: silent,
+      syncApi: dueApi,
     );
+    if (dueApi) _lastApiSyncAt = now;
+
     final inside = att.insideGeofence;
 
     // Enter: outside → inside (once per day local + API)
@@ -139,12 +191,11 @@ class OfficeLocationService {
       final sent =
           await att.processArrivalReminder(pos.latitude, pos.longitude);
       if (showLocal) {
-        await PushNotificationService.instance.showLocalAlert(
+        await _notifyUser(
           title: 'Office Attendance Reminder',
           body: sent
               ? 'You are at the office. Please mark your attendance.'
               : 'You are at the office. Open Attend to check in.',
-          type: 'ATTENDANCE',
           id: 91011,
         );
       }
@@ -157,12 +208,11 @@ class OfficeLocationService {
       if (stillIn) {
         final sent =
             await att.processExitReminder(pos.latitude, pos.longitude);
-        await PushNotificationService.instance.showLocalAlert(
+        await _notifyUser(
           title: 'Outside office zone',
           body: sent
               ? 'You left the office while still checked in. Open Attend and check out.'
               : 'You left the office zone. Check out if you are done for the day.',
-          type: 'ATTENDANCE',
           id: 91012,
         );
       }
@@ -174,14 +224,16 @@ class OfficeLocationService {
   Future<void> refreshNow({bool silent = true}) async {
     final pos = await currentPosition();
     if (pos == null) return;
-    await _handlePosition(pos, silent: silent);
+    await _handlePosition(pos, silent: silent, forceApiSync: true);
   }
 
   Future<void> start({String? userId}) async {
     if (_starting) return;
-    if (_started && _sub != null && (userId == null || userId == _boundUserId)) {
-      // Already running for this session — just refresh.
-      unawaited(refreshNow());
+    if (_started &&
+        _sub != null &&
+        (userId == null || userId == _boundUserId)) {
+      // Already running — soft refresh without restarting the stream (no blink).
+      unawaited(refreshNow(silent: true));
       return;
     }
     _starting = true;
@@ -206,8 +258,9 @@ class OfficeLocationService {
       );
 
       _poll?.cancel();
-      _poll = Timer.periodic(const Duration(seconds: 45), (_) {
-        unawaited(refreshNow());
+      // Rare poll only — stream already drives geofence; avoids flicker.
+      _poll = Timer.periodic(const Duration(seconds: 90), (_) {
+        unawaited(refreshNow(silent: true));
       });
       _started = true;
     } finally {

@@ -169,7 +169,11 @@ class _SplashScreenState extends State<SplashScreen>
       ]));
       unawaited(PushNotificationService.instance.registerWithBackend());
       final userId = auth.user?.id;
-      OfficeLocationService.instance.bind(attendance, userId: userId);
+      OfficeLocationService.instance.bind(
+        attendance,
+        userId: userId,
+        ui: context.read<UiProvider>(),
+      );
       unawaited(OfficeLocationService.instance.start(userId: userId));
       if (!mounted) return;
       final shell = const AppShell();

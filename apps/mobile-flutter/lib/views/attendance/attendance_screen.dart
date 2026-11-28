@@ -45,7 +45,11 @@ class _AttendanceScreenState extends State<AttendanceScreen>
   Future<void> _bootLocation() async {
     final att = context.read<AttendanceProvider>();
     final userId = context.read<AuthProvider>().user?.id;
-    OfficeLocationService.instance.bind(att, userId: userId);
+    OfficeLocationService.instance.bind(
+      att,
+      userId: userId,
+      ui: context.read<UiProvider>(),
+    );
     // Do not freeze the status card while the stream starts — avoids blank/green flicker.
     await OfficeLocationService.instance.start(userId: userId);
   }

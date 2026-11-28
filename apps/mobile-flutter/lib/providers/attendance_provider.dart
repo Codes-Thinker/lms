@@ -190,13 +190,18 @@ class AttendanceProvider extends ChangeNotifier {
 
       final prevInside = _insideGeofence;
       final prevDist = _distanceFromOffice;
+      final firstFix = !_hasGpsFix;
       _applyHysteresis(rawInside);
       _distanceFromOffice = dist.round();
       _hasGpsFix = true;
 
+      // Avoid UI blink: only rebuild on geofence flip / first fix / big distance jump.
+      final distJump =
+          prevDist < 0 || (prevDist - _distanceFromOffice).abs() >= 12;
       if (!silent ||
+          firstFix ||
           prevInside != _insideGeofence ||
-          prevDist != _distanceFromOffice) {
+          distJump) {
         notifyListeners();
       }
     } else if (!silent) {
@@ -338,6 +343,9 @@ class AttendanceProvider extends ChangeNotifier {
       final officeLng = (data['officeLng'] as num?)?.toDouble();
       final radius = (data['radius'] as num?)?.toInt() ?? 50;
 
+      final prevInside = _insideGeofence;
+      final prevDist = _distanceFromOffice;
+      final prevRadius = _geofenceRadius;
       _officeLat = officeLat ?? _officeLat;
       _officeLng = officeLng ?? _officeLng;
       _geofenceRadius = radius;
@@ -349,7 +357,12 @@ class AttendanceProvider extends ChangeNotifier {
       }
 
       if (!silent) _checkingLocation = false;
-      notifyListeners();
+      final changed = !silent ||
+          prevInside != _insideGeofence ||
+          prevRadius != _geofenceRadius ||
+          prevDist < 0 ||
+          (dist >= 0 && (prevDist - dist).abs() >= 12);
+      if (changed) notifyListeners();
     } catch (e) {
       debugPrint('Location verify failed: $e');
       // Keep last good geofence state on silent/network errors — no flicker.
