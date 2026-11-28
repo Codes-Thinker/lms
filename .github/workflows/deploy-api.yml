@@ -1,13 +1,10 @@
-# Push to main (apps/api) → rsync API to EC2 → migrate/build/PM2.
+# Push to main (apps/api) → optional GitHub mirror → EC2 git pull + PM2.
+# Uses the SAME EC2_* secrets as Deploy Admin (appleboy/ssh-action).
 #
-# GitHub → Settings → Secrets → Actions (repo: Codes-Thinker/lms)
-# Required (same as Deploy Admin):
-#   EC2_HOST, EC2_USER, EC2_SSH_KEY
-# Optional:
-#   EC2_APP_DIR   default ~/codesthinkerlms-server
-#   EC2_PORT      default 3000
-# Optional mirror of public server repo:
-#   SERVER_REPO_TOKEN  PAT with push to Codes-Thinker/codesthinkerlms-server
+# Secrets (Codes-Thinker/lms → Settings → Secrets → Actions):
+#   EC2_HOST, EC2_USER, EC2_SSH_KEY   (required for live deploy)
+#   EC2_APP_DIR, EC2_PORT             (optional)
+#   SERVER_REPO_TOKEN                 (optional — mirrors to codesthinkerlms-server)
 
 name: Deploy API to EC2
 
@@ -24,15 +21,68 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy-ec2:
-    name: Rsync & restart on EC2
+  sync-server-repo:
+    name: Sync apps/api → codesthinkerlms-server
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout LMS monorepo
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: Mirror API into server repo
+        env:
+          TOKEN: ${{ secrets.SERVER_REPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::warning::SERVER_REPO_TOKEN not set — skip GitHub mirror."
+            echo "EC2 deploy still runs (pulls whatever is already on codesthinkerlms-server)."
+            exit 0
+          fi
+          git clone --depth 1 \
+            "https://x-access-token:${TOKEN}@github.com/Codes-Thinker/codesthinkerlms-server.git" \
+            server-repo
+          rsync -a --delete \
+            --exclude node_modules \
+            --exclude dist \
+            --exclude .env \
+            --exclude '.env.*' \
+            --exclude '.git' \
+            --exclude secrets \
+            --exclude 'secrets/**' \
+            --exclude .vscode \
+            --exclude tsconfig.tsbuildinfo \
+            --exclude README.md \
+            --exclude .gitignore \
+            --exclude .github \
+            apps/api/ server-repo/
+          mkdir -p server-repo/scripts
+          cp apps/api/scripts/deploy-ec2.sh server-repo/scripts/deploy-ec2.sh
+          chmod +x server-repo/scripts/deploy-ec2.sh
+          if [ -f server-repo/.gitignore ]; then
+            grep -q '^secrets/' server-repo/.gitignore || printf '\nsecrets/\n*.pem\n' >> server-repo/.gitignore
+          else
+            printf 'node_modules/\ndist/\n.env\n.env.*\nsecrets/\n*.pem\n' > server-repo/.gitignore
+          fi
+          cd server-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No API file changes to sync."
+          else
+            git commit -m "ci: sync API from lms@${GITHUB_SHA::7}"
+            git push origin HEAD:main
+          fi
+
+  deploy-ec2:
+    name: Pull & restart on EC2
+    runs-on: ubuntu-latest
+    needs: sync-server-repo
+    if: always()
+    steps:
       - name: Require EC2 secrets
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
@@ -44,42 +94,13 @@ jobs:
           [ -n "${EC2_HOST:-}" ] || { echo "::error::Missing secret EC2_HOST"; missing=1; }
           [ -n "${EC2_USER:-}" ] || { echo "::error::Missing secret EC2_USER"; missing=1; }
           [ -n "${EC2_SSH_KEY:-}" ] || { echo "::error::Missing secret EC2_SSH_KEY"; missing=1; }
-          exit "$missing"
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Add the same EC2_* secrets used by successful Deploy Admin runs."
+            exit 1
+          fi
+          echo "EC2 secrets present — deploying to ${EC2_USER}@${EC2_HOST}"
 
-      - name: Install SSH key
-        env:
-          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/ec2_key
-          chmod 600 ~/.ssh/ec2_key
-          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Rsync apps/api → EC2
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          APP_DIR: ${{ secrets.EC2_APP_DIR }}
-        run: |
-          set -euo pipefail
-          DIR="${APP_DIR:-/home/${EC2_USER}/codesthinkerlms-server}"
-          # Expand ~ on remote if user passed ~/...
-          REMOTE_DIR="$DIR"
-          rsync -az --delete \
-            -e "ssh -i $HOME/.ssh/ec2_key -o StrictHostKeyChecking=accept-new" \
-            --exclude node_modules \
-            --exclude dist \
-            --exclude .env \
-            --exclude '.env.*' \
-            --exclude .git \
-            apps/api/ "${EC2_USER}@${EC2_HOST}:${REMOTE_DIR}/"
-          # Ensure deploy script is executable on remote
-          ssh -i "$HOME/.ssh/ec2_key" -o StrictHostKeyChecking=accept-new \
-            "${EC2_USER}@${EC2_HOST}" \
-            "mkdir -p '${REMOTE_DIR}/scripts' && chmod +x '${REMOTE_DIR}/scripts/deploy-ec2.sh' 2>/dev/null || true"
-
-      - name: Migrate, build, PM2 restart
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         env:
           APP_DIR: ${{ secrets.EC2_APP_DIR }}
@@ -95,7 +116,15 @@ jobs:
             set -euo pipefail
             DIR="${APP_DIR:-$HOME/codesthinkerlms-server}"
             export PORT="${APP_PORT:-3000}"
+            echo "Deploy dir: $DIR"
             cd "$DIR"
+            if [ -d .git ]; then
+              git fetch origin
+              git checkout main 2>/dev/null || git checkout -B main origin/main
+              git pull --ff-only origin main || git reset --hard origin/main
+            else
+              echo "WARN: $DIR is not a git checkout — skipping pull (code must already be on disk)"
+            fi
             if [ -f scripts/deploy-ec2.sh ]; then
               bash scripts/deploy-ec2.sh
             else
@@ -106,47 +135,3 @@ jobs:
               pm2 restart codesthinkerlms --update-env || pm2 start dist/main.js --name codesthinkerlms --cwd "$DIR"
               pm2 save
             fi
-
-  # Optional: keep codesthinkerlms-server GitHub mirror in sync (does not block deploy).
-  sync-server-repo:
-    name: Mirror to codesthinkerlms-server (optional)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout LMS monorepo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Clone + push mirror
-        env:
-          TOKEN: ${{ secrets.SERVER_REPO_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${TOKEN:-}" ]; then
-            echo "::warning::SERVER_REPO_TOKEN not set — skipping GitHub mirror (EC2 deploy still runs)."
-            exit 0
-          fi
-          git clone --depth 1 \
-            "https://x-access-token:${TOKEN}@github.com/Codes-Thinker/codesthinkerlms-server.git" \
-            server-repo
-          rsync -a --delete \
-            --exclude node_modules \
-            --exclude dist \
-            --exclude .env \
-            --exclude '.env.*' \
-            --exclude '.git' \
-            apps/api/ server-repo/
-          mkdir -p server-repo/scripts
-          cp apps/api/scripts/deploy-ec2.sh server-repo/scripts/deploy-ec2.sh
-          chmod +x server-repo/scripts/deploy-ec2.sh
-          cd server-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No API file changes to sync."
-          else
-            git commit -m "ci: sync API from lms@${GITHUB_SHA::7}"
-            git push origin HEAD:main
-          fi
