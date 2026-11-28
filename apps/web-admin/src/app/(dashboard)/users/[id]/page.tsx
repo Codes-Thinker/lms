@@ -429,6 +429,30 @@ export default function UserProfilePage() {
     }
   }
 
+  async function generateTemporaryPassword() {
+    if (!params?.id) return;
+    if (
+      !window.confirm(
+        "Generate a temporary password? The user will be activated and any open invitations revoked. The password is shown once."
+      )
+    ) {
+      return;
+    }
+    setTempBusy(true);
+    try {
+      const res = await api<{ temporaryPassword: string }>(
+        `/users/${params.id}/temporary-password`,
+        { method: "POST" }
+      );
+      setTempPassword(res.temporaryPassword);
+      show("Temporary password generated");
+    } catch (e) {
+      show(String(e), "error");
+    } finally {
+      setTempBusy(false);
+    }
+  }
+
   async function saveUser(e: FormEvent) {
     e.preventDefault();
     if (!params?.id) return;
@@ -809,26 +833,7 @@ export default function UserProfilePage() {
                   type="button"
                   variant="secondary"
                   disabled={tempBusy || !params?.id}
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Generate a temporary password? The user will be activated and any open invitations revoked. The password is shown once."
-                      )
-                    ) {
-                      return;
-                    }
-                    setTempBusy(true);
-                    api<{ temporaryPassword: string }>(
-                      `/users/${params.id}/temporary-password`,
-                      { method: "POST" }
-                    )
-                      .then((res) => {
-                        setTempPassword(res.temporaryPassword);
-                        show("Temporary password generated");
-                      })
-                      .catch((e) => show(String(e), "error"))
-                      .finally(() => setTempBusy(false));
-                  }}
+                  onClick={() => void generateTemporaryPassword()}
                 >
                   {tempBusy ? "Generating…" : "Generate temporary password"}
                 </Button>
@@ -1069,7 +1074,6 @@ export default function UserProfilePage() {
         <div className="glass-card p-5">
           <h3 className="mb-3 font-semibold">Details</h3>
           <dl className="space-y-2 text-sm">
-            <Row label="User ID" value={u.id} />
             <Row label="Role" value={roleLabel(u.accountType)} />
             <Row label="Status" value={u.status || "-"} />
             <Row label="Email" value={u.email} />
@@ -1111,6 +1115,55 @@ export default function UserProfilePage() {
               }
             />
           </dl>
+          {u.accountType !== "SUPER_ADMIN" ? (
+            <div className="mt-4 border-t border-slate-100 pt-4">
+              <p className="mb-1 text-sm font-medium text-slate-800">Password</p>
+              <p className="mb-2 text-xs text-slate-500">
+                Stored passwords cannot be viewed. Generate a temporary one to
+                share with the user (shown once).
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={tempBusy || !params?.id}
+                onClick={() => void generateTemporaryPassword()}
+              >
+                {tempBusy ? "Generating…" : "Generate temporary password"}
+              </Button>
+              {tempPassword ? (
+                <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+                  <p className="font-semibold text-amber-900">
+                    Temporary password (copy now — not shown again)
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <code className="rounded bg-white px-2 py-1 font-mono text-slate-900">
+                      {tempPassword}
+                    </code>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        void navigator.clipboard.writeText(tempPassword);
+                        show("Copied");
+                      }}
+                    >
+                      Copy
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setTempPassword(null)}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="glass-card space-y-4 p-5">
