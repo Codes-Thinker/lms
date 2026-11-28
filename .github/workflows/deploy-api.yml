@@ -1,10 +1,12 @@
-# Push to main (apps/api) → optional GitHub mirror → EC2 git pull + PM2.
-# Uses the SAME EC2_* secrets as Deploy Admin (appleboy/ssh-action).
+# Deploy API to EC2 — ONE job, same appleboy SSH as a real Admin deploy.
 #
-# Secrets (Codes-Thinker/lms → Settings → Secrets → Actions):
-#   EC2_HOST, EC2_USER, EC2_SSH_KEY   (required for live deploy)
-#   EC2_APP_DIR, EC2_PORT             (optional)
-#   SERVER_REPO_TOKEN                 (optional — mirrors to codesthinkerlms-server)
+# REQUIRED secrets (repo Settings → Secrets → Actions):
+#   EC2_HOST      e.g. 13.x.x.x or api.codesthinkerlms.site
+#   EC2_USER      ubuntu
+#   EC2_SSH_KEY   full private key including -----BEGIN...-----END-----
+# OPTIONAL:
+#   EC2_APP_DIR   default $HOME/codesthinkerlms-server
+#   EC2_PORT      default 3000
 
 name: Deploy API to EC2
 
@@ -21,84 +23,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  sync-server-repo:
-    name: Sync apps/api → codesthinkerlms-server
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout LMS monorepo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Mirror API into server repo
-        env:
-          TOKEN: ${{ secrets.SERVER_REPO_TOKEN }}
-        run: |
-          set -euo pipefail
-          if [ -z "${TOKEN:-}" ]; then
-            echo "::warning::SERVER_REPO_TOKEN not set — skip GitHub mirror."
-            echo "EC2 deploy still runs (pulls whatever is already on codesthinkerlms-server)."
-            exit 0
-          fi
-          git clone --depth 1 \
-            "https://x-access-token:${TOKEN}@github.com/Codes-Thinker/codesthinkerlms-server.git" \
-            server-repo
-          rsync -a --delete \
-            --exclude node_modules \
-            --exclude dist \
-            --exclude .env \
-            --exclude '.env.*' \
-            --exclude '.git' \
-            --exclude secrets \
-            --exclude 'secrets/**' \
-            --exclude .vscode \
-            --exclude tsconfig.tsbuildinfo \
-            --exclude README.md \
-            --exclude .gitignore \
-            --exclude .github \
-            apps/api/ server-repo/
-          mkdir -p server-repo/scripts
-          cp apps/api/scripts/deploy-ec2.sh server-repo/scripts/deploy-ec2.sh
-          chmod +x server-repo/scripts/deploy-ec2.sh
-          if [ -f server-repo/.gitignore ]; then
-            grep -q '^secrets/' server-repo/.gitignore || printf '\nsecrets/\n*.pem\n' >> server-repo/.gitignore
-          else
-            printf 'node_modules/\ndist/\n.env\n.env.*\nsecrets/\n*.pem\n' > server-repo/.gitignore
-          fi
-          cd server-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No API file changes to sync."
-          else
-            git commit -m "ci: sync API from lms@${GITHUB_SHA::7}"
-            git push origin HEAD:main
-          fi
-
   deploy-ec2:
     name: Pull & restart on EC2
     runs-on: ubuntu-latest
-    needs: sync-server-repo
-    if: always()
     steps:
-      - name: Require EC2 secrets
+      - name: Check EC2 secrets
+        id: secrets
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           set -euo pipefail
-          missing=0
-          [ -n "${EC2_HOST:-}" ] || { echo "::error::Missing secret EC2_HOST"; missing=1; }
-          [ -n "${EC2_USER:-}" ] || { echo "::error::Missing secret EC2_USER"; missing=1; }
-          [ -n "${EC2_SSH_KEY:-}" ] || { echo "::error::Missing secret EC2_SSH_KEY"; missing=1; }
-          if [ "$missing" -ne 0 ]; then
-            echo "::error::Add the same EC2_* secrets used by successful Deploy Admin runs."
+          ok=1
+          if [ -z "${EC2_HOST:-}" ]; then
+            echo "::error title=Missing EC2_HOST::Add repo secret EC2_HOST (EC2 public IP or DNS)."
+            ok=0
+          fi
+          if [ -z "${EC2_USER:-}" ]; then
+            echo "::error title=Missing EC2_USER::Add repo secret EC2_USER (usually ubuntu)."
+            ok=0
+          fi
+          if [ -z "${EC2_SSH_KEY:-}" ]; then
+            echo "::error title=Missing EC2_SSH_KEY::Add repo secret EC2_SSH_KEY (PEM private key)."
+            ok=0
+          fi
+          if [ "$ok" -ne 1 ]; then
+            echo ""
+            echo "============================================================"
+            echo "Deploy API cannot run until these secrets exist on:"
+            echo "  https://github.com/Codes-Thinker/lms/settings/secrets/actions"
+            echo ""
+            echo "  EC2_HOST     = your EC2 public IP"
+            echo "  EC2_USER     = ubuntu"
+            echo "  EC2_SSH_KEY  = private key that SSHs to that EC2"
+            echo "  EC2_APP_DIR  = /home/ubuntu/codesthinkerlms-server  (optional)"
+            echo ""
+            echo "NOTE: Deploy Admin can show GREEN even when it SKIPS deploy"
+            echo "(if EC2_ADMIN_DIR is empty). That does NOT mean API secrets exist."
+            echo "============================================================"
             exit 1
           fi
-          echo "EC2 secrets present — deploying to ${EC2_USER}@${EC2_HOST}"
+          echo "Secrets OK — host=${EC2_USER}@${EC2_HOST}"
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -111,19 +77,22 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: APP_DIR,APP_PORT
           script_stop: true
-          command_timeout: 15m
+          command_timeout: 20m
           script: |
             set -euo pipefail
             DIR="${APP_DIR:-$HOME/codesthinkerlms-server}"
             export PORT="${APP_PORT:-3000}"
-            echo "Deploy dir: $DIR"
+            echo "==> API deploy dir: $DIR"
+            if [ ! -d "$DIR" ]; then
+              echo "Creating $DIR and cloning codesthinkerlms-server..."
+              mkdir -p "$(dirname "$DIR")"
+              git clone https://github.com/Codes-Thinker/codesthinkerlms-server.git "$DIR"
+            fi
             cd "$DIR"
             if [ -d .git ]; then
               git fetch origin
-              git checkout main 2>/dev/null || git checkout -B main origin/main
+              git checkout main
               git pull --ff-only origin main || git reset --hard origin/main
-            else
-              echo "WARN: $DIR is not a git checkout — skipping pull (code must already be on disk)"
             fi
             if [ -f scripts/deploy-ec2.sh ]; then
               bash scripts/deploy-ec2.sh
